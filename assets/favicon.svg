@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="egg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4cc2ff"/>
+      <stop offset="1" stop-color="#7ee0a3"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0d1117"/>
+  <path d="M32 8C22 8 13 24 13 37c0 11 8.5 19 19 19s19-8 19-19C51 24 42 8 32 8z" fill="url(#egg)"/>
+  <path d="M32 8C22 8 13 24 13 37c0 11 8.5 19 19 19" fill="none" stroke="#0d1117" stroke-opacity=".15" stroke-width="2"/>
+  <circle cx="25" cy="26" r="4.5" fill="#0d1117" opacity=".85"/>
+  <circle cx="39" cy="26" r="4.5" fill="#0d1117" opacity=".85"/>
+  <circle cx="26.5" cy="24.5" r="1.6" fill="#e6edf3"/>
+  <circle cx="40.5" cy="24.5" r="1.6" fill="#e6edf3"/>
+</svg>
