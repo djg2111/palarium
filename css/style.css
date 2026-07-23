@@ -239,6 +239,22 @@ select#genderSel{padding:10px 12px}
 .ivchip{font-size:11.5px;color:var(--dim);background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:1px 7px;margin-left:6px}
 .rospal .note{color:var(--dim);font-size:12.5px;font-style:italic;margin-top:4px}
 .warnbox{border-left:3px solid var(--pink);background:rgba(255,126,182,.07);padding:10px 14px;border-radius:0 10px 10px 0;font-size:13.5px;margin-bottom:12px;color:#e8bfd2}
+.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+.fld label{display:block;font-size:11.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;font-weight:700}
+.fld .picker{max-width:none;min-width:0}
+.fld select{width:100%;padding:10px 12px}
+.fld .search-inp{width:100%}
+.fld .ivrow .iv{flex:1;min-width:0}
+.formacts{margin-top:16px;display:flex;gap:10px;align-items:center}
+.collhead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.collhead h2{font-size:19px}
+.collhead .collacts{margin-left:auto;display:flex;gap:8px}
+.rospal.editing{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+#rosterFormCard.editing{border-color:var(--accent)}
+.pop .srcrow{display:flex;gap:4px;padding:7px 10px;border-bottom:1px solid var(--border)}
+.pop .srcrow button{flex:1;padding:5px 10px;border-radius:7px;font-size:12.5px;font-weight:700;color:var(--dim);background:var(--bg3)}
+.pop .srcrow button.on{color:var(--text);box-shadow:inset 0 0 0 1px var(--accent)}
+.pop .srcrow button:hover:not(.on){color:var(--text)}
 .rospal{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:11px 14px;display:flex;gap:12px;align-items:center}
 .rospal .body{flex:1;min-width:0}
 .rospal .nm{font-weight:700;font-size:14.5px}

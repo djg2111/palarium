@@ -47,25 +47,43 @@
   </section>
 
   <section class="view" id="view-roster">
-    <div class="pcard">
-      <h2>🐾 My pal roster</h2>
-      <div class="sub">Register the actual pals you own — species, gender, nickname and the passives they carry. Roster pals become starting points in the Planner, and species you own are preferred (★) as chain partners. Stored in this browser — use Export to back it up.</div>
-      <div class="addrow" id="rosterForm">
-        <div id="pickR"></div>
-        <select id="genderSel" title="Gender"><option value="">Gender ?</option><option value="M">♂ Male</option><option value="F">♀ Female</option></select>
-        <input class="search-inp" id="nickInp" placeholder="Nickname (optional)" style="width:170px">
-        <div class="ptag" id="passivePick"></div>
-        <div class="ivrow" title="IVs 0–100 (optional)">
-          <input class="iv" id="ivH" type="number" min="0" max="100" placeholder="HP">
-          <input class="iv" id="ivA" type="number" min="0" max="100" placeholder="ATK">
-          <input class="iv" id="ivD" type="number" min="0" max="100" placeholder="DEF">
+    <div class="pcard" id="rosterFormCard">
+      <h2 id="rosterFormTitle">➕ Add a pal</h2>
+      <div class="sub">Register a pal you own. Only species is required — everything else is optional detail. Added species are auto-starred as owned (used by the Planner and Find Parents).</div>
+      <div class="formgrid" id="rosterForm">
+        <div class="fld"><label>Species</label><div id="pickR"></div></div>
+        <div class="fld sm"><label>Gender</label>
+          <select id="genderSel"><option value="">Unknown</option><option value="M">♂ Male</option><option value="F">♀ Female</option></select>
         </div>
-        <input class="search-inp" id="noteInp" placeholder="Notes (optional)" style="width:210px">
-        <button class="alink primary" id="rosterAdd">+ Add pal</button>
+        <div class="fld sm"><label>Nickname</label><input class="search-inp" id="nickInp" placeholder="—"></div>
+        <div class="fld"><label>Passives</label><div class="ptag" id="passivePick"></div></div>
+        <div class="fld sm"><label>IVs · HP / ATK / DEF</label>
+          <div class="ivrow">
+            <input class="iv" id="ivH" type="number" min="0" max="100" placeholder="HP">
+            <input class="iv" id="ivA" type="number" min="0" max="100" placeholder="ATK">
+            <input class="iv" id="ivD" type="number" min="0" max="100" placeholder="DEF">
+          </div>
+        </div>
+        <div class="fld"><label>Notes</label><input class="search-inp" id="noteInp" placeholder="e.g. in ranch, breeding stock…"></div>
+      </div>
+      <div class="formacts">
+        <button class="alink primary" id="rosterAdd">+ Add to roster</button>
         <button class="alink" id="rosterCancel" style="display:none">Cancel</button>
       </div>
-      <div class="dex-controls" style="margin-top:18px">
-        <input class="search-inp" id="rosterSearch" placeholder="Search roster…">
+    </div>
+
+    <div class="pcard">
+      <div class="collhead">
+        <h2>📦 Collection</h2>
+        <span class="rstats" id="rosterStats"></span>
+        <div class="collacts">
+          <button class="alink" id="exportBtn" title="Download roster, plans and owned list as a JSON backup">⬇ Export</button>
+          <button class="alink" id="importBtn" title="Restore a JSON backup">⬆ Import</button>
+          <input type="file" id="importFile" accept="application/json" style="display:none">
+        </div>
+      </div>
+      <div class="dex-controls">
+        <input class="search-inp" id="rosterSearch" placeholder="Search name, nickname or passive…">
         <select id="rosterPassiveFilter"><option value="">Any passive</option></select>
         <select id="rosterSort">
           <option value="z">Sort: Paldex #</option>
@@ -74,10 +92,6 @@
           <option value="ps">Sort: Most passives</option>
           <option value="iv">Sort: Best IVs</option>
         </select>
-        <span class="rstats" id="rosterStats"></span>
-        <button class="alink" id="exportBtn" title="Download roster, plans and owned list as a JSON backup">⬇ Export</button>
-        <button class="alink" id="importBtn" title="Restore a JSON backup">⬆ Import</button>
-        <input type="file" id="importFile" accept="application/json" style="display:none">
       </div>
       <div class="roster" id="rosterList"></div>
     </div>

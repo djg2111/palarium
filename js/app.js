@@ -221,13 +221,24 @@ let openPicker = null;
 document.addEventListener('click', e => { if (openPicker && !openPicker.root.contains(e.target)) openPicker.close(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && openPicker) openPicker.close(); });
 
-function makePicker(mount, {placeholder, allowClear, onChange}) {
+function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle}) {
   const root = document.createElement('div'); root.className = 'picker';
   const btn = document.createElement('button'); btn.className = 'picker-btn'; btn.type = 'button';
   const pop = document.createElement('div'); pop.className = 'pop';
   const inp = document.createElement('input'); inp.placeholder = 'Search…';
   const list = document.createElement('div'); list.className = 'list';
-  pop.append(inp, list); root.append(btn, pop); mount.appendChild(root);
+  let ownedOnlyPick = false, srcAll = null, srcOwn = null;
+  pop.appendChild(inp);
+  if (ownedToggle) {
+    const row = document.createElement('div'); row.className = 'srcrow';
+    srcAll = document.createElement('button'); srcAll.type = 'button'; srcAll.textContent = 'All pals'; srcAll.className = 'on';
+    srcOwn = document.createElement('button'); srcOwn.type = 'button';
+    const setSrc = v => { ownedOnlyPick = v; srcAll.classList.toggle('on', !v); srcOwn.classList.toggle('on', v); renderList(); inp.focus(); };
+    srcAll.addEventListener('click', () => setSrc(false));
+    srcOwn.addEventListener('click', () => setSrc(true));
+    row.append(srcAll, srcOwn); pop.appendChild(row);
+  }
+  pop.appendChild(list); root.append(btn, pop); mount.appendChild(root);
 
   let sel = null, hl = 0, rows = [];
   const api = { root, get: () => sel,
@@ -255,8 +266,14 @@ function makePicker(mount, {placeholder, allowClear, onChange}) {
   function renderList() {
     const q = inp.value.trim().toLowerCase();
     list.innerHTML = ''; rows = []; hl = 0;
-    const matches = PALS.filter(p => !q || p.n.toLowerCase().includes(q) || zk(p).includes(q) || p.t.some(t => t.startsWith(q)));
-    if (!matches.length) { const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No pals match.'; list.appendChild(e); return; }
+    if (srcOwn) srcOwn.textContent = `★ Owned (${owned.size})`;
+    const matches = PALS.filter(p => (!ownedOnlyPick || owned.has(p.k))
+      && (!q || p.n.toLowerCase().includes(q) || zk(p).includes(q) || p.t.some(t => t.startsWith(q))));
+    if (!matches.length) {
+      const e = document.createElement('div'); e.className = 'empty';
+      e.textContent = ownedOnlyPick && !owned.size ? 'No owned pals yet — star some in the Paldex or add roster pals.' : 'No pals match.';
+      list.appendChild(e); return;
+    }
     for (const p of matches) {
       const r = document.createElement('button'); r.className = 'row'; r.type = 'button';
       r.appendChild(icon(p, 30));
@@ -528,7 +545,9 @@ function passiveChips(names, readonly = true) {
 let roster = JSON.parse(localStorage.getItem('palbreed_roster') || '[]')
   .filter(r => byKey.has(r.k)).map(r => ({g: null, nick: '', note: '', iv: null, ...r}));
 function saveRoster() { localStorage.setItem('palbreed_roster', JSON.stringify(roster)); }
-const pickR = makePicker(document.getElementById('pickR'), {placeholder:'Species', allowClear:true, onChange:()=>{}});
+const pickR = makePicker(document.getElementById('pickR'), {placeholder:'Pick a species…', allowClear:true, ownedToggle:true, onChange:()=>{}});
+const rosterFormTitle = document.getElementById('rosterFormTitle');
+const rosterFormCard = document.getElementById('rosterFormCard');
 const rosterPassives = makePassivePicker(document.getElementById('passivePick'));
 const genderSel = document.getElementById('genderSel');
 const nickInp = document.getElementById('nickInp');
@@ -542,13 +561,15 @@ function resetRosterForm() {
   editingId = null;
   pickR.set(null, true); rosterPassives.clear(); genderSel.value = ''; nickInp.value = ''; noteInp.value = '';
   ivEls.forEach(e => e.value = '');
-  rosterAddBtn.textContent = '+ Add pal'; rosterCancelBtn.style.display = 'none';
+  rosterAddBtn.textContent = '+ Add to roster'; rosterCancelBtn.style.display = 'none';
+  rosterFormTitle.textContent = '➕ Add a pal';
+  rosterFormCard.classList.remove('editing');
 }
 function readIVs() {
   const vals = ivEls.map(e => e.value === '' ? null : Math.max(0, Math.min(100, +e.value)));
   return vals.every(v => v === null) ? null : vals;
 }
-rosterCancelBtn.addEventListener('click', resetRosterForm);
+rosterCancelBtn.addEventListener('click', () => { resetRosterForm(); renderRoster(); });
 rosterAddBtn.addEventListener('click', () => {
   const p = pickR.get();
   if (!p) { pickR.root.querySelector('.picker-btn').style.borderColor = 'var(--pink)'; return; }
@@ -603,7 +624,7 @@ function renderRoster() {
   }
   for (const r of rows) {
     const p = byKey.get(r.k);
-    const card = document.createElement('div'); card.className = 'rospal';
+    const card = document.createElement('div'); card.className = 'rospal' + (r.id === editingId ? ' editing' : '');
     card.appendChild(icon(p, 44, true));
     const body = document.createElement('div'); body.className = 'body';
     const nm = document.createElement('div'); nm.className = 'nm';
@@ -628,8 +649,11 @@ function renderRoster() {
       pickR.set(byKey.get(r.k), true); rosterPassives.set(r.ps); genderSel.value = r.g || ''; nickInp.value = r.nick || '';
       noteInp.value = r.note || '';
       ivEls.forEach((e, i) => e.value = r.iv && r.iv[i] !== null ? r.iv[i] : '');
-      rosterAddBtn.textContent = '✓ Save'; rosterCancelBtn.style.display = '';
-      document.getElementById('rosterForm').scrollIntoView({block:'center', behavior:'smooth'});
+      rosterAddBtn.textContent = '✓ Save changes'; rosterCancelBtn.style.display = '';
+      rosterFormTitle.textContent = '✎ Editing ' + (r.nick || p.n);
+      rosterFormCard.classList.add('editing');
+      renderRoster();
+      rosterFormCard.scrollIntoView({block:'start', behavior:'smooth'});
     });
     const bx = document.createElement('button'); bx.textContent = '✕'; bx.title = 'Remove from roster';
     bx.addEventListener('click', () => { roster = roster.filter(x => x.id !== r.id); saveRoster(); renderRoster(); });
