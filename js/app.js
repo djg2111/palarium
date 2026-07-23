@@ -6,6 +6,26 @@ const TYPE_COLORS = {neutral:'var(--neutral)',fire:'var(--fire)',water:'var(--wa
 const WORKS = {kindling:'🔥 Kindling',watering:'💧 Watering',planting:'🌱 Planting',generatingElectricity:'⚡ Electricity',handiwork:'🛠️ Handiwork',gathering:'🧺 Gathering',lumbering:'🪓 Lumbering',mining:'⛏️ Mining',medicineProduction:'💊 Medicine',cooling:'❄️ Cooling',transporting:'📦 Transporting',farming:'🐄 Farming'};
 const workIcon = k => (WORKS[k] || k).split(' ')[0];
 
+// ---------- toasts (aria-live region) & switch helper ----------
+const toastsEl = document.getElementById('toasts');
+function toast(msg, undoFn) {
+  const t = document.createElement('div'); t.className = 'toast';
+  const s = document.createElement('span'); s.textContent = msg; t.appendChild(s);
+  let timer;
+  const dismiss = () => { clearTimeout(timer); t.remove(); };
+  if (undoFn) {
+    const u = document.createElement('button'); u.className = 'undo'; u.textContent = 'Undo';
+    u.addEventListener('click', () => { undoFn(); dismiss(); });
+    t.appendChild(u);
+  }
+  const x = document.createElement('button'); x.className = 'tx'; x.textContent = '✕'; x.setAttribute('aria-label', 'Dismiss notification');
+  x.addEventListener('click', dismiss);
+  t.appendChild(x);
+  timer = setTimeout(dismiss, undoFn ? 8000 : 3500);
+  toastsEl.appendChild(t);
+}
+function setSwitch(el, on) { el.classList.toggle('on', on); el.setAttribute('aria-checked', String(on)); }
+
 const pairKey = (a,b) => a < b ? a+'|'+b : b+'|'+a;
 const comboByPair = new Map(), comboByChild = new Map();
 for (const c of DATA.combos) {
@@ -100,13 +120,43 @@ const overlay = document.getElementById('overlay');
 const modalEl = document.getElementById('modal');
 overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal(); });
-function closeModal() { overlay.classList.remove('open'); document.body.style.overflow = ''; }
+let currentModalPal = null, lastFocusModal = null;
+function closeModal() {
+  overlay.classList.remove('open'); document.body.style.overflow = '';
+  currentModalPal = null;
+  if (lastFocusModal && document.contains(lastFocusModal)) lastFocusModal.focus();
+  lastFocusModal = null;
+}
+document.addEventListener('keydown', e => {
+  if (!overlay.classList.contains('open') || roverlayOpen()) return;
+  if (openPicker || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName)) return;
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    e.preventDefault();
+    const idx = PALS.indexOf(currentModalPal);
+    if (idx < 0) return;
+    openModal(PALS[(idx + (e.key === 'ArrowRight' ? 1 : -1) + PALS.length) % PALS.length]);
+  }
+});
+function roverlayOpen() { const r = document.getElementById('roverlay'); return r && r.classList.contains('open'); }
 function sec(title) { const s = document.createElement('div'); s.className = 'msec'; const h = document.createElement('h3'); h.textContent = title; s.appendChild(h); return s; }
 
 function openModal(p) {
+  const wasOpen = overlay.classList.contains('open');
+  if (!wasOpen) lastFocusModal = document.activeElement;
+  currentModalPal = p;
+  modalEl.setAttribute('aria-label', p.n + ' details');
   modalEl.innerHTML = '';
-  const close = document.createElement('button'); close.className = 'close'; close.textContent = '✕'; close.addEventListener('click', closeModal);
+  const close = document.createElement('button'); close.className = 'close'; close.textContent = '✕';
+  close.setAttribute('aria-label', 'Close dialog'); close.addEventListener('click', closeModal);
   modalEl.appendChild(close);
+  const idx = PALS.indexOf(p);
+  const mkNav = (label, delta, cls, sym) => {
+    const b = document.createElement('button'); b.className = 'mnav ' + cls; b.type = 'button';
+    b.textContent = sym; b.title = label + ' (arrow keys)'; b.setAttribute('aria-label', label);
+    b.addEventListener('click', () => openModal(PALS[(idx + delta + PALS.length) % PALS.length]));
+    return b;
+  };
+  modalEl.append(mkNav('Previous pal', -1, 'prev', '‹'), mkNav('Next pal', 1, 'next', '›'));
 
   const head = document.createElement('div'); head.className = 'mhead';
   head.appendChild(icon(p, 96));
@@ -116,7 +166,12 @@ function openModal(p) {
   const z = document.createElement('span'); z.className = 'zk'; z.textContent = zk(p); h2.appendChild(z);
   const star = document.createElement('button'); star.className = 'star' + (owned.has(p.k) ? ' on' : '');
   star.textContent = owned.has(p.k) ? '★' : '☆'; star.title = 'Mark as owned';
-  star.addEventListener('click', () => { toggleOwned(p.k); star.classList.toggle('on'); star.textContent = owned.has(p.k) ? '★' : '☆'; renderDex(); renderReverse(); });
+  star.setAttribute('aria-label', 'Mark ' + p.n + ' as owned'); star.setAttribute('aria-pressed', String(owned.has(p.k)));
+  star.addEventListener('click', () => {
+    toggleOwned(p.k); star.classList.toggle('on'); star.textContent = owned.has(p.k) ? '★' : '☆';
+    star.setAttribute('aria-pressed', String(owned.has(p.k)));
+    renderDex(); renderReverse();
+  });
   h2.appendChild(star);
   hb.appendChild(h2);
   const crow = document.createElement('div'); crow.className = 'crow';
@@ -215,6 +270,7 @@ function openModal(p) {
   overlay.classList.add('open');
   overlay.scrollTop = 0;
   document.body.style.overflow = 'hidden';
+  if (!wasOpen) close.focus();
 }
 
 // ---------- picker ----------
@@ -225,9 +281,10 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && openPicker
 function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle}) {
   const root = document.createElement('div'); root.className = 'picker';
   const btn = document.createElement('button'); btn.className = 'picker-btn'; btn.type = 'button';
+  btn.setAttribute('aria-haspopup', 'listbox'); btn.setAttribute('aria-expanded', 'false');
   const pop = document.createElement('div'); pop.className = 'pop';
-  const inp = document.createElement('input'); inp.placeholder = 'Search…';
-  const list = document.createElement('div'); list.className = 'list';
+  const inp = document.createElement('input'); inp.placeholder = 'Search…'; inp.setAttribute('aria-label', 'Search pals');
+  const list = document.createElement('div'); list.className = 'list'; list.setAttribute('role', 'listbox');
   let ownedOnlyPick = false, srcAll = null, srcOwn = null;
   pop.appendChild(inp);
   if (ownedToggle) {
@@ -244,10 +301,11 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle}) {
   let sel = null, hl = 0, rows = [];
   const api = { root, get: () => sel,
     set(p, silent) { sel = p; renderBtn(); if (!silent) onChange && onChange(p); },
-    close() { root.classList.remove('open'); if (openPicker === api) openPicker = null; } };
+    close() { root.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); if (openPicker === api) openPicker = null; } };
 
   function renderBtn() {
     btn.innerHTML = '';
+    btn.setAttribute('aria-label', placeholder + ': ' + (sel ? sel.n : 'none selected'));
     if (!sel) {
       const s = document.createElement('span'); s.className = 'ph'; s.textContent = placeholder; btn.appendChild(s);
       const c = document.createElement('span'); c.className = 'caret'; c.textContent = '▾'; btn.appendChild(c);
@@ -277,6 +335,7 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle}) {
     }
     for (const p of matches) {
       const r = document.createElement('button'); r.className = 'row'; r.type = 'button';
+      r.setAttribute('role', 'option'); r.setAttribute('aria-selected', String(sel && sel.k === p.k));
       r.appendChild(icon(p, 30));
       const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = p.n;
       const z = document.createElement('span'); z.className = 'zk'; z.textContent = zk(p);
@@ -295,6 +354,7 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle}) {
   api.openPop = () => {
     if (openPicker && openPicker !== api) openPicker.close();
     root.classList.add('open'); openPicker = api;
+    btn.setAttribute('aria-expanded', 'true');
     pop.classList.toggle('flip', root.getBoundingClientRect().left + 340 > window.innerWidth - 12);
     inp.value = ''; renderList(); inp.focus();
   };
@@ -331,7 +391,10 @@ const tabsEl = document.getElementById('tabs');
 function showTab(v) {
   currentTab = v;
   document.querySelectorAll('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
-  tabsEl.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+  tabsEl.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', b.dataset.v === v);
+    b.setAttribute('aria-selected', String(b.dataset.v === v));
+  });
   save();
 }
 tabsEl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.v); });
@@ -407,7 +470,7 @@ pairFilter.addEventListener('input', () => { reverseShown = 120; renderReverse()
 let reverseShown = 120;
 let ownedOnly = false;
 const ownedToggle = document.getElementById('ownedToggle');
-ownedToggle.addEventListener('click', () => { ownedOnly = !ownedOnly; ownedToggle.classList.toggle('on', ownedOnly); reverseShown = 120; renderReverse(); });
+ownedToggle.addEventListener('click', () => { ownedOnly = !ownedOnly; setSwitch(ownedToggle, ownedOnly); reverseShown = 120; renderReverse(); });
 
 function reversePairs(target) {
   const out = [];
@@ -491,6 +554,7 @@ const PASSIVES = DATA.passives || [];
 function makePassivePicker(mount, max = 4) {
   mount.classList.add('ptag');
   const inp = document.createElement('input'); inp.className = 'taginp'; inp.placeholder = 'Add passives (e.g. Artisan)…';
+  inp.setAttribute('aria-label', 'Search and add passive skills');
   const pop = document.createElement('div'); pop.className = 'tpop';
   const chips = document.createElement('div'); chips.className = 'pchips';
   mount.append(inp, pop, chips);
@@ -559,7 +623,10 @@ let genderVal = '';
 const genderSeg = document.getElementById('genderSeg');
 function setGender(v) {
   genderVal = v || '';
-  [...genderSeg.children].forEach(b => b.classList.toggle('on', b.dataset.g === genderVal));
+  [...genderSeg.children].forEach(b => {
+    b.classList.toggle('on', b.dataset.g === genderVal);
+    b.setAttribute('aria-pressed', String(b.dataset.g === genderVal));
+  });
 }
 genderSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setGender(b.dataset.g); });
 const rosterAddBtn = document.getElementById('rosterAdd');
@@ -584,16 +651,36 @@ function openRosterEditor(entry, presetPal) {
     rosterAddBtn.textContent = '+ Add to roster';
   }
   pickR.root.querySelector('.picker-btn').style.borderColor = '';
+  document.getElementById('rosterAddAnother').style.display = entry ? 'none' : '';
+  lastFocusEditor = document.activeElement;
   roverlay.classList.add('open'); roverlay.scrollTop = 0;
   document.body.style.overflow = 'hidden';
   renderRoster();
+  document.getElementById('rmClose').focus();
 }
+let lastFocusEditor = null;
 function closeRosterEditor() {
   editingId = null;
   roverlay.classList.remove('open');
   document.body.style.overflow = '';
   renderRoster();
+  if (lastFocusEditor && document.contains(lastFocusEditor)) lastFocusEditor.focus();
+  lastFocusEditor = null;
 }
+// keep Tab cycling inside whichever dialog is open
+function trapTab(e, container) {
+  if (e.key !== 'Tab') return;
+  const f = [...container.querySelectorAll('button,[href],input,select,summary,[tabindex]:not([tabindex="-1"])')]
+    .filter(el => el.offsetParent !== null);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+document.addEventListener('keydown', e => {
+  if (roverlay.classList.contains('open')) trapTab(e, roverlay);
+  else if (overlay.classList.contains('open')) trapTab(e, overlay);
+});
 document.getElementById('rmClose').addEventListener('click', closeRosterEditor);
 document.getElementById('rosterOpenAdd').addEventListener('click', () => openRosterEditor(null));
 roverlay.addEventListener('click', e => { if (e.target === roverlay) closeRosterEditor(); });
@@ -603,9 +690,9 @@ function readIVs() {
   return vals.every(v => v === null) ? null : vals;
 }
 rosterCancelBtn.addEventListener('click', closeRosterEditor);
-rosterAddBtn.addEventListener('click', () => {
+function commitRosterEntry() {
   const p = pickR.get();
-  if (!p) { pickR.root.querySelector('.picker-btn').style.borderColor = 'var(--pink)'; return; }
+  if (!p) { pickR.root.querySelector('.picker-btn').style.borderColor = 'var(--pink)'; return null; }
   const entry = {k: p.k, ps: rosterPassives.get(), g: genderVal || null, nick: nickInp.value.trim(),
     note: noteInp.value.trim(), iv: readIVs()};
   if (editingId) {
@@ -615,8 +702,25 @@ rosterAddBtn.addEventListener('click', () => {
     roster.push({id: Date.now() + '' + Math.floor(Math.random() * 1e4), ...entry});
   }
   if (!owned.has(p.k)) toggleOwned(p.k);
-  saveRoster(); closeRosterEditor();
-  renderDex(); renderReverse();
+  saveRoster(); renderDex(); renderReverse();
+  return p;
+}
+rosterAddBtn.addEventListener('click', () => {
+  const wasEditing = !!editingId;
+  const p = commitRosterEntry();
+  if (!p) return;
+  closeRosterEditor();
+  toast(wasEditing ? 'Saved changes to ' + p.n : 'Added ' + p.n + ' to roster');
+});
+const rosterAddAnotherBtn = document.getElementById('rosterAddAnother');
+rosterAddAnotherBtn.addEventListener('click', () => {
+  const p = commitRosterEntry();
+  if (!p) return;
+  toast('Added ' + p.n + ' to roster');
+  // keep the dialog open and the species selected — clear per-pal details for the next entry
+  rosterPassives.clear(); setGender(''); nickInp.value = ''; noteInp.value = '';
+  ivEls.forEach(e => e.value = ''); moreDetails.open = false;
+  renderRoster();
 });
 const rosterSearch = document.getElementById('rosterSearch');
 const rosterPassiveFilter = document.getElementById('rosterPassiveFilter');
@@ -631,7 +735,7 @@ let groupBySpecies = false;
 const groupToggle = document.getElementById('groupToggle');
 groupToggle.addEventListener('click', () => {
   groupBySpecies = !groupBySpecies;
-  groupToggle.classList.toggle('on', groupBySpecies);
+  setSwitch(groupToggle, groupBySpecies);
   save(); renderRoster();
 });
 const ivSum = r => (r.iv || []).reduce((a, b) => a + (b || 0), 0);
@@ -669,9 +773,16 @@ function renderRoster() {
     const be = document.createElement('button'); be.textContent = '✎'; be.title = 'Edit';
     be.addEventListener('click', () => openRosterEditor(r));
     const bx = document.createElement('button'); bx.textContent = '✕'; bx.title = 'Remove from roster';
+    bx.setAttribute('aria-label', 'Remove ' + (r.nick || byKey.get(r.k).n) + ' from roster');
     bx.addEventListener('click', () => {
-      if (!confirm('Remove ' + (r.nick || byKey.get(r.k).n) + ' from your roster?')) return;
-      roster = roster.filter(x => x.id !== r.id); saveRoster(); renderRoster();
+      const idx = roster.findIndex(x => x.id === r.id);
+      if (idx < 0) return;
+      const removed = roster[idx];
+      roster.splice(idx, 1); saveRoster(); renderRoster();
+      toast('Removed ' + (removed.nick || byKey.get(removed.k).n) + ' from roster', () => {
+        roster.splice(Math.min(idx, roster.length), 0, removed);
+        saveRoster(); renderRoster();
+      });
     });
     acts.append(b1, be, bx);
     return acts;
@@ -769,6 +880,7 @@ document.getElementById('importFile').addEventListener('change', e => {
       owned.clear(); for (const k of d.owned || []) if (byKey.has(k)) owned.add(k);
       saveRoster(); savePlans(); localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
       renderRoster(); renderPlans(); renderDex(); renderReverse();
+      toast('Backup imported — ' + roster.length + ' pals, ' + plans.length + ' plans restored');
     } catch (err) { alert('Import failed: ' + err.message); }
     e.target.value = '';
   };
@@ -804,7 +916,7 @@ function renderSlotChips() {
 }
 let partnerOwnedOnly = false;
 const partnerToggle = document.getElementById('partnerToggle');
-partnerToggle.addEventListener('click', () => { partnerOwnedOnly = !partnerOwnedOnly; partnerToggle.classList.toggle('on', partnerOwnedOnly); });
+partnerToggle.addEventListener('click', () => { partnerOwnedOnly = !partnerOwnedOnly; setSwitch(partnerToggle, partnerOwnedOnly); });
 
 function ownedSpeciesSet() {
   const s = new Set(owned);
@@ -987,9 +1099,11 @@ function renderRoute(out, steps, target, carried) {
   const saveBtn = document.createElement('button'); saveBtn.className = 'alink primary'; saveBtn.textContent = 'Save plan';
   saveBtn.addEventListener('click', () => {
     if (!currentRoute) return;
-    plans.push({id: Date.now() + '', name: nameInp.value.trim() || target.n, tK: currentRoute.tK,
+    const name = nameInp.value.trim() || target.n;
+    plans.push({id: Date.now() + '', name, tK: currentRoute.tK,
       passives: currentRoute.passives, steps: currentRoute.steps, done: currentRoute.steps.map(() => false)});
     savePlans(); renderPlans();
+    toast('Plan “' + name + '” saved');
     saveBtn.textContent = 'Saved ✓'; setTimeout(() => saveBtn.textContent = 'Save plan', 1500);
   });
   saver.append(nameInp, saveBtn);
@@ -1014,9 +1128,16 @@ function renderPlans() {
     head.appendChild(prog);
     if (plan.passives.length) head.appendChild(passiveChips(plan.passives));
     const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕ delete';
+    del.setAttribute('aria-label', 'Delete plan ' + plan.name);
     del.addEventListener('click', () => {
-      if (!confirm('Delete plan “' + plan.name + '”?')) return;
-      plans = plans.filter(x => x.id !== plan.id); savePlans(); renderPlans();
+      const idx = plans.findIndex(x => x.id === plan.id);
+      if (idx < 0) return;
+      const removed = plans[idx];
+      plans.splice(idx, 1); savePlans(); renderPlans();
+      toast('Deleted plan “' + removed.name + '”', () => {
+        plans.splice(Math.min(idx, plans.length), 0, removed);
+        savePlans(); renderPlans();
+      });
     });
     head.appendChild(del);
     card.appendChild(head);
@@ -1053,12 +1174,18 @@ dexWork.addEventListener('change', () => {
   if (dexWork.value) dexSort = {key: 'w', dir: -1};
   renderDex();
 });
-dexOwnedBtn.addEventListener('click', () => { dexOwnedOnly = !dexOwnedOnly; dexOwnedBtn.classList.toggle('on', dexOwnedOnly); save(); renderDex(); });
-document.querySelectorAll('th[data-s]').forEach(th => th.addEventListener('click', () => {
-  const k = th.dataset.s;
-  dexSort = {key: k, dir: dexSort.key === k ? -dexSort.dir : (k === 'w' || k === 'own' ? -1 : 1)};
-  renderDex();
-}));
+dexOwnedBtn.addEventListener('click', () => { dexOwnedOnly = !dexOwnedOnly; setSwitch(dexOwnedBtn, dexOwnedOnly); save(); renderDex(); });
+document.querySelectorAll('th[data-s]').forEach(th => {
+  th.tabIndex = 0;
+  th.setAttribute('role', 'button');
+  const sort = () => {
+    const k = th.dataset.s;
+    dexSort = {key: k, dir: dexSort.key === k ? -dexSort.dir : (k === 'w' || k === 'own' ? -1 : 1)};
+    renderDex();
+  };
+  th.addEventListener('click', sort);
+  th.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sort(); } });
+});
 function renderDex() {
   const q = dexSearch.value.trim().toLowerCase();
   const ty = dexType.value, wk = dexWork.value;
@@ -1077,7 +1204,9 @@ function renderDex() {
   });
   document.querySelectorAll('th[data-s]').forEach(th => {
     const base = th.dataset.label || (th.dataset.label = th.textContent);
-    th.innerHTML = base + (dexSort.key === th.dataset.s ? ` <span class="arr">${dexSort.dir > 0 ? '▲' : '▼'}</span>` : '');
+    const active = dexSort.key === th.dataset.s;
+    th.innerHTML = base + (active ? ` <span class="arr">${dexSort.dir > 0 ? '▲' : '▼'}</span>` : '');
+    th.setAttribute('aria-sort', active ? (dexSort.dir > 0 ? 'ascending' : 'descending') : 'none');
   });
   document.getElementById('dexCount').textContent =
     rows.length === PALS.length ? PALS.length + ' pals' : rows.length + ' of ' + PALS.length + ' pals';
@@ -1087,6 +1216,7 @@ function renderDex() {
     const td0 = document.createElement('td');
     const star = document.createElement('button'); star.className = 'star' + (owned.has(p.k) ? ' on' : '');
     star.textContent = owned.has(p.k) ? '★' : '☆'; star.title = 'Mark as owned';
+    star.setAttribute('aria-label', 'Mark ' + p.n + ' as owned'); star.setAttribute('aria-pressed', String(owned.has(p.k)));
     star.addEventListener('click', e => { e.stopPropagation(); toggleOwned(p.k); renderDex(); renderReverse(); });
     td0.appendChild(star);
     const td1 = document.createElement('td'); td1.textContent = zk(p);
@@ -1101,7 +1231,10 @@ function renderDex() {
     const parts = Object.entries(p.w || {}).sort((a,b) => b[1]-a[1]).map(([k,v]) => k === wk ? `<b>${workIcon(k)}${v}</b>` : workIcon(k)+v);
     td6.innerHTML = parts.join(' ');
     tr.append(td0, td1, td2, td3, td4, td5, td6);
+    tr.tabIndex = 0;
+    tr.setAttribute('aria-label', 'View ' + p.n + ' details');
     tr.addEventListener('click', () => openModal(p));
+    tr.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === tr) { e.preventDefault(); openModal(p); } });
     dexBody.appendChild(tr);
   }
   if (!rows.length) {
@@ -1116,8 +1249,8 @@ if (state.a && byKey.get(state.a)) pickA.set(byKey.get(state.a), true);
 if (state.b && byKey.get(state.b)) pickB.set(byKey.get(state.b), true);
 if (state.t && byKey.get(state.t)) pickT.set(byKey.get(state.t), true);
 if (state.l && byKey.get(state.l)) pickL.set(byKey.get(state.l), true);
-if (state.ownedOnly) { ownedOnly = true; ownedToggle.classList.add('on'); }
-if (state.dexOwnedOnly) { dexOwnedOnly = true; dexOwnedBtn.classList.add('on'); }
-if (state.rgroup) { groupBySpecies = true; groupToggle.classList.add('on'); }
+if (state.ownedOnly) { ownedOnly = true; setSwitch(ownedToggle, true); }
+if (state.dexOwnedOnly) { dexOwnedOnly = true; setSwitch(dexOwnedBtn, true); }
+if (state.rgroup) { groupBySpecies = true; setSwitch(groupToggle, true); }
 renderBreed(); renderReverse(); renderDex(); renderRoster(); renderPlans(); renderSlotChips();
 if (state.tab) showTab(state.tab);
