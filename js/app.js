@@ -145,6 +145,7 @@ function openModal(p) {
   btns.appendChild(mkBtn('Set as Parent 1', false, () => { closeModal(); pickA.set(p, true); renderBreed(); showTab('breed'); }));
   btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(); pickB.set(p, true); renderBreed(); showTab('breed'); }));
   btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(); pickPT.set(p, true); showTab('plan'); }));
+  btns.appendChild(mkBtn('＋ Add to roster', false, () => { closeModal(); openRosterEditor(null, p); }));
   bs.appendChild(btns);
   modalEl.appendChild(bs);
 
@@ -321,7 +322,7 @@ const state = JSON.parse(localStorage.getItem('palbreed') || '{}');
 function save() {
   localStorage.setItem('palbreed', JSON.stringify({
     tab: currentTab, a: pickA.get()?.k, b: pickB.get()?.k, t: pickT.get()?.k, l: pickL.get()?.k,
-    ownedOnly, dexOwnedOnly }));
+    ownedOnly, dexOwnedOnly, rgroup: typeof groupBySpecies !== 'undefined' && groupBySpecies }));
 }
 
 // ---------- tabs ----------
@@ -546,34 +547,65 @@ let roster = JSON.parse(localStorage.getItem('palbreed_roster') || '[]')
   .filter(r => byKey.has(r.k)).map(r => ({g: null, nick: '', note: '', iv: null, ...r}));
 function saveRoster() { localStorage.setItem('palbreed_roster', JSON.stringify(roster)); }
 const pickR = makePicker(document.getElementById('pickR'), {placeholder:'Pick a species…', allowClear:true, ownedToggle:true, onChange:()=>{}});
-const rosterFormTitle = document.getElementById('rosterFormTitle');
-const rosterFormCard = document.getElementById('rosterFormCard');
 const rosterPassives = makePassivePicker(document.getElementById('passivePick'));
-const genderSel = document.getElementById('genderSel');
 const nickInp = document.getElementById('nickInp');
 const noteInp = document.getElementById('noteInp');
 const ivEls = ['ivH', 'ivA', 'ivD'].map(id => document.getElementById(id));
+const moreDetails = document.getElementById('moreDetails');
+const roverlay = document.getElementById('roverlay');
+const rmTitle = document.getElementById('rmTitle');
+let genderVal = '';
+const genderSeg = document.getElementById('genderSeg');
+function setGender(v) {
+  genderVal = v || '';
+  [...genderSeg.children].forEach(b => b.classList.toggle('on', b.dataset.g === genderVal));
+}
+genderSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setGender(b.dataset.g); });
 const rosterAddBtn = document.getElementById('rosterAdd');
 const rosterCancelBtn = document.getElementById('rosterCancel');
 const gsymR = g => g === 'M' ? '♂' : g === 'F' ? '♀' : '';
 let editingId = null;
-function resetRosterForm() {
-  editingId = null;
-  pickR.set(null, true); rosterPassives.clear(); genderSel.value = ''; nickInp.value = ''; noteInp.value = '';
-  ivEls.forEach(e => e.value = '');
-  rosterAddBtn.textContent = '+ Add to roster'; rosterCancelBtn.style.display = 'none';
-  rosterFormTitle.textContent = '➕ Add a pal';
-  rosterFormCard.classList.remove('editing');
+function openRosterEditor(entry, presetPal) {
+  editingId = entry ? entry.id : null;
+  if (entry) {
+    const p = byKey.get(entry.k);
+    pickR.set(p, true); rosterPassives.set(entry.ps); setGender(entry.g);
+    nickInp.value = entry.nick || ''; noteInp.value = entry.note || '';
+    ivEls.forEach((e, i) => e.value = entry.iv && entry.iv[i] !== null ? entry.iv[i] : '');
+    moreDetails.open = !!(entry.iv || entry.note);
+    rmTitle.textContent = '✎ Editing ' + (entry.nick || p.n);
+    rosterAddBtn.textContent = '✓ Save changes';
+  } else {
+    pickR.set(presetPal || null, true); rosterPassives.clear(); setGender('');
+    nickInp.value = ''; noteInp.value = ''; ivEls.forEach(e => e.value = '');
+    moreDetails.open = false;
+    rmTitle.textContent = presetPal ? 'Add ' + presetPal.n + ' to roster' : 'Add a pal';
+    rosterAddBtn.textContent = '+ Add to roster';
+  }
+  pickR.root.querySelector('.picker-btn').style.borderColor = '';
+  roverlay.classList.add('open'); roverlay.scrollTop = 0;
+  document.body.style.overflow = 'hidden';
+  renderRoster();
 }
+function closeRosterEditor() {
+  editingId = null;
+  roverlay.classList.remove('open');
+  document.body.style.overflow = '';
+  renderRoster();
+}
+document.getElementById('rmClose').addEventListener('click', closeRosterEditor);
+document.getElementById('rosterOpenAdd').addEventListener('click', () => openRosterEditor(null));
+roverlay.addEventListener('click', e => { if (e.target === roverlay) closeRosterEditor(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && roverlay.classList.contains('open')) closeRosterEditor(); });
 function readIVs() {
   const vals = ivEls.map(e => e.value === '' ? null : Math.max(0, Math.min(100, +e.value)));
   return vals.every(v => v === null) ? null : vals;
 }
-rosterCancelBtn.addEventListener('click', () => { resetRosterForm(); renderRoster(); });
+rosterCancelBtn.addEventListener('click', closeRosterEditor);
 rosterAddBtn.addEventListener('click', () => {
   const p = pickR.get();
   if (!p) { pickR.root.querySelector('.picker-btn').style.borderColor = 'var(--pink)'; return; }
-  const entry = {k: p.k, ps: rosterPassives.get(), g: genderSel.value || null, nick: nickInp.value.trim(),
+  const entry = {k: p.k, ps: rosterPassives.get(), g: genderVal || null, nick: nickInp.value.trim(),
     note: noteInp.value.trim(), iv: readIVs()};
   if (editingId) {
     const r = roster.find(x => x.id === editingId);
@@ -582,8 +614,8 @@ rosterAddBtn.addEventListener('click', () => {
     roster.push({id: Date.now() + '' + Math.floor(Math.random() * 1e4), ...entry});
   }
   if (!owned.has(p.k)) toggleOwned(p.k);
-  saveRoster(); resetRosterForm();
-  renderRoster(); renderDex(); renderReverse();
+  saveRoster(); closeRosterEditor();
+  renderDex(); renderReverse();
 });
 const rosterSearch = document.getElementById('rosterSearch');
 const rosterPassiveFilter = document.getElementById('rosterPassiveFilter');
@@ -594,6 +626,13 @@ for (const ps of PASSIVES) {
 rosterSearch.addEventListener('input', renderRoster);
 rosterPassiveFilter.addEventListener('change', renderRoster);
 rosterSort.addEventListener('change', renderRoster);
+let groupBySpecies = false;
+const groupToggle = document.getElementById('groupToggle');
+groupToggle.addEventListener('click', () => {
+  groupBySpecies = !groupBySpecies;
+  groupToggle.classList.toggle('on', groupBySpecies);
+  save(); renderRoster();
+});
 const ivSum = r => (r.iv || []).reduce((a, b) => a + (b || 0), 0);
 const ROSTER_SORTS = {
   z: (a, b) => byKey.get(a.k).z - byKey.get(b.k).z,
@@ -619,47 +658,70 @@ function renderRoster() {
   rows.sort(ROSTER_SORTS[rosterSort.value] || ROSTER_SORTS.z);
   if (!rows.length) {
     list.innerHTML = '<div class="hint" style="grid-column:1/-1;padding:14px 0">' +
-      (roster.length ? 'No roster pals match these filters.' : 'No pals registered yet — add your first above.') + '</div>';
+      (roster.length ? 'No roster pals match these filters.' : 'No pals registered yet — hit "＋ Add pal", or use "Add to roster" on any pal card.') + '</div>';
     renderRosterStrip(); return;
   }
-  for (const r of rows) {
-    const p = byKey.get(r.k);
-    const card = document.createElement('div'); card.className = 'rospal' + (r.id === editingId ? ' editing' : '');
-    card.appendChild(icon(p, 44, true));
-    const body = document.createElement('div'); body.className = 'body';
+  const mkActs = r => {
+    const acts = document.createElement('div'); acts.className = 'acts';
+    const b1 = document.createElement('button'); b1.textContent = '+ Start'; b1.title = 'Add to the next free Planner start slot';
+    b1.addEventListener('click', () => setSlotAuto(r));
+    const be = document.createElement('button'); be.textContent = '✎'; be.title = 'Edit';
+    be.addEventListener('click', () => openRosterEditor(r));
+    const bx = document.createElement('button'); bx.textContent = '✕'; bx.title = 'Remove from roster';
+    bx.addEventListener('click', () => { roster = roster.filter(x => x.id !== r.id); saveRoster(); renderRoster(); });
+    acts.append(b1, be, bx);
+    return acts;
+  };
+  const identity = r => {
     const nm = document.createElement('div'); nm.className = 'nm';
-    nm.textContent = p.n;
-    if (r.g) { const g = document.createElement('span'); g.className = 'g ' + (r.g === 'M' ? 'gm' : 'gf'); g.textContent = ' ' + gsymR(r.g); nm.appendChild(g); }
-    if (r.nick) { const nk = document.createElement('span'); nk.className = 'nick'; nk.textContent = '“' + r.nick + '”'; nm.appendChild(nk); }
+    if (r.g) { const g = document.createElement('span'); g.className = 'g ' + (r.g === 'M' ? 'gm' : 'gf'); g.textContent = gsymR(r.g) + ' '; nm.appendChild(g); }
+    if (r.nick) { const nk = document.createElement('span'); nk.textContent = '“' + r.nick + '” '; nm.appendChild(nk); }
     if (r.iv) {
       const ivc = document.createElement('span'); ivc.className = 'ivchip';
       ivc.textContent = 'IV ' + r.iv.map(v => v === null ? '–' : v).join('·');
       ivc.title = 'HP · Attack · Defense IVs'; nm.appendChild(ivc);
     }
-    body.appendChild(nm);
-    if (r.ps.length) body.appendChild(passiveChips(r.ps));
-    if (r.note) { const nt = document.createElement('div'); nt.className = 'note'; nt.textContent = r.note; body.appendChild(nt); }
-    card.appendChild(body);
-    const acts = document.createElement('div'); acts.className = 'acts';
-    const b1 = document.createElement('button'); b1.textContent = '+ Start'; b1.title = 'Add to the next free Planner start slot';
-    b1.addEventListener('click', () => setSlotAuto(r));
-    const be = document.createElement('button'); be.textContent = '✎'; be.title = 'Edit';
-    be.addEventListener('click', () => {
-      editingId = r.id;
-      pickR.set(byKey.get(r.k), true); rosterPassives.set(r.ps); genderSel.value = r.g || ''; nickInp.value = r.nick || '';
-      noteInp.value = r.note || '';
-      ivEls.forEach((e, i) => e.value = r.iv && r.iv[i] !== null ? r.iv[i] : '');
-      rosterAddBtn.textContent = '✓ Save changes'; rosterCancelBtn.style.display = '';
-      rosterFormTitle.textContent = '✎ Editing ' + (r.nick || p.n);
-      rosterFormCard.classList.add('editing');
-      renderRoster();
-      rosterFormCard.scrollIntoView({block:'start', behavior:'smooth'});
-    });
-    const bx = document.createElement('button'); bx.textContent = '✕'; bx.title = 'Remove from roster';
-    bx.addEventListener('click', () => { roster = roster.filter(x => x.id !== r.id); saveRoster(); renderRoster(); });
-    acts.append(b1, be, bx);
-    card.appendChild(acts);
-    list.appendChild(card);
+    return nm;
+  };
+  if (groupBySpecies) {
+    const groups = new Map();
+    for (const r of rows) (groups.get(r.k) || groups.set(r.k, []).get(r.k)).push(r);
+    for (const [k, entries] of groups) {
+      const p = byKey.get(k);
+      const g = document.createElement('div'); g.className = 'rosgroup';
+      const head = document.createElement('div'); head.className = 'ghead';
+      head.appendChild(icon(p, 36, true));
+      const nm = document.createElement('span'); nm.textContent = p.n; head.appendChild(nm);
+      const cnt = document.createElement('span'); cnt.className = 'cntb'; cnt.textContent = '×' + entries.length; head.appendChild(cnt);
+      g.appendChild(head);
+      for (const r of entries) {
+        const row = document.createElement('div'); row.className = 'gentry' + (r.id === editingId ? ' editing' : '');
+        const who = document.createElement('span'); who.className = 'who';
+        who.appendChild(identity(r));
+        row.appendChild(who);
+        if (r.ps.length) row.appendChild(passiveChips(r.ps));
+        if (r.note) { const nt = document.createElement('span'); nt.className = 'nick'; nt.textContent = r.note; nt.title = r.note; row.appendChild(nt); }
+        row.appendChild(mkActs(r));
+        g.appendChild(row);
+      }
+      list.appendChild(g);
+    }
+  } else {
+    for (const r of rows) {
+      const p = byKey.get(r.k);
+      const card = document.createElement('div'); card.className = 'rospal' + (r.id === editingId ? ' editing' : '');
+      card.appendChild(icon(p, 44, true));
+      const body = document.createElement('div'); body.className = 'body';
+      const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = p.n + ' ';
+      const id = identity(r);
+      while (id.firstChild) nm.appendChild(id.firstChild);
+      body.appendChild(nm);
+      if (r.ps.length) body.appendChild(passiveChips(r.ps));
+      if (r.note) { const nt = document.createElement('div'); nt.className = 'note'; nt.textContent = r.note; body.appendChild(nt); }
+      card.appendChild(body);
+      card.appendChild(mkActs(r));
+      list.appendChild(card);
+    }
   }
   renderRosterStrip();
 }
@@ -1047,5 +1109,6 @@ if (state.t && byKey.get(state.t)) pickT.set(byKey.get(state.t), true);
 if (state.l && byKey.get(state.l)) pickL.set(byKey.get(state.l), true);
 if (state.ownedOnly) { ownedOnly = true; ownedToggle.classList.add('on'); }
 if (state.dexOwnedOnly) { dexOwnedOnly = true; dexOwnedBtn.classList.add('on'); }
+if (state.rgroup) { groupBySpecies = true; groupToggle.classList.add('on'); }
 renderBreed(); renderReverse(); renderDex(); renderRoster(); renderPlans(); renderSlotChips();
 if (state.tab) showTab(state.tab);

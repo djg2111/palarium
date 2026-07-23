@@ -47,36 +47,12 @@
   </section>
 
   <section class="view" id="view-roster">
-    <div class="pcard" id="rosterFormCard">
-      <h2 id="rosterFormTitle">➕ Add a pal</h2>
-      <div class="sub">Register a pal you own. Only species is required — everything else is optional detail. Added species are auto-starred as owned (used by the Planner and Find Parents).</div>
-      <div class="formgrid" id="rosterForm">
-        <div class="fld"><label>Species</label><div id="pickR"></div></div>
-        <div class="fld sm"><label>Gender</label>
-          <select id="genderSel"><option value="">Unknown</option><option value="M">♂ Male</option><option value="F">♀ Female</option></select>
-        </div>
-        <div class="fld sm"><label>Nickname</label><input class="search-inp" id="nickInp" placeholder="—"></div>
-        <div class="fld"><label>Passives</label><div class="ptag" id="passivePick"></div></div>
-        <div class="fld sm"><label>IVs · HP / ATK / DEF</label>
-          <div class="ivrow">
-            <input class="iv" id="ivH" type="number" min="0" max="100" placeholder="HP">
-            <input class="iv" id="ivA" type="number" min="0" max="100" placeholder="ATK">
-            <input class="iv" id="ivD" type="number" min="0" max="100" placeholder="DEF">
-          </div>
-        </div>
-        <div class="fld"><label>Notes</label><input class="search-inp" id="noteInp" placeholder="e.g. in ranch, breeding stock…"></div>
-      </div>
-      <div class="formacts">
-        <button class="alink primary" id="rosterAdd">+ Add to roster</button>
-        <button class="alink" id="rosterCancel" style="display:none">Cancel</button>
-      </div>
-    </div>
-
     <div class="pcard">
       <div class="collhead">
         <h2>📦 Collection</h2>
         <span class="rstats" id="rosterStats"></span>
         <div class="collacts">
+          <button class="alink primary" id="rosterOpenAdd">＋ Add pal</button>
           <button class="alink" id="exportBtn" title="Download roster, plans and owned list as a JSON backup">⬇ Export</button>
           <button class="alink" id="importBtn" title="Restore a JSON backup">⬆ Import</button>
           <input type="file" id="importFile" accept="application/json" style="display:none">
@@ -92,6 +68,7 @@
           <option value="ps">Sort: Most passives</option>
           <option value="iv">Sort: Best IVs</option>
         </select>
+        <div class="toggle" id="groupToggle" title="Collapse duplicate species into one tile"><span class="kn"></span>Group by species</div>
       </div>
       <div class="roster" id="rosterList"></div>
     </div>
@@ -222,6 +199,40 @@
 <footer>Palarium · a personal fan project — pal data &amp; icons extracted from palpedia.net (game v1.0.0) · Palworld © Pocketpair · works fully offline · star pals in the Paldex to build your owned list</footer>
 
 <div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+
+<div class="overlay" id="roverlay"><div class="modal rmodal">
+  <button class="close" id="rmClose" title="Close">✕</button>
+  <h2 class="rmtitle" id="rmTitle">Add a pal</h2>
+  <div class="vform">
+    <div class="fld"><label>Species</label><div id="pickR"></div></div>
+    <div class="fld"><label>Gender <span class="opt">· optional</span></label>
+      <div class="segrow" id="genderSeg">
+        <button type="button" data-g="" class="on">Unknown</button>
+        <button type="button" data-g="M">♂ Male</button>
+        <button type="button" data-g="F">♀ Female</button>
+      </div>
+    </div>
+    <div class="fld"><label>Passives <span class="opt">· optional, up to 4</span></label><div class="ptag" id="passivePick"></div></div>
+    <div class="fld"><label>Nickname <span class="opt">· optional</span></label><input class="search-inp" id="nickInp" placeholder="—"></div>
+    <details class="moredet" id="moreDetails">
+      <summary>More details — IVs &amp; notes</summary>
+      <div>
+        <div class="fld"><label>IVs · HP / ATK / DEF</label>
+          <div class="ivrow">
+            <input class="iv" id="ivH" type="number" min="0" max="100" placeholder="HP">
+            <input class="iv" id="ivA" type="number" min="0" max="100" placeholder="ATK">
+            <input class="iv" id="ivD" type="number" min="0" max="100" placeholder="DEF">
+          </div>
+        </div>
+        <div class="fld"><label>Notes</label><input class="search-inp" id="noteInp" placeholder="e.g. in ranch, breeding stock…"></div>
+      </div>
+    </details>
+  </div>
+  <div class="formacts">
+    <button class="alink primary" id="rosterAdd">+ Add to roster</button>
+    <button class="alink" id="rosterCancel">Cancel</button>
+  </div>
+</div></div>
 
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
