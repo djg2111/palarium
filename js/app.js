@@ -292,13 +292,13 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle}) {
     rows.forEach((r, j) => r.el.classList.toggle('hl', j === hl));
     rows[hl].el.scrollIntoView({block:'nearest'});
   }
-  btn.addEventListener('click', () => {
-    if (root.classList.contains('open')) return api.close();
-    if (openPicker) openPicker.close();
+  api.openPop = () => {
+    if (openPicker && openPicker !== api) openPicker.close();
     root.classList.add('open'); openPicker = api;
     pop.classList.toggle('flip', root.getBoundingClientRect().left + 340 > window.innerWidth - 12);
     inp.value = ''; renderList(); inp.focus();
-  });
+  };
+  btn.addEventListener('click', () => { root.classList.contains('open') ? api.close() : api.openPop(); });
   inp.addEventListener('input', renderList);
   inp.addEventListener('keydown', e => {
     if (e.key === 'ArrowDown') { e.preventDefault(); highlight(hl + 1); }
@@ -337,8 +337,9 @@ function showTab(v) {
 tabsEl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.v); });
 
 // ---------- breed view ----------
-const pickA = makePicker(document.getElementById('pickA'), {placeholder:'Parent 1', allowClear:true, onChange:renderBreed});
-const pickB = makePicker(document.getElementById('pickB'), {placeholder:'Parent 2', allowClear:true, onChange:renderBreed});
+const pickA = makePicker(document.getElementById('pickA'), {placeholder:'Parent 1', allowClear:true, ownedToggle:true,
+  onChange: p => { renderBreed(); if (p && !pickB.get()) setTimeout(() => pickB.openPop(), 0); }});
+const pickB = makePicker(document.getElementById('pickB'), {placeholder:'Parent 2', allowClear:true, ownedToggle:true, onChange:renderBreed});
 document.getElementById('swapBtn').addEventListener('click', () => {
   const a = pickA.get(), b = pickB.get();
   pickA.set(b, true); pickB.set(a, true); renderBreed();
@@ -399,8 +400,8 @@ function renderBreed() {
 }
 
 // ---------- reverse view ----------
-const pickT = makePicker(document.getElementById('pickT'), {placeholder:'Target child', allowClear:true, onChange:() => { reverseShown = 120; renderReverse(); }});
-const pickL = makePicker(document.getElementById('pickL'), {placeholder:'Any parent', allowClear:true, onChange:() => { reverseShown = 120; renderReverse(); }});
+const pickT = makePicker(document.getElementById('pickT'), {placeholder:'Target child', allowClear:true, ownedToggle:true, onChange:() => { reverseShown = 120; renderReverse(); }});
+const pickL = makePicker(document.getElementById('pickL'), {placeholder:'Any parent', allowClear:true, ownedToggle:true, onChange:() => { reverseShown = 120; renderReverse(); }});
 const pairFilter = document.getElementById('pairFilter');
 pairFilter.addEventListener('input', () => { reverseShown = 120; renderReverse(); });
 let reverseShown = 120;
@@ -668,7 +669,10 @@ function renderRoster() {
     const be = document.createElement('button'); be.textContent = '✎'; be.title = 'Edit';
     be.addEventListener('click', () => openRosterEditor(r));
     const bx = document.createElement('button'); bx.textContent = '✕'; bx.title = 'Remove from roster';
-    bx.addEventListener('click', () => { roster = roster.filter(x => x.id !== r.id); saveRoster(); renderRoster(); });
+    bx.addEventListener('click', () => {
+      if (!confirm('Remove ' + (r.nick || byKey.get(r.k).n) + ' from your roster?')) return;
+      roster = roster.filter(x => x.id !== r.id); saveRoster(); renderRoster();
+    });
     acts.append(b1, be, bx);
     return acts;
   };
@@ -779,9 +783,9 @@ const pickS = {};
 for (const n of SLOTS) {
   pickS[n] = makePicker(document.getElementById('pickS' + n), {
     placeholder: n === 1 ? 'Pick species or use roster' : 'None',
-    allowClear: true, onChange: () => { slotPassives[n] = []; slotGenders[n] = null; renderSlotChips(); }});
+    allowClear: true, ownedToggle: true, onChange: () => { slotPassives[n] = []; slotGenders[n] = null; renderSlotChips(); }});
 }
-const pickPT = makePicker(document.getElementById('pickPT'), {placeholder:'Target species', allowClear:true, onChange:()=>{}});
+const pickPT = makePicker(document.getElementById('pickPT'), {placeholder:'Target species', allowClear:true, ownedToggle:true, onChange:()=>{}});
 function setSlotAuto(rosterEntry) {
   let n = SLOTS.find(i => !pickS[i].get()) ?? 4;
   pickS[n].set(byKey.get(rosterEntry.k), true);
@@ -1010,7 +1014,10 @@ function renderPlans() {
     head.appendChild(prog);
     if (plan.passives.length) head.appendChild(passiveChips(plan.passives));
     const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕ delete';
-    del.addEventListener('click', () => { plans = plans.filter(x => x.id !== plan.id); savePlans(); renderPlans(); });
+    del.addEventListener('click', () => {
+      if (!confirm('Delete plan “' + plan.name + '”?')) return;
+      plans = plans.filter(x => x.id !== plan.id); savePlans(); renderPlans();
+    });
     head.appendChild(del);
     card.appendChild(head);
     plan.steps.forEach((s, i) => {
@@ -1072,6 +1079,8 @@ function renderDex() {
     const base = th.dataset.label || (th.dataset.label = th.textContent);
     th.innerHTML = base + (dexSort.key === th.dataset.s ? ` <span class="arr">${dexSort.dir > 0 ? '▲' : '▼'}</span>` : '');
   });
+  document.getElementById('dexCount').textContent =
+    rows.length === PALS.length ? PALS.length + ' pals' : rows.length + ' of ' + PALS.length + ' pals';
   dexBody.innerHTML = '';
   for (const p of rows) {
     const tr = document.createElement('tr');
