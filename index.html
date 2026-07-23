@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Palarium — Palworld Breeding Studio</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header><div class="hwrap">
+  <div class="logo">Pal<span>arium</span></div>
+  <nav class="tabs" id="tabs">
+    <button data-v="breed" class="active">Breed</button>
+    <button data-v="reverse">Find Parents</button>
+    <button data-v="plan">Planner</button>
+    <button data-v="roster">Roster</button>
+    <button data-v="dex">Paldex</button>
+    <button data-v="guide">Guide</button>
+  </nav>
+</div></header>
+
+<main>
+  <section class="view active" id="view-breed">
+    <div class="parents">
+      <div id="pickA"></div>
+      <span class="op">×</span>
+      <div id="pickB"></div>
+      <button class="swap" id="swapBtn" title="Swap parents">⇄</button>
+    </div>
+    <div class="result-zone" id="breedResult"><div class="hint">Pick two parents to see their child.</div></div>
+  </section>
+
+  <section class="view" id="view-reverse">
+    <div class="controls">
+      <div class="ctl"><label>Target child</label><div id="pickT"></div></div>
+      <div class="ctl"><label>Must include parent (optional)</label><div id="pickL"></div></div>
+      <div class="ctl"><label>Filter pairs</label><input class="search-inp" id="pairFilter" placeholder="Type a parent name…"></div>
+      <div class="ctl"><label>&nbsp;</label><div class="toggle" id="ownedToggle" title="Only show pairs where you own both parents (star pals in the Paldex)"><span class="kn"></span>Owned pals only</div></div>
+    </div>
+    <div id="reverseResult"><div class="hint">Pick a target pal to list every parent combination that produces it.</div></div>
+  </section>
+
+  <section class="view" id="view-roster">
+    <div class="pcard">
+      <h2>🐾 My pal roster</h2>
+      <div class="sub">Register the actual pals you own — species, gender, nickname and the passives they carry. Roster pals become starting points in the Planner, and species you own are preferred (★) as chain partners. Stored in this browser — use Export to back it up.</div>
+      <div class="addrow" id="rosterForm">
+        <div id="pickR"></div>
+        <select id="genderSel" title="Gender"><option value="">Gender ?</option><option value="M">♂ Male</option><option value="F">♀ Female</option></select>
+        <input class="search-inp" id="nickInp" placeholder="Nickname (optional)" style="width:170px">
+        <div class="ptag" id="passivePick"></div>
+        <div class="ivrow" title="IVs 0–100 (optional)">
+          <input class="iv" id="ivH" type="number" min="0" max="100" placeholder="HP">
+          <input class="iv" id="ivA" type="number" min="0" max="100" placeholder="ATK">
+          <input class="iv" id="ivD" type="number" min="0" max="100" placeholder="DEF">
+        </div>
+        <input class="search-inp" id="noteInp" placeholder="Notes (optional)" style="width:210px">
+        <button class="alink primary" id="rosterAdd">+ Add pal</button>
+        <button class="alink" id="rosterCancel" style="display:none">Cancel</button>
+      </div>
+      <div class="dex-controls" style="margin-top:18px">
+        <input class="search-inp" id="rosterSearch" placeholder="Search roster…">
+        <select id="rosterPassiveFilter"><option value="">Any passive</option></select>
+        <select id="rosterSort">
+          <option value="z">Sort: Paldex #</option>
+          <option value="n">Sort: Name</option>
+          <option value="new">Sort: Newest first</option>
+          <option value="ps">Sort: Most passives</option>
+          <option value="iv">Sort: Best IVs</option>
+        </select>
+        <span class="rstats" id="rosterStats"></span>
+        <button class="alink" id="exportBtn" title="Download roster, plans and owned list as a JSON backup">⬇ Export</button>
+        <button class="alink" id="importBtn" title="Restore a JSON backup">⬆ Import</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none">
+      </div>
+      <div class="roster" id="rosterList"></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-plan">
+    <div class="pcard">
+      <h2>🐾 Quick start from your roster</h2>
+      <div class="sub">Click a pal to drop it into the next free start slot. Manage your pals in the Roster tab.</div>
+      <div class="strip" id="rosterStrip"></div>
+    </div>
+
+    <div class="pcard">
+      <h2>🗺️ Plan a breeding route</h2>
+      <div class="sub">Pick up to four starting pals (from your roster, or any species) and a target species. The planner merges your starters' passives into one line — trying every merge order — then finds the shortest chain of partners to reach the target. At every step, keep a child that inherited the passives you're carrying.</div>
+      <div class="slotgrid">
+        <div class="slot"><h4>Start pal 1</h4><div id="pickS1"></div><div class="pchips" id="chipsS1"></div></div>
+        <div class="slot"><h4>Start 2 · optional</h4><div id="pickS2"></div><div class="pchips" id="chipsS2"></div></div>
+        <div class="slot"><h4>Start 3 · optional</h4><div id="pickS3"></div><div class="pchips" id="chipsS3"></div></div>
+        <div class="slot"><h4>Start 4 · optional</h4><div id="pickS4"></div><div class="pchips" id="chipsS4"></div></div>
+      </div>
+      <div class="targetrow">
+        <div class="slot"><h4>Target species</h4><div id="pickPT"></div></div>
+        <div class="tools">
+          <div class="toggle" id="partnerToggle" title="Only use species you own (starred or in roster) as chain partners"><span class="kn"></span>Only use my pals as partners</div>
+          <button class="alink primary" id="computeBtn">Compute route ➜</button>
+        </div>
+      </div>
+      <div class="routewrap" id="routeOut"><div class="hint">Choose starting pal(s) and a target, then hit Compute.</div></div>
+    </div>
+
+    <div class="pcard">
+      <h2>📋 Saved plans</h2>
+      <div class="sub">Your breeding to-do lists. Tick off steps as you hatch them.</div>
+      <div id="plansList"><div class="hint">No saved plans yet — compute a route and save it.</div></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-dex">
+    <div class="dex-controls">
+      <input class="search-inp" id="dexSearch" placeholder="Search pals…">
+      <select id="dexType"><option value="">All elements</option></select>
+      <select id="dexWork"><option value="">Any work suitability</option></select>
+      <div class="toggle" id="dexOwned" title="Only show starred pals"><span class="kn"></span>Owned only</div>
+    </div>
+    <table>
+      <thead><tr>
+        <th data-s="own" title="Owned">★</th>
+        <th data-s="z">#</th><th data-s="n">Pal</th><th data-s="t" class="hn">Element</th>
+        <th data-s="r">Breeding power</th><th data-s="m" class="hn">♂ chance</th><th data-s="w">Work suitability</th>
+      </tr></thead>
+      <tbody id="dexBody"></tbody>
+    </table>
+  </section>
+
+  <section class="view" id="view-guide">
+    <div class="guide">
+
+      <div class="gcard">
+        <h2><span>🍰</span>Breeding, explained like you're 5</h2>
+        <div class="sub">The short version — everything you need to hatch your first eggs.</div>
+        <ol>
+          <li><b>Build a Breeding Farm</b> (Technology level 19). Also build an <b>Egg Incubator</b> (level 7, needs Paldium).</li>
+          <li><b>Put one boy pal and one girl pal in the farm.</b> Any two species can make a baby together — genders just have to be different. Check a pal's gender in your Palbox.</li>
+          <li><b>Bake a Cake</b> and put it in the little chest attached to the farm. No cake, no baby. One cake = one egg.
+            <div class="recipe"><span class="mchip">5× Flour</span><span class="mchip">8× Red Berries</span><span class="mchip">7× Milk</span><span class="mchip">8× Eggs</span><span class="mchip">2× Honey</span></div>
+          </li>
+          <li><b>Wait about 5 minutes.</b> An egg pops out. Stick it in the incubator and wait for it to hatch (bigger and rarer eggs take longer).</li>
+          <li><b>Which pal comes out?</b> Three simple rules:
+            <ul>
+              <li>Same species parents → <b>same species baby</b>. Lamball + Lamball = Lamball.</li>
+              <li>Different species → the game does secret math (see the deep dive). Just use the <b>Breed</b> tab — it tells you exactly what you'll get.</li>
+              <li>A few pairs are <span class="gold">special recipes</span> that ignore the math — they're marked with a gold <b>UNIQUE</b> badge in this app. Example: Relaxaurus + Sparkit = Relaxaurus Lux.</li>
+            </ul>
+          </li>
+          <li><b>Why bother?</b> Babies can <b>inherit passive skills</b> from both parents. Breed a pal with great passives into a strong species and you get a super-pal you could never catch in the wild.</li>
+        </ol>
+        <div class="note">Legendary pals (Jetragon, Frostallion, Paladius, Necromus…) can't be created by mixing other pals — the only way to breed one is <b>two of the same legendary</b>. Their entries say "unique only" in the Paldex.</div>
+      </div>
+
+      <div class="gcard">
+        <h2><span>🧬</span>Deep dive</h2>
+        <div class="sub">How the game actually decides what hatches — the same rules this calculator runs.</div>
+
+        <details open><summary>The species formula (breeding power)</summary><div>
+          <p>Every species has a hidden number called <b>breeding power</b> (internally <code>CombiRank</code> — you can see it for every pal in the Paldex tab). When two different species breed:</p>
+          <p><code>target = floor((powerA + powerB + 1) ÷ 2)</code></p>
+          <p>The child is the species whose breeding power is <b>closest to that target</b>. If two species are exactly equally close, a hidden priority value decides the winner. That's it — the whole species system is one averaging formula.</p>
+          <ul>
+            <li>Not every pal can be a "math result": <b>legendaries and all sub-species</b> (Relaxaurus Lux, Incineram Noct, etc.) are excluded from the pool — only 183 of the 288 species can hatch from averaging. The excluded ones need their unique recipe or same-species parents.</li>
+            <li><b>Unique recipes override the math.</b> This app checks them first, exactly like the game.</li>
+            <li>A handful of recipes are <b>gender-dependent</b>: Katress ♀ × Wixen ♂ gives Katress Ignis, but Katress ♂ × Wixen ♀ gives Wixen Noct. The Breed tab shows both outcomes when it matters.</li>
+            <li>Because it's an average, you can often reach the same child from hundreds of different pairs — that's what the <b>Find Parents</b> tab enumerates.</li>
+          </ul>
+        </div></details>
+
+        <details><summary>Passive skill inheritance (the real endgame)</summary><div>
+          <p>The child can inherit up to <b>4 passive skills</b> drawn from the combined pool of both parents' passives, and it can also roll <b>random passives</b> that neither parent has.</p>
+          <ul>
+            <li>Roughly speaking (community-measured, the game doesn't show the odds): if the parents together have <i>exactly</i> the 4 passives you want and nothing else, about <b>1 in 10</b> eggs is a perfect 4/4 baby.</li>
+            <li>Every junk passive on either parent <b>dilutes the pool</b> and tanks your odds. The meta strategy is to breed "clean" parents first: pals whose only passives are ones you want.</li>
+            <li>Classic workflow: combine 2 desired passives on one parent, 2 on the other → hatch until a child has 3–4 → use that child as a new parent. Passives have no gender, so any keeper can pair with any opposite-gender partner of the right species chain.</li>
+            <li>Popular combat set: <b>Legend</b> (from legendaries — yes, it inherits!), <b>Musclehead</b>, <b>Ferocious</b>, <b>element +20%</b>. Work set: <b>Artisan</b>, <b>Serious</b>, <b>Lucky</b>, <b>Work Slave</b>.</li>
+          </ul>
+        </div></details>
+
+        <details><summary>IVs, genders and stats</summary><div>
+          <ul>
+            <li>Each pal has hidden <b>IVs (0–100)</b> for HP, Attack and Defense. A child's IVs are usually inherited from one parent or the other, with a chance to roll fresh — so hatch several keepers and compare. (IV viewer mods or the in-game stat comparison help here.)</li>
+            <li><b>Gender is rolled per species</b> — every pal card in this app shows the ♂/♀ odds. Some species are heavily skewed (useful to know when you need a specific gender for a gender-locked recipe or your next pairing).</li>
+            <li>Alpha (oversized) status does <b>not</b> inherit; the <b>Lucky</b> passive from lucky pals inherits like any other passive.</li>
+          </ul>
+        </div></details>
+
+        <details><summary>Eggs, incubation and throughput</summary><div>
+          <ul>
+            <li>Egg type and size depend on the child (element + rarity). Bigger/rarer eggs take longer — huge eggs can take many real-time hours at default settings.</li>
+            <li>Eggs have a <b>temperature preference</b> ("feels a little cold…"). Match it — put the incubator near a heater or campfire for warm-loving eggs, a cooler for cold-loving ones — and incubation speeds up significantly.</li>
+            <li>Playing on your own server? The world setting <code>PalEggDefaultHatchingTime</code> (default 72 h for huge eggs) scales all incubation — many servers set it to 0–2 h.</li>
+            <li>One farm produces <b>one egg per cake per ~5 minutes</b> while both parents are assigned and fed. Build multiple breeding farms to parallelize.</li>
+            <li>Cakes stored in the breeding farm's chest <b>never spoil</b> — stock it up.</li>
+          </ul>
+        </div></details>
+      </div>
+    </div>
+  </section>
+</main>
+<footer>Palarium · a personal fan project — pal data &amp; icons extracted from palpedia.net (game v1.0.0) · Palworld © Pocketpair · works fully offline · star pals in the Paldex to build your owned list</footer>
+
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
