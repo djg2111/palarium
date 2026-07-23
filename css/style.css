@@ -295,7 +295,7 @@ select#genderSel{padding:10px 12px}
 .rospal .acts button:hover{color:var(--text);border-color:var(--accent)}
 .slotgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px}
 .slot{background:var(--bg);border:1px dashed var(--border2);border-radius:14px;padding:12px 14px}
-.slot h4{font-size:11.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);margin-bottom:7px}
+.slot .slotlb{font-size:11.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);margin-bottom:7px}
 .slot .picker{max-width:none;min-width:0}
 .slot .picker-btn{padding:8px 12px}
 .targetrow{display:flex;gap:14px;flex-wrap:wrap;align-items:stretch}

@@ -86,13 +86,13 @@
       <h2>🗺️ Plan a breeding route</h2>
       <div class="sub">Pick up to four starting pals (from your roster, or any species) and a target species. The planner merges your starters' passives into one line — trying every merge order — then finds the shortest chain of partners to reach the target. At every step, keep a child that inherited the passives you're carrying.</div>
       <div class="slotgrid">
-        <div class="slot"><h4>Start pal 1</h4><div id="pickS1"></div><div class="pchips" id="chipsS1"></div></div>
-        <div class="slot"><h4>Start 2 · optional</h4><div id="pickS2"></div><div class="pchips" id="chipsS2"></div></div>
-        <div class="slot"><h4>Start 3 · optional</h4><div id="pickS3"></div><div class="pchips" id="chipsS3"></div></div>
-        <div class="slot"><h4>Start 4 · optional</h4><div id="pickS4"></div><div class="pchips" id="chipsS4"></div></div>
+        <div class="slot"><div class="slotlb">Start pal 1</div><div id="pickS1"></div><div class="pchips" id="chipsS1"></div></div>
+        <div class="slot"><div class="slotlb">Start 2 · optional</div><div id="pickS2"></div><div class="pchips" id="chipsS2"></div></div>
+        <div class="slot"><div class="slotlb">Start 3 · optional</div><div id="pickS3"></div><div class="pchips" id="chipsS3"></div></div>
+        <div class="slot"><div class="slotlb">Start 4 · optional</div><div id="pickS4"></div><div class="pchips" id="chipsS4"></div></div>
       </div>
       <div class="targetrow">
-        <div class="slot"><h4>Target species</h4><div id="pickPT"></div></div>
+        <div class="slot"><div class="slotlb">Target species</div><div id="pickPT"></div></div>
         <div class="tools">
           <button type="button" class="toggle" id="partnerToggle" role="switch" aria-checked="false" title="Only use species you own (starred or in roster) as chain partners"><span class="kn"></span>Only use my pals as partners</button>
           <button class="alink primary" id="computeBtn">Compute route ➜</button>
