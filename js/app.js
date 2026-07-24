@@ -1117,7 +1117,17 @@ function renderRoster() {
 function renderRosterStrip() {
   const strip = document.getElementById('rosterStrip');
   strip.innerHTML = '';
-  if (!roster.length) { strip.innerHTML = '<div class="hint" style="padding:6px 0">No pals in your roster yet — add them in the Roster tab.</div>'; return; }
+  const lb = document.querySelector('.quicklb');
+  if (lb) lb.hidden = !roster.length;
+  if (!roster.length) {
+    const h = document.createElement('div'); h.className = 'hint'; h.style.padding = '6px 0';
+    h.append('No pals in your roster yet — ');
+    const b = document.createElement('button'); b.className = 'alink'; b.textContent = 'open the Roster tab';
+    b.addEventListener('click', () => navTab('roster'));
+    h.appendChild(b);
+    strip.appendChild(h);
+    return;
+  }
   for (const r of [...roster].sort((a, b) => byKey.get(a.k).z - byKey.get(b.k).z)) {
     const p = byKey.get(r.k);
     const chip = document.createElement('button'); chip.className = 'spal'; chip.type = 'button';

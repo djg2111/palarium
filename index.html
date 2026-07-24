@@ -72,7 +72,7 @@
   <section class="view" id="view-roster">
     <div class="pcard">
       <div class="collhead">
-        <h2>📦 Collection</h2>
+        <h2>📦 Roster</h2>
         <span class="rstats" id="rosterStats"></span>
         <div class="collacts">
           <button class="alink primary" id="rosterOpenAdd">＋ Add pal</button>
@@ -100,31 +100,30 @@
 
   <section class="view" id="view-plan">
     <div class="pcard">
-      <h2>🐾 Quick start from your roster</h2>
-      <div class="sub">Click a pal to drop it into the next free start slot. Manage your pals in the Roster tab.</div>
-      <div class="strip" id="rosterStrip"></div>
-    </div>
-
-    <div class="pcard">
       <h2>🗺️ Plan a breeding route</h2>
       <div class="sub">Pick starting pal(s) and a target species — the planner finds the shortest breeding chain and tracks the passives you want to carry along it.</div>
       <details class="moredet plannerhow"><summary>How the planner works</summary>
         <div><p>Pick up to four starting pals (from your roster, or any species — add the passives each one carries under its slot). The planner merges your starters into one line, trying every merge order, then finds the shortest chain of partners to reach the target. At every step, hatch until a child inherited the passives you're carrying, then continue with that child. Set <b>desired passives</b> on the target to track a specific goal set — the route steps show the approximate odds per egg.</p></div>
       </details>
+      <div class="plansec">1 · Starting pals</div>
+      <div class="quicklb">Quick add from your roster — click a pal to fill the next free slot:</div>
+      <div class="strip" id="rosterStrip"></div>
       <div class="slotgrid">
         <div class="slot"><div class="slotlb">Start pal 1</div><div id="pickS1"></div><div id="passS1"></div></div>
         <div class="slot"><div class="slotlb">Start 2 · optional</div><div id="pickS2"></div><div id="passS2"></div></div>
         <div class="slot"><div class="slotlb">Start 3 · optional</div><div id="pickS3"></div><div id="passS3"></div></div>
         <div class="slot"><div class="slotlb">Start 4 · optional</div><div id="pickS4"></div><div id="passS4"></div></div>
       </div>
+      <div class="plansec">2 · Target</div>
       <div class="targetrow">
         <div class="slot"><div class="slotlb">Target species</div><div id="pickPT"></div>
           <div class="slotlb mt">Desired passives · optional</div><div id="desiredPass"></div></div>
-        <div class="tools">
-          <button type="button" class="toggle" id="partnerToggle" role="switch" aria-checked="false" title="Only use species you own (starred or in roster) as chain partners"><span class="kn"></span>Only use my pals as partners</button>
-          <button class="alink primary" id="computeBtn">Compute route ➜</button>
-          <button class="alink" id="clearSlots" title="Clear all start slots and the target">✕ Clear</button>
-        </div>
+      </div>
+      <div class="plansec">3 · Route</div>
+      <div class="actionbar">
+        <button class="cta" id="computeBtn">Compute route ➜</button>
+        <button class="alink" id="clearSlots" title="Clear all start slots and the target">✕ Clear</button>
+        <button type="button" class="toggle" id="partnerToggle" role="switch" aria-checked="false" title="Only use species you own (starred or in roster) as chain partners"><span class="kn"></span>Only use my pals as partners</button>
       </div>
       <div class="routewrap" id="routeOut"><div class="hint">Choose starting pal(s) and a target, then hit Compute.</div></div>
     </div>
