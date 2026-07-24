@@ -228,6 +228,20 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .pair .own{font-size:var(--fs-sm);color:var(--gold)}
 .pair .x{color:var(--muted)}
 .pair .badge{margin-left:auto;flex-shrink:0}
+/* ---------- unique combos ----------
+   Two tiers per card: the result is the heading (these rows sort by it), the
+   recipe is a muted caption. Nothing truncates — the recipe wraps instead. */
+.combos{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:10px}
+.combo{display:flex;align-items:center;gap:13px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:11px 15px;text-align:left}
+.combo:hover{border-color:var(--border-strong)}
+.combo>.pico{width:40px;height:40px}
+.combo .cbody{flex:1;min-width:0}
+.combo .cres{display:block;font-weight:600;font-size:var(--fs-md);line-height:1.3}
+.combo .crecipe{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:4px;font-size:var(--fs-sm);color:var(--muted)}
+.combo .cp{display:inline-flex;align-items:center;gap:5px}
+.combo .cp .pico{width:20px;height:20px;border-width:1px}
+.combo .cx{color:var(--faint)}
+.combo .cself{font-style:italic;color:var(--faint)}
 .more{margin:22px auto 0;display:block;background:var(--surface);border:1px solid var(--border-strong);padding:10px 26px;border-radius:var(--r-md);font-weight:600}
 .more:hover{border-color:var(--border-strong);color:var(--text)}
 

@@ -2340,21 +2340,40 @@ function renderCombos() {
   document.getElementById('comboCount').textContent =
     rows.length === DATA.combos.length ? DATA.combos.length + ' unique combos' : rows.length + ' of ' + DATA.combos.length + ' combos';
   for (const r of rows) {
-    const row = document.createElement('button'); row.className = 'pair'; row.type = 'button';
-    const side = (pal, g) => {
-      const s = document.createElement('span'); s.className = 'pside';
-      s.appendChild(icon(pal, 30, true));
-      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = pal.n;
+    // Result first, recipe underneath. Three equal pal units on one line left
+    // every name truncated to "Azuro…" and read as a wall of same-sized icons;
+    // these rows are sorted by result, so lead with it and mute the parents.
+    const row = document.createElement('button'); row.className = 'combo'; row.type = 'button';
+    row.appendChild(icon(r.c, 40));
+    const body = document.createElement('span'); body.className = 'cbody';
+    const res = document.createElement('span'); res.className = 'cres'; res.textContent = r.c.n;
+    const recipe = document.createElement('span'); recipe.className = 'crecipe';
+    const parent = (pal, g) => {
+      const s = document.createElement('span'); s.className = 'cp';
+      s.appendChild(icon(pal, 20));
+      const nm = document.createElement('span'); nm.textContent = pal.n;
       s.appendChild(nm);
       if (g) s.appendChild(gEl(g === 'Male' ? '♂' : '♀'));
       return s;
     };
-    row.appendChild(side(r.a, r.ga));
-    const x1 = document.createElement('span'); x1.className = 'x'; x1.textContent = '×'; row.appendChild(x1);
-    row.appendChild(side(r.b, r.gb));
-    const arr = document.createElement('span'); arr.className = 'x'; arr.textContent = '→'; row.appendChild(arr);
-    row.appendChild(side(r.c));
+    if (r.a === r.b && r.a === r.c) {
+      // 115 of 251 combos are a legendary/sub-species bred from two of itself —
+      // spelling the same name out three times per card is what made the list
+      // read as noise. The result heading above already names the pal.
+      const t = document.createElement('span'); t.className = 'cself'; t.textContent = 'two of the same';
+      recipe.appendChild(t);
+    } else if (r.a === r.b) {
+      recipe.append(parent(r.a, r.ga));
+      const two = document.createElement('span'); two.className = 'cx'; two.textContent = '×2';
+      recipe.appendChild(two);
+    } else {
+      const x = document.createElement('span'); x.className = 'cx'; x.textContent = '×';
+      recipe.append(parent(r.a, r.ga), x, parent(r.b, r.gb));
+    }
+    body.append(res, recipe);
+    row.appendChild(body);
     row.title = 'Load this pair in the Breed tab';
+    row.setAttribute('aria-label', `${r.a.n} × ${r.b.n} makes ${r.c.n} — load this pair in the Breed tab`);
     row.addEventListener('click', () => { pickA.set(r.a, true); pickB.set(r.b, true); renderBreed(); navTab('breed'); });
     list.appendChild(row);
   }
