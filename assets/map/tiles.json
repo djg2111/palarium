@@ -1,0 +1,21 @@
+{
+ "tileSize": 512,
+ "mode": "lossless",
+ "maxZoom": 3,
+ "maps": {
+  "main": {
+   "size": 8192,
+   "maxZoom": 3,
+   "nativeZoom": 4,
+   "tiles": 85,
+   "bytes": 9759778
+  },
+  "tree": {
+   "size": 8192,
+   "maxZoom": 3,
+   "nativeZoom": 4,
+   "tiles": 85,
+   "bytes": 13193650
+  }
+ }
+}
