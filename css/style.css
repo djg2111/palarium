@@ -136,6 +136,7 @@ table{width:100%;border-collapse:collapse}
 th{position:sticky;top:var(--hh,64px);background:var(--bg);text-align:left;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);padding:8px 12px;border-bottom:1px solid var(--border2);cursor:pointer;user-select:none;white-space:nowrap;z-index:5}
 th:hover{color:var(--text)}
 th .arr{color:var(--accent)}
+.thbtn{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;padding:0}
 td{padding:7px 12px;border-bottom:1px solid var(--border);font-size:14px}
 tbody tr{cursor:pointer}
 tbody tr:hover{background:var(--bg2)}

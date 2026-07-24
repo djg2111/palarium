@@ -285,6 +285,7 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle}) {
   const pop = document.createElement('div'); pop.className = 'pop';
   const inp = document.createElement('input'); inp.placeholder = 'Search…'; inp.setAttribute('aria-label', 'Search pals');
   const list = document.createElement('div'); list.className = 'list'; list.setAttribute('role', 'listbox');
+  list.setAttribute('aria-label', 'Matching pals');
   let ownedOnlyPick = false, srcAll = null, srcOwn = null;
   pop.appendChild(inp);
   if (ownedToggle) {
@@ -335,7 +336,7 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle}) {
     }
     for (const p of matches) {
       const r = document.createElement('button'); r.className = 'row'; r.type = 'button';
-      r.setAttribute('role', 'option'); r.setAttribute('aria-selected', String(sel && sel.k === p.k));
+      r.setAttribute('role', 'option'); r.setAttribute('aria-selected', String(!!(sel && sel.k === p.k)));
       r.appendChild(icon(p, 30));
       const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = p.n;
       const z = document.createElement('span'); z.className = 'zk'; z.textContent = zk(p);
@@ -1176,15 +1177,11 @@ dexWork.addEventListener('change', () => {
 });
 dexOwnedBtn.addEventListener('click', () => { dexOwnedOnly = !dexOwnedOnly; setSwitch(dexOwnedBtn, dexOwnedOnly); save(); renderDex(); });
 document.querySelectorAll('th[data-s]').forEach(th => {
-  th.tabIndex = 0;
-  th.setAttribute('role', 'button');
-  const sort = () => {
+  th.addEventListener('click', () => {
     const k = th.dataset.s;
     dexSort = {key: k, dir: dexSort.key === k ? -dexSort.dir : (k === 'w' || k === 'own' ? -1 : 1)};
     renderDex();
-  };
-  th.addEventListener('click', sort);
-  th.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sort(); } });
+  });
 });
 function renderDex() {
   const q = dexSearch.value.trim().toLowerCase();
@@ -1205,7 +1202,8 @@ function renderDex() {
   document.querySelectorAll('th[data-s]').forEach(th => {
     const base = th.dataset.label || (th.dataset.label = th.textContent);
     const active = dexSort.key === th.dataset.s;
-    th.innerHTML = base + (active ? ` <span class="arr">${dexSort.dir > 0 ? '▲' : '▼'}</span>` : '');
+    th.innerHTML = `<button type="button" class="thbtn" aria-label="Sort by ${base === '★' ? 'owned' : base}">${base}` +
+      (active ? ` <span class="arr" aria-hidden="true">${dexSort.dir > 0 ? '▲' : '▼'}</span>` : '') + '</button>';
     th.setAttribute('aria-sort', active ? (dexSort.dir > 0 ? 'ascending' : 'descending') : 'none');
   });
   document.getElementById('dexCount').textContent =
