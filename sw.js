@@ -1,6 +1,6 @@
 // Palarium service worker: network-first for the app shell (so deploys land
 // immediately when online), cache-first for pal icons (immutable-ish, 299 files).
-const VERSION = 'palarium-v7';
+const VERSION = 'palarium-v8';
 const SHELL = ['.', 'index.html', 'css/style.css', 'js/app.js', 'js/data.js', 'assets/favicon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {

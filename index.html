@@ -199,6 +199,7 @@
           <li><b>Put one boy pal and one girl pal in the farm.</b> Any two species can make a baby together — genders just have to be different. Check a pal's gender in your Palbox.</li>
           <li><b>Bake a Cake</b> and put it in the little chest attached to the farm. No cake, no baby. One cake = one egg.
             <div class="recipe"><span class="mchip">5× Flour</span><span class="mchip">8× Red Berries</span><span class="mchip">7× Milk</span><span class="mchip">8× Eggs</span><span class="mchip">2× Honey</span></div>
+            <div class="fldhint">1.0 added four premium cakes — better passives, double eggs, mutations. <button type="button" class="alink gjump" data-open="g-cakes">See the new cakes</button></div>
           </li>
           <li><b>Wait about 5 minutes.</b> An egg pops out. Stick it in the incubator and wait for it to hatch (bigger and rarer eggs take longer).</li>
           <li><b>Which pal comes out?</b> Three simple rules:
@@ -229,6 +230,22 @@
           </ul>
         </div></details>
 
+        <details id="g-cakes"><summary>Choosing your cake (new in 1.0)</summary><div>
+          <p>Since 1.0 the cake you feed the farm changes what hatches. Pick it per goal:</p>
+          <ul>
+            <li><b>Cake</b> — the baseline. One egg, normal odds (recipe above).</li>
+            <li><b>Mushroom Cake</b> · Tech 30 — slightly better stat (IV) rolls on the child.
+              <div class="recipe"><span class="mchip">5× Flour</span><span class="mchip">5× Mushrooms</span><span class="mchip">3× Cavern Mushrooms</span><span class="mchip">8× Eggs</span><span class="mchip">2× Honey</span></div></li>
+            <li><b>Vegetable Cake</b> · Tech 47 — <b>two eggs</b> per breeding cycle. Doubles throughput, and each egg rolls its mutation chance separately.
+              <div class="recipe"><span class="mchip">8× Flour</span><span class="mchip">8× Tomatoes</span><span class="mchip">7× Lettuce</span><span class="mchip">8× Eggs</span><span class="mchip">4× Honey</span></div></li>
+            <li><b>Extravagant Vegetable Cake</b> · Tech 60 — mutation chance rises to <b>~3%</b> per egg, plus better stat rolls. The mutation-hunting pick.
+              <div class="recipe"><span class="mchip">12× Flour</span><span class="mchip">8× Cotton Candy</span><span class="mchip">10× Potatoes</span><span class="mchip">6× Onions</span><span class="mchip">8× Carrots</span></div></li>
+            <li><b>Special Cake</b> · Tech 74 — much better odds that the child inherits the parents' passives. With clean parents carrying exactly the 4 passives you want, keepers become common. No effect on mutation or egg count.
+              <div class="recipe"><span class="mchip">20× Flour</span><span class="mchip">8× Caramel Cotton Candy</span><span class="mchip">15× Milk</span><span class="mchip">15× Eggs</span><span class="mchip">2× Mammorest Meat</span></div></li>
+          </ul>
+          <div class="note">Rule of thumb: building a passive line → <b>Special</b> · hunting mutations → <b>Extravagant Vegetable</b> · mass production → <b>Vegetable</b> · stat polish on a budget → <b>Mushroom</b>.</div>
+        </div></details>
+
         <details id="g-passives"><summary>Passive skill inheritance (the real endgame)</summary><div>
           <p>The child can inherit up to <b>4 passive skills</b> drawn from the combined pool of both parents' passives, and it can also roll <b>random passives</b> that neither parent has.</p>
           <ul>
@@ -236,12 +253,14 @@
             <li>Every junk passive on either parent <b>dilutes the pool</b> and tanks your odds. The meta strategy is to breed "clean" parents first: pals whose only passives are ones you want.</li>
             <li>Classic workflow: combine 2 desired passives on one parent, 2 on the other → hatch until a child has 3–4 → use that child as a new parent. Passives have no gender, so any keeper can pair with any opposite-gender partner of the right species chain.</li>
             <li>Popular combat set: <b>Legend</b> (from legendaries — yes, it inherits!), <b>Musclehead</b>, <b>Ferocious</b>, <b>element +20%</b>. Work set: <b>Artisan</b>, <b>Serious</b>, <b>Lucky</b>, <b>Work Slave</b>.</li>
+            <li>Endgame: the <b>Special Cake</b> (Tech 74) sharply raises how much of the parents' pool carries over. The odds shown in this app assume a regular Cake — treat them as a floor once you're baking Special Cakes.</li>
           </ul>
         </div></details>
 
-        <details id="g-ivs"><summary>IVs, genders and stats</summary><div>
+        <details id="g-ivs"><summary>IVs, genders, stats and active skills</summary><div>
           <ul>
-            <li>Each pal has hidden <b>IVs (0–100)</b> for HP, Attack and Defense. A child's IVs are usually inherited from one parent or the other, with a chance to roll fresh — so hatch several keepers and compare. (IV viewer mods or the in-game stat comparison help here.)</li>
+            <li>Each pal has hidden <b>IVs (0–100)</b> for HP, Attack and Defense — worth roughly <b>+30%</b> to a stat at max. Community testing says each stat usually copies one parent's value, at least one stat always comes from a parent, and the rest can roll fresh — so hatch several keepers and compare. A <b>Mushroom</b> or <b>Extravagant Vegetable Cake</b> nudges the rolls upward.</li>
+            <li><b>Active skills (changed in 1.0):</b> the child's inherited attack skills are drawn from the three skills <b>equipped</b> on the parents at breeding time — set both parents' movesets before dropping them in the farm.</li>
             <li><b>Gender is rolled per species</b> — every pal card in this app shows the ♂/♀ odds. Some species are heavily skewed (useful to know when you need a specific gender for a gender-locked recipe or your next pairing).</li>
             <li>Alpha (oversized) status does <b>not</b> inherit; the <b>Lucky</b> passive from lucky pals inherits like any other passive.</li>
           </ul>
@@ -249,7 +268,8 @@
 
         <details id="g-mutations"><summary>Egg mutations 🧬</summary><div>
           <ul>
-            <li>Every bred egg has a <b>~1% chance to mutate</b> — <b>~3%</b> if you use an <b>Extravagant Vegetable Cake</b> instead of a regular Cake.</li>
+            <li>Every bred egg has a <b>~1% chance to mutate</b> — <b>~3%</b> if you use an <b>Extravagant Vegetable Cake</b> instead of a regular Cake. A <b>Vegetable Cake</b>'s two eggs each roll separately, so it's ≈2% per breeding cycle at the base rate.</li>
+            <li>Mutated eggs are <b>visibly different</b> — purple with a distinct pattern — so you'll know before it hatches.</li>
             <li>A mutated pal can come with any of: up to <b>2 free condensation levels</b>, <b>Alpha</b> (oversized) status, one or more <b>mutation-exclusive passives</b>, or even hatch as a <b>different species</b> than the normal child.</li>
             <li>The exclusive passives (marked 🧬 in this app's passive picker) can't be rolled any other way: <b>Babysitter</b> (+30% egg production &amp; incubation speed at base — the breeding meta pick), <b>Idiosyncratic</b>, <b>Immortality</b>, <b>Heavily Armored</b>, <b>Skymarcher</b>. Once obtained they inherit like normal passives.</li>
             <li>Which species a mutated egg can turn into is <i>not fully understood yet</i> — community data collection is ongoing, so this app doesn't pretend to predict it. Treat species mutations as a lottery bonus.</li>
@@ -260,9 +280,10 @@
           <ul>
             <li>Egg type and size depend on the child (element + rarity). Bigger/rarer eggs take longer — huge eggs can take many real-time hours at default settings.</li>
             <li>Eggs have a <b>temperature preference</b> ("feels a little cold…"). Match it — put the incubator near a heater or campfire for warm-loving eggs, a cooler for cold-loving ones — and incubation speeds up significantly.</li>
-            <li>Playing on your own server? The world setting <code>PalEggDefaultHatchingTime</code> (default 72 h for huge eggs) scales all incubation — many servers set it to 0–2 h.</li>
-            <li>One farm produces <b>one egg per cake per ~5 minutes</b> while both parents are assigned and fed. Build multiple breeding farms to parallelize.</li>
+            <li><b>1.0 halved default incubation times</b> in newly created Normal and Hard worlds — existing saves keep whatever they had. The world setting <code>PalEggDefaultHatchingTime</code> still scales everything; many servers set it to 0–2 h.</li>
+            <li>One farm produces <b>one egg per cake per ~5 minutes</b> while both parents are assigned and fed (two eggs with a Vegetable Cake). Build multiple breeding farms to parallelize.</li>
             <li>Cakes stored in the breeding farm's chest <b>never spoil</b> — stock it up.</li>
+            <li>True endgame: the <b>Ancient Breeding Facility</b> (Tech 76 · 100× Pal Metal Ingot, 50× AI Core, 30× Ancient Parts, 30× Ancient Core) automates the whole loop — assign two pals, pick a cake, and it breeds <i>and hatches</i> continuously with no separate incubator.</li>
           </ul>
         </div></details>
       </div>

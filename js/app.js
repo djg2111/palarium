@@ -1736,7 +1736,7 @@ function stepEl(s, opts = {}) {
     // a button, not a tooltip-only span: touch users have no hover
     const o = document.createElement('button'); o.type = 'button'; o.className = 'odds';
     o.textContent = `🎲 ≈${Math.max(1, Math.round(opts.odds.p * 100))}%/egg`;
-    const expl = `≈${Math.round(opts.odds.p * 100)}% per egg to inherit all ${opts.odds.keep} tracked passive${opts.odds.keep === 1 ? '' : 's'} (pool of ${opts.odds.pool}). Expect ≈${Math.max(1, Math.round(1 / opts.odds.p))} eggs. ${opts.odds.rp ? 'Partner passives from your roster are included.' : 'Assumes a passive-free partner.'} Community-measured.`;
+    const expl = `≈${Math.round(opts.odds.p * 100)}% per egg to inherit all ${opts.odds.keep} tracked passive${opts.odds.keep === 1 ? '' : 's'} (pool of ${opts.odds.pool}). Expect ≈${Math.max(1, Math.round(1 / opts.odds.p))} eggs. ${opts.odds.rp ? 'Partner passives from your roster are included.' : 'Assumes a passive-free partner.'} Assumes a regular Cake — a Special Cake improves the odds. Community-measured.`;
     o.title = expl;
     o.setAttribute('aria-expanded', 'false');
     o.addEventListener('click', () => {
@@ -2471,6 +2471,11 @@ if (state.pm === 'saved' && plans.length) setPlanMode('saved');
 document.querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', () => {
   if (b.dataset.nav === 'combos') { navTab('dex'); setDexMode('combos'); }
   else navTab(b.dataset.nav);
+}));
+// in-guide anchors: open the referenced <details> section and scroll to it
+document.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
+  const d = document.getElementById(b.dataset.open);
+  if (d) { d.open = true; d.scrollIntoView({block: 'start', behavior: SMOOTH}); }
 }));
 booting = false;
 if (!applyHash(initialHash)) showTab(state.tab && document.getElementById('view-' + state.tab) ? state.tab : currentTab);
