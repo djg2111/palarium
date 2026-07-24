@@ -1244,8 +1244,18 @@ function renderRoster() {
   });
   rows.sort(ROSTER_SORTS[rosterSort.value] || ROSTER_SORTS.z);
   if (!rows.length) {
-    list.innerHTML = '<div class="hint" style="grid-column:1/-1;padding:14px 0">' +
-      (roster.length ? 'No roster pals match these filters.' : 'No pals registered yet — hit "+ Add pal", or use "Add to roster" on any pal card.') + '</div>';
+    const h = document.createElement('div'); h.className = 'hint';
+    h.style.gridColumn = '1/-1'; h.style.padding = '14px 0';
+    if (roster.length) {
+      h.textContent = 'No roster pals match these filters.';
+    } else {
+      h.append('No pals in your roster yet. ');
+      const b = document.createElement('button'); b.className = 'alink primary'; b.textContent = '+ Add your first pal';
+      b.addEventListener('click', () => openRosterEditor(null));
+      h.appendChild(b);
+      h.append(' — or use “Add to roster” on any pal card.');
+    }
+    list.appendChild(h);
     renderRosterStrip(); return;
   }
   const mkActs = r => {
