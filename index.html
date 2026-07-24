@@ -30,6 +30,10 @@
 </div></header>
 
 <main id="main">
+  <div class="tipbar" id="tipbar" hidden>
+    <span>👋 First time here? Press <code>/</code> to search any list · star <b>★</b> pals in the Paldex to mark what you own — every “Owned” filter uses them · works fully offline once loaded.</span>
+    <button id="tipDismiss" aria-label="Dismiss tips">✕</button>
+  </div>
   <section class="view active" id="view-breed">
     <div class="parents">
       <div id="pickA"></div>
@@ -77,6 +81,7 @@
           <input type="file" id="importFile" accept="application/json" style="display:none">
         </div>
       </div>
+      <div class="sub">Your roster tracks <b>individual pals</b> — passives, gender, IVs. Adding one automatically stars ★ its species as owned; the Planner and Hatchery use both.</div>
       <div class="dex-controls">
         <input type="search" class="search-inp" id="rosterSearch" placeholder="Search name, nickname or passive…" aria-label="Search roster">
         <select id="rosterPassiveFilter" aria-label="Filter by passive"><option value="">Any passive</option></select>
@@ -102,15 +107,19 @@
 
     <div class="pcard">
       <h2>🗺️ Plan a breeding route</h2>
-      <div class="sub">Pick up to four starting pals (from your roster, or any species) and a target species. The planner merges your starters' passives into one line — trying every merge order — then finds the shortest chain of partners to reach the target. At every step, keep a child that inherited the passives you're carrying.</div>
+      <div class="sub">Pick starting pal(s) and a target species — the planner finds the shortest breeding chain and tracks the passives you want to carry along it.</div>
+      <details class="moredet plannerhow"><summary>How the planner works</summary>
+        <div><p>Pick up to four starting pals (from your roster, or any species — add the passives each one carries under its slot). The planner merges your starters into one line, trying every merge order, then finds the shortest chain of partners to reach the target. At every step, hatch until a child inherited the passives you're carrying, then continue with that child. Set <b>desired passives</b> on the target to track a specific goal set — the route steps show the approximate odds per egg.</p></div>
+      </details>
       <div class="slotgrid">
-        <div class="slot"><div class="slotlb">Start pal 1</div><div id="pickS1"></div><div class="pchips" id="chipsS1"></div></div>
-        <div class="slot"><div class="slotlb">Start 2 · optional</div><div id="pickS2"></div><div class="pchips" id="chipsS2"></div></div>
-        <div class="slot"><div class="slotlb">Start 3 · optional</div><div id="pickS3"></div><div class="pchips" id="chipsS3"></div></div>
-        <div class="slot"><div class="slotlb">Start 4 · optional</div><div id="pickS4"></div><div class="pchips" id="chipsS4"></div></div>
+        <div class="slot"><div class="slotlb">Start pal 1</div><div id="pickS1"></div><div id="passS1"></div></div>
+        <div class="slot"><div class="slotlb">Start 2 · optional</div><div id="pickS2"></div><div id="passS2"></div></div>
+        <div class="slot"><div class="slotlb">Start 3 · optional</div><div id="pickS3"></div><div id="passS3"></div></div>
+        <div class="slot"><div class="slotlb">Start 4 · optional</div><div id="pickS4"></div><div id="passS4"></div></div>
       </div>
       <div class="targetrow">
-        <div class="slot"><div class="slotlb">Target species</div><div id="pickPT"></div></div>
+        <div class="slot"><div class="slotlb">Target species</div><div id="pickPT"></div>
+          <div class="slotlb mt">Desired passives · optional</div><div id="desiredPass"></div></div>
         <div class="tools">
           <button type="button" class="toggle" id="partnerToggle" role="switch" aria-checked="false" title="Only use species you own (starred or in roster) as chain partners"><span class="kn"></span>Only use my pals as partners</button>
           <button class="alink primary" id="computeBtn">Compute route ➜</button>
@@ -133,6 +142,7 @@
       <button data-m="combos" role="tab" aria-selected="false">Unique combos</button>
     </nav>
     <div id="dexPalsBlock">
+    <div class="viewsub">Star ★ a species to mark it as owned — stars power every “Owned” filter across the app. Pals in your Roster count as owned automatically.</div>
     <div class="dex-controls">
       <input type="search" class="search-inp" id="dexSearch" placeholder="Search pals…" aria-label="Search pals">
       <select id="dexType" aria-label="Filter by element"><option value="">All elements</option></select>

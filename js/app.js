@@ -8,7 +8,7 @@ const workIcon = k => (WORKS[k] || k).split(' ')[0];
 
 // ---------- toasts (aria-live region) & switch helper ----------
 const toastsEl = document.getElementById('toasts');
-function toast(msg, undoFn) {
+function toast(msg, undoFn, action) {
   const t = document.createElement('div'); t.className = 'toast';
   const s = document.createElement('span'); s.textContent = msg; t.appendChild(s);
   let timer;
@@ -18,10 +18,15 @@ function toast(msg, undoFn) {
     u.addEventListener('click', () => { undoFn(); dismiss(); });
     t.appendChild(u);
   }
+  if (action) {
+    const a = document.createElement('button'); a.className = 'undo'; a.textContent = action.label;
+    a.addEventListener('click', () => { action.fn(); dismiss(); });
+    t.appendChild(a);
+  }
   const x = document.createElement('button'); x.className = 'tx'; x.textContent = '✕'; x.setAttribute('aria-label', 'Dismiss notification');
   x.addEventListener('click', dismiss);
   t.appendChild(x);
-  timer = setTimeout(dismiss, undoFn ? 8000 : 3500);
+  timer = setTimeout(dismiss, undoFn || action ? 8000 : 3500);
   toastsEl.appendChild(t);
 }
 function setSwitch(el, on) { el.classList.toggle('on', on); el.setAttribute('aria-checked', String(on)); }
@@ -62,6 +67,13 @@ const owned = new Set(JSON.parse(localStorage.getItem('palbreed_owned') || '[]')
 function toggleOwned(k) {
   owned.has(k) ? owned.delete(k) : owned.add(k);
   localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
+}
+
+// ---------- recently picked pals (shared across all pickers) ----------
+let recentPicks = JSON.parse(localStorage.getItem('palbreed_recents') || '[]').filter(k => byKey.has(k));
+function pushRecent(k) {
+  recentPicks = [k, ...recentPicks.filter(x => x !== k)].slice(0, 8);
+  localStorage.setItem('palbreed_recents', JSON.stringify(recentPicks));
 }
 
 // ---------- shared rendering ----------
@@ -206,10 +218,10 @@ function openModal(p) {
   bs.appendChild(bm);
   const btns = document.createElement('div'); btns.className = 'mbtns';
   const mkBtn = (label, primary, fn) => { const b = document.createElement('button'); b.className = 'alink' + (primary ? ' primary' : ''); b.textContent = label; b.addEventListener('click', fn); return b; };
-  btns.appendChild(mkBtn('Find parents', true, () => { closeModal(); pickT.set(p, true); reverseShown = 120; renderReverse(); showTab('reverse'); }));
-  btns.appendChild(mkBtn('Set as Parent 1', false, () => { closeModal(); pickA.set(p, true); renderBreed(); showTab('breed'); }));
-  btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(); pickB.set(p, true); renderBreed(); showTab('breed'); }));
-  btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(); pickPT.set(p, true); showTab('plan'); }));
+  btns.appendChild(mkBtn('Find parents', true, () => { closeModal(); pickT.set(p, true); reverseShown = 120; renderReverse(); navTab('reverse'); }));
+  btns.appendChild(mkBtn('Set as Parent 1', false, () => { closeModal(); pickA.set(p, true); renderBreed(); navTab('breed'); }));
+  btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(); pickB.set(p, true); renderBreed(); navTab('breed'); }));
+  btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(); pickPT.set(p, true); navTab('plan'); scheduleAuto(); }));
   btns.appendChild(mkBtn('＋ Add to roster', false, () => { closeModal(); openRosterEditor(null, p); }));
   btns.appendChild(mkBtn('🔗 Copy link', false, async () => {
     try {
@@ -317,7 +329,7 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle}) {
 
   let sel = null, hl = 0, rows = [];
   const api = { root, get: () => sel,
-    set(p, silent) { sel = p; renderBtn(); if (!silent) onChange && onChange(p); },
+    set(p, silent) { sel = p; renderBtn(); if (p && !silent) pushRecent(p.k); if (!silent) onChange && onChange(p); },
     close() { root.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); if (openPicker === api) openPicker = null; } };
 
   function renderBtn() {
@@ -342,24 +354,34 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle}) {
   function renderList() {
     const q = inp.value.trim().toLowerCase();
     list.innerHTML = ''; rows = []; hl = 0;
-    if (srcOwn) srcOwn.textContent = `★ Owned (${owned.size})`;
-    const matches = PALS.filter(p => (!ownedOnlyPick || owned.has(p.k))
-      && (!q || p.n.toLowerCase().includes(q) || zk(p).includes(q) || p.t.some(t => t.startsWith(q))));
-    if (!matches.length) {
-      const e = document.createElement('div'); e.className = 'empty';
-      e.textContent = ownedOnlyPick && !owned.size ? 'No owned pals yet — star some in the Paldex or add roster pals.' : 'No pals match.';
-      list.appendChild(e); return;
-    }
-    for (const p of matches) {
+    const os = ownedSpeciesSet();
+    if (srcOwn) srcOwn.textContent = `★ Owned (${os.size})`;
+    const addRow = p => {
       const r = document.createElement('button'); r.className = 'row'; r.type = 'button';
       r.setAttribute('role', 'option'); r.setAttribute('aria-selected', String(!!(sel && sel.k === p.k)));
       r.appendChild(icon(p, 30));
       const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = p.n;
       const z = document.createElement('span'); z.className = 'zk'; z.textContent = zk(p);
-      r.append(nm, z, typeDots(p));
+      r.append(nm, z);
+      if (os.has(p.k)) { const o = document.createElement('span'); o.className = 'own'; o.textContent = '★'; o.title = 'Owned'; r.appendChild(o); }
+      r.appendChild(typeDots(p));
       r.addEventListener('click', () => { api.set(p); api.close(); });
       list.appendChild(r); rows.push({el:r, p});
+    };
+    const addGroup = label => {
+      const g = document.createElement('div'); g.className = 'lgroup'; g.textContent = label;
+      g.setAttribute('aria-hidden', 'true'); list.appendChild(g);
+    };
+    const matches = PALS.filter(p => (!ownedOnlyPick || os.has(p.k))
+      && (!q || p.n.toLowerCase().includes(q) || zk(p).includes(q) || p.t.some(t => t.startsWith(q))));
+    const recent = q ? [] : recentPicks.map(k => byKey.get(k)).filter(p => p && (!ownedOnlyPick || os.has(p.k)));
+    if (!matches.length && !recent.length) {
+      const e = document.createElement('div'); e.className = 'empty';
+      e.textContent = ownedOnlyPick && !os.size ? 'No owned pals yet — star some in the Paldex or add roster pals.' : 'No pals match.';
+      list.appendChild(e); return;
     }
+    if (recent.length) { addGroup('Recent'); recent.forEach(addRow); addGroup('All pals'); }
+    matches.forEach(addRow);
     highlight(0);
   }
   function highlight(i) {
@@ -401,6 +423,7 @@ function save() {
     tab: currentTab, a: pickA.get()?.k, b: pickB.get()?.k, t: pickT.get()?.k, l: pickL.get()?.k,
     ownedOnly, dexOwnedOnly, rgroup: typeof groupBySpecies !== 'undefined' && groupBySpecies,
     pt: pickPT.get()?.k, po: partnerOwnedOnly, sp: slotPassives, sg: slotGenders,
+    dp: desiredPick.get(),
     ro: !!currentRoute, chain: breedChain,
     hn: typeof hatchNewOnly !== 'undefined' && hatchNewOnly,
     dt: dexType.value, dw: dexWork.value, dsort: dexSort,
@@ -417,15 +440,44 @@ function showTab(v) {
   currentTab = v;
   document.querySelectorAll('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
   tabsEl.querySelectorAll('button').forEach(b => {
-    b.classList.toggle('active', b.dataset.v === v);
-    b.setAttribute('aria-selected', String(b.dataset.v === v));
+    const on = b.dataset.v === v;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', String(on));
+    b.tabIndex = on ? 0 : -1;
+    if (on) b.scrollIntoView({block: 'nearest', inline: 'nearest'});
   });
   if (v === 'hatch') renderHatch();
   save();
 }
+// in-app jumps push a history entry so Back returns to where you came from
+function navTab(v) {
+  if (currentTab !== v) history.pushState(null, '', '#/' + v);
+  showTab(v);
+}
+// roving arrow-key navigation for role=tablist containers
+function tablistKeys(container) {
+  container.addEventListener('keydown', e => {
+    const tabs = [...container.querySelectorAll('button')];
+    const i = tabs.indexOf(document.activeElement);
+    if (i < 0) return;
+    let ni = null;
+    if (e.key === 'ArrowRight') ni = (i + 1) % tabs.length;
+    else if (e.key === 'ArrowLeft') ni = (i - 1 + tabs.length) % tabs.length;
+    else if (e.key === 'Home') ni = 0;
+    else if (e.key === 'End') ni = tabs.length - 1;
+    if (ni === null) return;
+    e.preventDefault(); tabs[ni].focus(); tabs[ni].click();
+  });
+}
+tablistKeys(tabsEl);
 // ---------- shareable URLs ----------
 let booting = true;                    // suppress hash writes until init has applied the incoming hash
 const initialHash = location.hash;
+function planHash() {
+  const ks = SLOTS.map(n => pickS[n].get()).filter(Boolean).map(p => p.k);
+  const t = pickPT.get();
+  return ks.length && t ? '#/plan/' + ks.join('+') + '/' + t.k : null;
+}
 function updateHash() {
   if (booting) return;
   let h = '#/' + currentTab;
@@ -435,6 +487,8 @@ function updateHash() {
   } else if (currentTab === 'reverse') {
     const t = pickT.get();
     if (t) h += '/' + t.k;
+  } else if (currentTab === 'plan') {
+    h = planHash() || h;
   }
   if (location.hash !== h) history.replaceState(null, '', h);
 }
@@ -444,6 +498,23 @@ function applyHash(hash) {
   const [tab, x, y] = parts;
   if (tab === 'pal' && x && byKey.has(x)) { showTab('dex'); openModal(byKey.get(x)); return true; }
   if (!document.getElementById('view-' + tab)) return false;
+  if (tab === 'plan' && x) {
+    const ks = x.split('+').filter(k => byKey.has(k)).slice(0, 4);
+    if (ks.length) {
+      for (const n of SLOTS) {
+        const k = ks[n - 1] || null;
+        if ((pickS[n].get()?.k || null) !== k) {
+          pickS[n].set(k ? byKey.get(k) : null, true);
+          slotPassives[n] = []; slotGenders[n] = null;
+        }
+      }
+      renderSlotChips();
+    }
+    if (y && byKey.has(y)) pickPT.set(byKey.get(y), true);
+    showTab('plan');
+    if (ks.length && y && byKey.has(y)) computeRoute();
+    return true;
+  }
   if (tab === 'breed') {
     if (x && byKey.has(x)) pickA.set(byKey.get(x), true);
     if (y && byKey.has(y)) pickB.set(byKey.get(y), true);
@@ -454,12 +525,10 @@ function applyHash(hash) {
   showTab(tab);
   return true;
 }
-window.addEventListener('hashchange', applyHash);
+window.addEventListener('hashchange', () => applyHash());
 tabsEl.addEventListener('click', e => {
   const b = e.target.closest('button');
-  if (!b) return;
-  history.pushState(null, '', '#/' + b.dataset.v); // back/forward navigates tabs
-  showTab(b.dataset.v);
+  if (b) navTab(b.dataset.v); // back/forward navigates tabs
 });
 window.addEventListener('popstate', () => applyHash());
 
@@ -480,7 +549,7 @@ function openChainStep(steps, idx) {
   pickA.set(byKey.get(st.aK), true);
   pickB.set(byKey.get(st.bK), true);
   renderBreed();
-  showTab('breed');
+  navTab('breed');
 }
 function appendChainCard(zone, a, b) {
   if (!breedChain) return;
@@ -549,7 +618,26 @@ function renderBreed() {
   const zone = document.getElementById('breedResult');
   zone.innerHTML = '';
   const a = pickA.get(), b = pickB.get();
-  if (!a || !b) { zone.innerHTML = '<div class="hint">Pick two parents to see their child. Click the result card for full details.</div>'; return; }
+  if (!a || !b) {
+    const h = document.createElement('div'); h.className = 'hint';
+    h.textContent = 'Pick two parents to see their child. Click the result card for full details.';
+    zone.appendChild(h);
+    const lr = document.createElement('div'); lr.className = 'linkrow';
+    const exA = PALS.find(p => p.n === 'Relaxaurus'), exB = PALS.find(p => p.n === 'Sparkit');
+    if (exA && exB) {
+      const ex = document.createElement('button'); ex.className = 'alink';
+      ex.textContent = '✨ Try an example: Relaxaurus × Sparkit';
+      ex.title = 'A unique combo — the gold UNIQUE badge means the pair ignores the breeding math';
+      ex.addEventListener('click', () => { pickA.set(exA, true); pickB.set(exB, true); renderBreed(); });
+      lr.appendChild(ex);
+    }
+    const rev = document.createElement('button'); rev.className = 'alink';
+    rev.textContent = '🔍 …or work backwards from a target pal';
+    rev.addEventListener('click', () => navTab('reverse'));
+    lr.appendChild(rev);
+    zone.appendChild(lr);
+    return;
+  }
   const res = breed(a, b);
   const mutNote = () => {
     const m = document.createElement('div'); m.className = 'mathline';
@@ -578,11 +666,20 @@ function renderBreed() {
     const m = document.createElement('div'); m.className = 'mathline';
     m.innerHTML = `breeding power: <b>${a.r}</b> + <b>${b.r}</b> → target <b>${res.target}</b> → closest pal <b>${ch.n}</b> (${ch.r})`;
     zone.appendChild(m);
+    const alts = CANDS.filter(c => c.k !== ch.k)
+      .map(c => ({c, d: Math.abs(c.r - res.target)}))
+      .sort((x, y) => x.d - y.d || y.c.pr - x.c.pr).slice(0, 2);
+    if (alts.length) {
+      const m2 = document.createElement('div'); m2.className = 'mathline';
+      m2.textContent = 'next closest: ' + alts.map(al => `${al.c.n} (${al.c.r})`).join(' · ');
+      m2.title = 'Species whose breeding power is next-nearest to the target — they lose the tie to ' + ch.n;
+      zone.appendChild(m2);
+    }
   }
   mutNote();
   const lr = document.createElement('div'); lr.className = 'linkrow';
   const b2 = document.createElement('button'); b2.className = 'alink'; b2.textContent = `Find all parents of ${ch.n}`;
-  b2.addEventListener('click', () => { pickT.set(ch, true); reverseShown = 120; renderReverse(); showTab('reverse'); });
+  b2.addEventListener('click', () => { pickT.set(ch, true); reverseShown = 120; renderReverse(); navTab('reverse'); });
   const b3 = document.createElement('button'); b3.className = 'alink'; b3.textContent = `Continue: breed ${ch.n} with…`;
   b3.title = 'Use this child as Parent 1 and pick its partner';
   b3.addEventListener('click', () => {
@@ -628,23 +725,28 @@ function renderReverse() {
   zone.innerHTML = '';
   const t = pickT.get();
   if (!t) { zone.innerHTML = '<div class="hint">Pick a target pal to list every parent combination that produces it. Click any pal picture for its full card.</div>'; return; }
+  const os = ownedSpeciesSet();
   let pairs = reversePairs(t);
   const total = pairs.length;
   const lock = pickL.get();
   if (lock) pairs = pairs.filter(p => p.a.k === lock.k || p.b.k === lock.k);
-  if (ownedOnly) pairs = pairs.filter(p => owned.has(p.a.k) && owned.has(p.b.k));
+  if (ownedOnly) pairs = pairs.filter(p => os.has(p.a.k) && os.has(p.b.k));
   const q = pairFilter.value.trim().toLowerCase();
   if (q) pairs = pairs.filter(p => p.a.n.toLowerCase().includes(q) || p.b.n.toLowerCase().includes(q));
-  pairs.sort((x, y) => (y.kind !== 'avg') - (x.kind !== 'avg') || x.a.z - y.a.z || x.b.z - y.b.z);
+  // pairs you can actually make come first: own both, then own one, then the rest
+  const ownScore = p => (os.has(p.a.k) ? 1 : 0) + (os.has(p.b.k) ? 1 : 0);
+  pairs.sort((x, y) => ownScore(y) - ownScore(x) || (y.kind !== 'avg') - (x.kind !== 'avg') || x.a.z - y.a.z || x.b.z - y.b.z);
+  const makeable = pairs.filter(p => ownScore(p) === 2).length;
 
   const sum = document.createElement('div'); sum.className = 'rsummary';
   const cnt = document.createElement('span'); cnt.className = 'cnt';
   cnt.textContent = `${pairs.length}${pairs.length !== total ? ' of ' + total : ''} combination${total === 1 ? '' : 's'}`;
-  const sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = `produce ${t.n} · click a pair to load it in the Breed tab`;
+  const sub = document.createElement('span'); sub.className = 'sub';
+  sub.textContent = `produce ${t.n}` + (makeable && !ownedOnly ? ` · ★ ${makeable} makeable with your pals (listed first)` : '') + ' · click a pair to load it in the Breed tab';
   sum.append(cnt, sub); zone.appendChild(sum);
   if (!pairs.length) {
     const h = document.createElement('div'); h.className = 'hint';
-    h.textContent = ownedOnly && !owned.size ? 'You haven’t starred any pals yet — mark owned pals in the Paldex tab.' : 'No combinations with these filters.';
+    h.textContent = ownedOnly && !os.size ? 'You haven’t starred any pals yet — mark owned pals in the Paldex tab.' : 'No combinations with these filters.';
     zone.appendChild(h); return;
   }
 
@@ -657,7 +759,7 @@ function renderReverse() {
       s.appendChild(icon(pal, 32, true));
       const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = pal.n;
       s.appendChild(nm);
-      if (owned.has(pal.k)) { const o = document.createElement('span'); o.className = 'own'; o.textContent = '★'; o.title = 'Owned'; s.appendChild(o); }
+      if (os.has(pal.k)) { const o = document.createElement('span'); o.className = 'own'; o.textContent = '★'; o.title = 'Owned'; s.appendChild(o); }
       if (g) { const gg = document.createElement('span'); gg.className = 'g'; gg.textContent = gsym(g); s.appendChild(gg); }
       return s;
     };
@@ -670,7 +772,11 @@ function renderReverse() {
       bd.textContent = p.kind === 'same' ? 'Same species' : p.kind === 'gender' ? 'Gender combo' : 'Unique';
       row.appendChild(bd);
     }
-    row.addEventListener('click', () => { pickA.set(p.a, true); pickB.set(p.b, true); renderBreed(); showTab('breed'); });
+    if (ownedOnly) {
+      const issue = pairGenderIssue(p.a.k, p.b.k);
+      if (issue) { const w = document.createElement('span'); w.className = 'warnchip'; w.textContent = '⚠ ' + issue; row.appendChild(w); }
+    }
+    row.addEventListener('click', () => { pickA.set(p.a, true); pickB.set(p.b, true); renderBreed(); navTab('breed'); });
     grid.appendChild(row);
   }
   zone.appendChild(grid);
@@ -684,7 +790,7 @@ function renderReverse() {
 
 // ---------- planner: passive tag input ----------
 const PASSIVES = DATA.passives || [];
-function makePassivePicker(mount, max = 4) {
+function makePassivePicker(mount, max = 4, onChange) {
   mount.classList.add('ptag');
   const inp = document.createElement('input'); inp.className = 'taginp'; inp.placeholder = 'Add passives (e.g. Artisan)…';
   inp.setAttribute('aria-label', 'Search and add passive skills');
@@ -699,7 +805,7 @@ function makePassivePicker(mount, max = 4) {
       const c = document.createElement('button'); c.type = 'button';
       c.className = 'pchip' + (meta && meta.r < 0 ? ' neg' : '');
       c.textContent = n + ' ✕'; c.title = (meta && meta.e) || 'Remove';
-      c.addEventListener('click', () => { selected = selected.filter(x => x !== n); renderChips(); });
+      c.addEventListener('click', () => { selected = selected.filter(x => x !== n); renderChips(); onChange && onChange(); });
       chips.appendChild(c);
     }
   }
@@ -718,6 +824,7 @@ function makePassivePicker(mount, max = 4) {
       r.addEventListener('click', () => {
         if (selected.length >= max) return;
         selected.push(p.n); renderChips(); inp.value = ''; renderPop(); inp.focus();
+        onChange && onChange();
       });
       pop.appendChild(r);
     }
@@ -744,6 +851,26 @@ function passiveChips(names, readonly = true) {
 let roster = JSON.parse(localStorage.getItem('palbreed_roster') || '[]')
   .filter(r => byKey.has(r.k)).map(r => ({g: null, nick: '', note: '', iv: null, ...r}));
 function saveRoster() { localStorage.setItem('palbreed_roster', JSON.stringify(roster)); }
+// gender feasibility from recorded roster genders (star-only species = unknown, no warning)
+function speciesGenderInfo(k) {
+  const es = roster.filter(r => r.k === k);
+  if (!es.length) return null;
+  return {n: es.length, M: es.filter(r => r.g === 'M').length, F: es.filter(r => r.g === 'F').length, U: es.filter(r => !r.g).length};
+}
+function pairGenderIssue(aK, bK) {
+  const A = speciesGenderInfo(aK);
+  if (aK === bK) {
+    if (!A) return null;
+    if (A.n < 2) return `needs two ${byKey.get(aK).n} (♂ + ♀) — you have 1`;
+    if (!A.U && (!A.M || !A.F)) return `all your ${byKey.get(aK).n} are ${A.M ? '♂' : '♀'}`;
+    return null;
+  }
+  const B = speciesGenderInfo(bK);
+  if (!A || !B || A.U || B.U) return null;
+  const aOne = (A.M && !A.F) || (!A.M && A.F), bOne = (B.M && !B.F) || (!B.M && B.F);
+  if (aOne && bOne && !!A.M === !!B.M) return `both recorded ${A.M ? '♂' : '♀'}`;
+  return null;
+}
 const pickR = makePicker(document.getElementById('pickR'), {placeholder:'Pick a species…', allowClear:true, ownedToggle:true, onChange:()=>{}});
 const rosterPassives = makePassivePicker(document.getElementById('passivePick'));
 const nickInp = document.getElementById('nickInp');
@@ -789,7 +916,7 @@ function openRosterEditor(entry, presetPal) {
   roverlay.classList.add('open'); roverlay.scrollTop = 0;
   document.body.style.overflow = 'hidden';
   renderRoster();
-  document.getElementById('rmClose').focus();
+  pickR.root.querySelector('.picker-btn').focus();
 }
 let lastFocusEditor = null;
 function closeRosterEditor() {
@@ -912,10 +1039,24 @@ function renderRoster() {
       if (idx < 0) return;
       const removed = roster[idx];
       roster.splice(idx, 1); saveRoster(); renderRoster();
-      toast('Removed ' + (removed.nick || byKey.get(removed.k).n) + ' from roster', () => {
+      const undo = () => {
         roster.splice(Math.min(idx, roster.length), 0, removed);
-        saveRoster(); renderRoster();
-      });
+        saveRoster(); renderRoster(); renderDex(); renderReverse();
+      };
+      const name = removed.nick || byKey.get(removed.k).n;
+      // last roster entry of a species: offer to also drop the owned ★
+      if (!roster.some(x => x.k === removed.k) && owned.has(removed.k)) {
+        toast('Removed ' + name + ' — species still ★ owned', undo, {
+          label: 'Un-star ' + byKey.get(removed.k).n,
+          fn: () => {
+            if (owned.has(removed.k)) toggleOwned(removed.k);
+            renderDex(); renderReverse();
+            toast('Un-starred ' + byKey.get(removed.k).n);
+          },
+        });
+      } else {
+        toast('Removed ' + name + ' from roster', undo);
+      }
     });
     acts.append(b1, be, bx);
     return acts;
@@ -1024,16 +1165,30 @@ document.getElementById('importFile').addEventListener('change', e => {
 const SLOTS = [1, 2, 3, 4];
 const slotPassives = {1: [], 2: [], 3: [], 4: []};
 const slotGenders = {1: null, 2: null, 3: null, 4: null};
-const pickS = {};
+const pickS = {}, slotPass = {};
+// recompute automatically (debounced) once a starter and target are both set
+let autoTimer = null;
+function scheduleAuto() {
+  if (booting) return;
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(() => {
+    if (pickPT.get() && SLOTS.some(n => pickS[n].get())) computeRoute();
+  }, 600);
+}
 for (const n of SLOTS) {
   pickS[n] = makePicker(document.getElementById('pickS' + n), {
     placeholder: n === 1 ? 'Pick species or use roster' : 'None',
-    allowClear: true, ownedToggle: true, onChange: () => { slotPassives[n] = []; slotGenders[n] = null; renderSlotChips(); save(); }});
+    allowClear: true, ownedToggle: true,
+    onChange: () => { slotPassives[n] = []; slotGenders[n] = null; slotPass[n].set([]); save(); scheduleAuto(); }});
+  slotPass[n] = makePassivePicker(document.getElementById('passS' + n), 4,
+    () => { slotPassives[n] = slotPass[n].get(); save(); scheduleAuto(); });
 }
-const pickPT = makePicker(document.getElementById('pickPT'), {placeholder:'Target species', allowClear:true, ownedToggle:true, onChange:save});
+const pickPT = makePicker(document.getElementById('pickPT'), {placeholder:'Target species', allowClear:true, ownedToggle:true, onChange: () => { save(); scheduleAuto(); }});
+const desiredPick = makePassivePicker(document.getElementById('desiredPass'), 4, () => { save(); scheduleAuto(); });
 document.getElementById('clearSlots').addEventListener('click', () => {
+  clearTimeout(autoTimer);
   for (const n of SLOTS) { pickS[n].set(null, true); slotPassives[n] = []; slotGenders[n] = null; }
-  pickPT.set(null, true);
+  pickPT.set(null, true); desiredPick.clear();
   currentRoute = null; renderSlotChips();
   document.getElementById('routeOut').innerHTML = '<div class="hint">Choose starting pal(s) and a target, then hit Compute.</div>';
   save();
@@ -1045,19 +1200,16 @@ function setSlotAuto(rosterEntry) {
   slotGenders[n] = rosterEntry.g || null;
   renderSlotChips();
   save();
-  showTab('plan');
+  navTab('plan');
+  scheduleAuto();
   document.getElementById('pickS1').scrollIntoView({block:'center', behavior:'smooth'});
 }
 function renderSlotChips() {
-  for (const n of SLOTS) {
-    const el = document.getElementById('chipsS' + n);
-    el.innerHTML = '';
-    if (slotPassives[n].length) el.appendChild(passiveChips(slotPassives[n]));
-  }
+  for (const n of SLOTS) slotPass[n].set(slotPassives[n]);
 }
 let partnerOwnedOnly = false;
 const partnerToggle = document.getElementById('partnerToggle');
-partnerToggle.addEventListener('click', () => { partnerOwnedOnly = !partnerOwnedOnly; setSwitch(partnerToggle, partnerOwnedOnly); save(); });
+partnerToggle.addEventListener('click', () => { partnerOwnedOnly = !partnerOwnedOnly; setSwitch(partnerToggle, partnerOwnedOnly); save(); scheduleAuto(); });
 
 function ownedSpeciesSet() {
   const s = new Set(owned);
@@ -1138,6 +1290,9 @@ function computeRoute() {
   const pool = partnerPool();
   if (partnerOwnedOnly && pool.length < 2) { out.innerHTML = '<div class="hint">Your owned pool is too small — star more pals or turn off "only my pals".</div>'; return; }
   const carried = [...new Set(starters.flatMap(s => s.ps))];
+  const desired = desiredPick.get();
+  const goal = desired.length ? desired : carried;
+  const missing = desired.filter(x => !carried.includes(x));
   let best = null;
   const consider = (steps, fromK) => {
     const rest = findRoute(fromK, t.k, pool);
@@ -1164,17 +1319,18 @@ function computeRoute() {
       }
     }
   }
-  currentRoute = best === null ? null : {steps: best, tK: t.k, passives: carried};
-  renderRoute(out, best, t, carried);
-  // passive odds for the classic two-carrier merge
-  if (best && best.length && starters.length === 2 && carried.length) {
-    const unionPool = [...new Set([...starters[0].ps, ...starters[1].ps])];
-    const odds = passiveOdds(unionPool.length, carried.length);
-    if (odds > 0) {
-      const o = document.createElement('div'); o.className = 'mathline';
-      o.textContent = `🎲 Merge-step passive odds: ≈${Math.round(odds * 100)}% per egg to inherit all ${carried.length} carried passive${carried.length === 1 ? '' : 's'} (≈${Math.max(1, Math.round(1 / odds))} eggs on average) — community-measured estimate.`;
-      out.appendChild(o);
-    }
+  currentRoute = best === null ? null : {steps: best, tK: t.k, passives: goal};
+  const wo = best ? walkOdds(best, starters, goal) : null;
+  renderRoute(out, best, t, goal, {
+    label: desired.length ? 'goal:' : 'carrying:',
+    stepOdds: wo ? wo.odds : null,
+  });
+  // warn when desired passives are covered by neither a starter nor a roster partner on the route
+  const uncovered = best && best.length && wo ? desired.filter(x => !wo.carry.includes(x)) : missing;
+  if (uncovered.length) {
+    const w = document.createElement('div'); w.className = 'warnbox';
+    w.textContent = `⚠ Nothing on this route carries ${uncovered.join(', ')} — no starter or roster partner has ${uncovered.length === 1 ? 'it' : 'them'}. Add a starter or roster pal that does, or plan to catch/hatch a carrier mid-chain. Odds below only track the passives the route actually has.`;
+    out.prepend(w);
   }
   // warn when a merge step pairs two recorded same-gender starters
   if (best && starters.length > 1) {
@@ -1228,6 +1384,12 @@ function stepEl(s, opts = {}) {
     row.appendChild(bd);
   }
   if (opts.carrier) { const c = document.createElement('span'); c.className = 'carrier'; c.textContent = 'passive carrier line'; row.appendChild(c); }
+  if (opts.odds) {
+    const o = document.createElement('span'); o.className = 'odds';
+    o.textContent = `🎲 ≈${Math.max(1, Math.round(opts.odds.p * 100))}%/egg`;
+    o.title = `≈${Math.round(opts.odds.p * 100)}% chance per egg the child inherits all ${opts.odds.keep} tracked passive${opts.odds.keep === 1 ? '' : 's'} from this pairing (pool of ${opts.odds.pool}; ${opts.odds.rp ? 'includes the passives of your best roster pal used as the partner' : 'assumes a passive-free partner'}) — ≈${Math.max(1, Math.round(1 / opts.odds.p))} eggs on average. Community-measured estimate.`;
+    row.appendChild(o);
+  }
   if (opts.onOpen) {
     const ob = document.createElement('button'); ob.className = 'stepopen'; ob.type = 'button'; ob.textContent = '↗';
     ob.title = 'Open this pairing in the Breed tab with the full chain';
@@ -1339,7 +1501,50 @@ function passiveOdds(P, D) {
   for (let k = D; k <= kmax; k++) p += (w[k - 1] / tot) * comb(P - D, k - D) / comb(P, k);
   return p;
 }
-function renderRoute(out, steps, target, carried) {
+// per-step inheritance odds along a route: track which passives each bred line carries.
+// Kept children are assumed to inherit exactly the goal-relevant passives. Chain partners
+// are passive-free only when generic — if you own the species in your roster, we assume
+// you'll use your best pal of it, and its recorded passives join the pool (they can
+// dilute it, or contribute desired passives mid-chain).
+function walkOdds(steps, starters, goal) {
+  if (!goal.length) return {odds: steps.map(() => null), carry: []};
+  const goalSet = new Set(goal);
+  const lineage = new Map();
+  for (const s of starters) {
+    const prev = lineage.get(s.k) || [];
+    lineage.set(s.k, [...new Set([...prev, ...s.ps])]);
+  }
+  const partnerPs = k => {
+    const es = roster.filter(r => r.k === k);
+    if (!es.length) return [];
+    let best = null, bs = -Infinity;
+    for (const e of es) {
+      const hit = e.ps.filter(x => goalSet.has(x)).length;
+      const score = hit * 10 - (e.ps.length - hit); // most goal passives, then least junk
+      if (score > bs) { bs = score; best = e; }
+    }
+    return best.ps;
+  };
+  const odds = steps.map(st => {
+    let rosterPartner = false;
+    const side = k => {
+      if (lineage.has(k)) return lineage.get(k);
+      const ps = partnerPs(k);
+      if (ps.length) rosterPartner = true;
+      return ps;
+    };
+    const pa = side(st.aK), pb = side(st.bK);
+    const pool = [...new Set([...pa, ...pb])];
+    const keep = pool.filter(x => goalSet.has(x));
+    lineage.set(st.cK, keep);
+    if (!keep.length) return null;
+    const p = passiveOdds(pool.length, keep.length);
+    return p > 0 ? {p, pool: pool.length, keep: keep.length, rp: rosterPartner} : null;
+  });
+  const carry = steps.length ? lineage.get(steps[steps.length - 1].cK) || [] : [];
+  return {odds, carry};
+}
+function renderRoute(out, steps, target, carried, ropts = {}) {
   out.innerHTML = '';
   if (steps === null) {
     const h = document.createElement('div'); h.className = 'hint';
@@ -1351,17 +1556,25 @@ function renderRoute(out, steps, target, carried) {
   if (!steps.length) {
     out.innerHTML = `<div class="hint">Your start pal already is ${target.n} — no breeding needed.</div>`; return;
   }
+  const stepOdds = ropts.stepOdds || [];
   const sum = document.createElement('div'); sum.className = 'rsummary';
   const cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = `${steps.length} step${steps.length === 1 ? '' : 's'} to ${target.n}`;
   sum.appendChild(cnt);
-  if (carried.length) { const sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = 'carrying:'; sum.appendChild(sub); sum.appendChild(passiveChips(carried)); }
+  if (carried.length) { const sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = ropts.label || 'carrying:'; sum.appendChild(sub); sum.appendChild(passiveChips(carried)); }
   out.appendChild(sum);
   if (steps.length > 1) out.appendChild(treeViewport(routeTree(steps)));
-  steps.forEach((s, i) => out.appendChild(stepEl(s, {stepNo: i + 1, carrier: true, onOpen: () => openChainStep(steps, i)})));
+  steps.forEach((s, i) => out.appendChild(stepEl(s, {stepNo: i + 1, carrier: true, odds: stepOdds[i], onOpen: () => openChainStep(steps, i)})));
   if (carried.length) {
     const n = document.createElement('div'); n.className = 'mathline';
     n.textContent = 'At each step, hatch until a child inherits your passives (and the right gender for the next pairing), then continue with that child.';
     out.appendChild(n);
+    const withOdds = stepOdds.filter(Boolean);
+    if (withOdds.length) {
+      const eggs = withOdds.reduce((a, o) => a + 1 / o.p, 0);
+      const agg = document.createElement('div'); agg.className = 'mathline';
+      agg.textContent = `🎲 Expected eggs across the chain: ≈${Math.ceil(eggs)} to keep all tracked passives at every step (community-measured estimate).`;
+      out.appendChild(agg);
+    }
   }
   const saver = document.createElement('div'); saver.className = 'saverow';
   const nameInp = document.createElement('input'); nameInp.className = 'search-inp'; nameInp.style.width = '240px';
@@ -1377,7 +1590,17 @@ function renderRoute(out, steps, target, carried) {
     toast('Plan “' + name + '” saved');
     saveBtn.textContent = 'Saved ✓'; setTimeout(() => saveBtn.textContent = 'Save plan', 1500);
   });
-  saver.append(nameInp, saveBtn);
+  const linkBtn = document.createElement('button'); linkBtn.className = 'alink'; linkBtn.textContent = '🔗 Copy route link';
+  linkBtn.title = 'Copy a shareable link to this route (starters + target — passives stay local)';
+  linkBtn.addEventListener('click', async () => {
+    const ph = planHash();
+    if (!ph) return;
+    try {
+      await navigator.clipboard.writeText(location.href.split('#')[0] + ph);
+      toast('Route link copied — species only, passives stay local');
+    } catch { toast('Copy failed — clipboard blocked by browser'); }
+  });
+  saver.append(nameInp, saveBtn, linkBtn);
   out.appendChild(saver);
 }
 
@@ -1442,6 +1665,7 @@ const hatchNewBtn = document.getElementById('hatchNewOnly');
 let hatchNewOnly = false;
 hatchSearch.addEventListener('input', renderHatch);
 hatchNewBtn.addEventListener('click', () => { hatchNewOnly = !hatchNewOnly; setSwitch(hatchNewBtn, hatchNewOnly); save(); renderHatch(); });
+let hatchOpen = null; // childK of the expanded card
 function renderHatch() {
   const list = document.getElementById('hatchList');
   const stats = document.getElementById('hatchStats');
@@ -1452,50 +1676,91 @@ function renderHatch() {
     list.innerHTML = '<div class="hint" style="grid-column:1/-1">Star pals in the Paldex or add them to your Roster first — then this page shows everything you can hatch from them.</div>';
     return;
   }
-  const kids = new Map(); // childK -> ways count
+  const kids = new Map(); // childK -> {ways, pairs:[[aK,bK],…]}
   for (let i = 0; i < own.length; i++) for (let j = i; j < own.length; j++) {
     const res = breed(byKey.get(own[i]), byKey.get(own[j]));
-    for (const c of res.children) kids.set(c.pal.k, (kids.get(c.pal.k) || 0) + 1);
+    for (const c of res.children) {
+      const e = kids.get(c.pal.k) || kids.set(c.pal.k, {ways: 0, pairs: []}).get(c.pal.k);
+      e.ways++; e.pairs.push([own[i], own[j]]);
+    }
   }
   const ownSet = new Set(own);
   const q = hatchSearch.value.trim().toLowerCase();
-  let rows = [...kids.entries()].map(([k, ways]) => ({p: byKey.get(k), ways, isNew: !ownSet.has(k)}))
+  let rows = [...kids.entries()].map(([k, e]) => ({p: byKey.get(k), ways: e.ways, pairs: e.pairs, isNew: !ownSet.has(k)}))
     .filter(r => (!hatchNewOnly || r.isNew) && (!q || r.p.n.toLowerCase().includes(q)));
   rows.sort((a, b) => (b.isNew - a.isNew) || a.p.z - b.p.z);
   const newCount = rows.filter(r => r.isNew).length;
   stats.textContent = `${rows.length} species from ${own.length} owned · ${newCount} new`;
   if (!rows.length) { list.innerHTML = '<div class="hint" style="grid-column:1/-1">Nothing matches these filters.</div>'; return; }
   for (const r of rows) {
-    const card = document.createElement('button'); card.className = 'hcard'; card.type = 'button';
+    const expanded = hatchOpen === r.p.k;
+    const card = document.createElement('button'); card.className = 'hcard' + (expanded ? ' expanded' : ''); card.type = 'button';
+    card.setAttribute('aria-expanded', String(expanded));
     card.appendChild(icon(r.p, 40, true));
     const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.p.n; card.appendChild(nm);
     if (r.p.rar >= 5) card.appendChild(tierBadge(r.p));
     if (r.isNew) { const nb = document.createElement('span'); nb.className = 'newb'; nb.textContent = 'NEW'; card.appendChild(nb); }
     const ways = document.createElement('span'); ways.className = 'ways';
     ways.textContent = r.ways + (r.ways === 1 ? ' pair' : ' pairs'); card.appendChild(ways);
-    card.title = `See which of your pairs produce ${r.p.n}`;
-    card.addEventListener('click', () => {
-      pickT.set(r.p, true);
-      ownedOnly = true; setSwitch(ownedToggle, true);
-      reverseShown = 120; renderReverse(); showTab('reverse');
-    });
+    card.title = (expanded ? 'Hide' : 'Show') + ` the pairs that produce ${r.p.n}`;
+    card.addEventListener('click', () => { hatchOpen = expanded ? null : r.p.k; renderHatch(); });
     list.appendChild(card);
+    if (expanded) list.appendChild(hatchPanel(r));
   }
+}
+function hatchPanel(r) {
+  const panel = document.createElement('div'); panel.className = 'hatchpanel';
+  const ttl = document.createElement('div'); ttl.className = 'hpttl';
+  ttl.textContent = `Your pairs that produce ${r.p.n} — click one to load it in the Breed tab:`;
+  panel.appendChild(ttl);
+  const wrap = document.createElement('div'); wrap.className = 'pairs';
+  for (const [aK, bK] of r.pairs) {
+    const a = byKey.get(aK), b = byKey.get(bK);
+    const row = document.createElement('button'); row.className = 'pair'; row.type = 'button';
+    const side = pal => {
+      const s = document.createElement('span'); s.className = 'pside';
+      s.appendChild(icon(pal, 32, true));
+      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = pal.n; s.appendChild(nm);
+      return s;
+    };
+    row.appendChild(side(a));
+    const x = document.createElement('span'); x.className = 'x'; x.textContent = '×'; row.appendChild(x);
+    row.appendChild(side(b));
+    const issue = pairGenderIssue(aK, bK);
+    if (issue) { const w = document.createElement('span'); w.className = 'warnchip'; w.textContent = '⚠ ' + issue; row.appendChild(w); }
+    row.addEventListener('click', () => { pickA.set(a, true); pickB.set(b, true); renderBreed(); navTab('breed'); });
+    wrap.appendChild(row);
+  }
+  panel.appendChild(wrap);
+  const lr = document.createElement('div'); lr.className = 'linkrow'; lr.style.justifyContent = 'flex-start';
+  const all = document.createElement('button'); all.className = 'alink';
+  all.textContent = `All parent pairs of ${r.p.n} ↗`;
+  all.title = 'Open Find Parents with every combination, not just your pals';
+  all.addEventListener('click', () => { pickT.set(r.p, true); reverseShown = 120; renderReverse(); navTab('reverse'); });
+  lr.appendChild(all);
+  panel.appendChild(lr);
+  return panel;
 }
 
 // ---------- unique combos browser ----------
 const dexModeEl = document.getElementById('dexMode');
-dexModeEl.addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  const m = b.dataset.m;
+function setDexMode(m) {
   dexModeEl.querySelectorAll('button').forEach(x => {
-    x.classList.toggle('active', x === b);
-    x.setAttribute('aria-selected', String(x === b));
+    const on = x.dataset.m === m;
+    x.classList.toggle('active', on);
+    x.setAttribute('aria-selected', String(on));
+    x.tabIndex = on ? 0 : -1;
   });
   document.getElementById('dexPalsBlock').hidden = m !== 'pals';
   document.getElementById('dexCombosBlock').hidden = m !== 'combos';
   if (m === 'combos') renderCombos();
+}
+dexModeEl.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (b) setDexMode(b.dataset.m);
 });
+tablistKeys(dexModeEl);
+setDexMode('pals');
 document.getElementById('comboSearch').addEventListener('input', renderCombos);
 function renderCombos() {
   const list = document.getElementById('comboList');
@@ -1522,7 +1787,7 @@ function renderCombos() {
     const arr = document.createElement('span'); arr.className = 'x'; arr.textContent = '→'; row.appendChild(arr);
     row.appendChild(side(r.c));
     row.title = 'Load this pair in the Breed tab';
-    row.addEventListener('click', () => { pickA.set(r.a, true); pickB.set(r.b, true); renderBreed(); showTab('breed'); });
+    row.addEventListener('click', () => { pickA.set(r.a, true); pickB.set(r.b, true); renderBreed(); navTab('breed'); });
     list.appendChild(row);
   }
 }
@@ -1558,7 +1823,8 @@ document.querySelectorAll('th[data-s]').forEach(th => {
 function renderDex() {
   const q = dexSearch.value.trim().toLowerCase();
   const ty = dexType.value, wk = dexWork.value;
-  let rows = PALS.filter(p => (!q || p.n.toLowerCase().includes(q)) && (!ty || p.t.includes(ty)) && (!wk || (p.w && p.w[wk])) && (!dexOwnedOnly || owned.has(p.k)));
+  const os = ownedSpeciesSet();
+  let rows = PALS.filter(p => (!q || p.n.toLowerCase().includes(q)) && (!ty || p.t.includes(ty)) && (!wk || (p.w && p.w[wk])) && (!dexOwnedOnly || os.has(p.k)));
   const {key, dir} = dexSort;
   const wval = p => wk ? (p.w?.[wk] || 0) : Object.values(p.w || {}).reduce((a,b) => a+b, 0);
   rows.sort((a, b) => {
@@ -1566,7 +1832,7 @@ function renderDex() {
     if (key === 't') { va = a.t[0]; vb = b.t[0]; }
     else if (key === 'z') { va = a.z * 10 + (a.zs ? 1 : 0); vb = b.z * 10 + (b.zs ? 1 : 0); }
     else if (key === 'w') { va = wval(a); vb = wval(b); }
-    else if (key === 'own') { va = owned.has(a.k) ? 1 : 0; vb = owned.has(b.k) ? 1 : 0; }
+    else if (key === 'own') { va = os.has(a.k) ? 1 : 0; vb = os.has(b.k) ? 1 : 0; }
     else { va = a[key]; vb = b[key]; }
     if (va === vb) { return a.z - b.z; }
     return (va < vb ? -1 : 1) * dir;
@@ -1632,6 +1898,7 @@ for (const n of SLOTS) {
   }
 }
 if (state.pt && byKey.has(state.pt)) pickPT.set(byKey.get(state.pt), true);
+if (Array.isArray(state.dp) && state.dp.length) desiredPick.set(state.dp);
 if (state.po) { partnerOwnedOnly = true; setSwitch(partnerToggle, true); }
 if (state.hn) { hatchNewOnly = true; setSwitch(hatchNewBtn, true); }
 if (state.dt) dexType.value = state.dt;
@@ -1643,8 +1910,18 @@ if (state.chain && Array.isArray(state.chain.steps)
   breedChain = state.chain;
 }
 renderBreed(); renderReverse(); renderDex(); renderRoster(); renderPlans(); renderSlotChips();
+// first-visit tips (dismissible; the footer keeps the short version)
+{
+  const tipbar = document.getElementById('tipbar');
+  if (!localStorage.getItem('palbreed_tipseen')) {
+    tipbar.hidden = false;
+    document.getElementById('tipDismiss').addEventListener('click', () => {
+      tipbar.hidden = true; localStorage.setItem('palbreed_tipseen', '1');
+    });
+  }
+}
 booting = false;
-if (!applyHash(initialHash) && state.tab) showTab(state.tab);
+if (!applyHash(initialHash)) showTab(state.tab && document.getElementById('view-' + state.tab) ? state.tab : currentTab);
 if (state.ro && pickS[1].get() && pickPT.get()) computeRoute();
 // "/" focuses the active view's search box
 document.addEventListener('keydown', e => {

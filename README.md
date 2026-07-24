@@ -4,17 +4,18 @@
 
 ## Features
 
-- **Breed** — pick two parents, see the exact child, with the breeding-power math shown. Handles unique combos and gender-dependent combos (e.g. Katress × Wixen).
-- **Find Parents** — every parent pair that produces a target pal, with lock-a-parent, owned-only, and text filters.
-- **Planner** — pick up to 4 starting pals (merging their passives into one line, trying every merge order) and a target species; get the shortest breeding chain, preferring species you own as partners. Save plans as step-by-step checklists. Warns when a merge pairs two same-gender pals from your roster.
-- **Roster** — your actual pals: species, gender, nickname, passives (full autocomplete), IVs, notes. Searchable, sortable, filterable; JSON export/import backup.
-- **Hatchery** — everything you can breed in one step from pals you own, with a "new species only" filter.
+- **Breed** — pick two parents, see the exact child, with the breeding-power math shown (including the next-closest species that lose the tie). Handles unique combos and gender-dependent combos (e.g. Katress × Wixen).
+- **Find Parents** — every parent pair that produces a target pal, with lock-a-parent, owned-only, and text filters. Pairs you can actually make (both species owned) sort first.
+- **Planner** — pick up to 4 starting pals (each slot takes the passives it carries) and a target species, plus an optional **desired passives** goal set; get the shortest breeding chain, preferring species you own as partners, with per-step inheritance odds and an expected-egg total (partners you own in the roster contribute their recorded passives to the pool; generic partners are assumed passive-free). Auto-recomputes as you tweak inputs. Save plans as step-by-step checklists; routes are shareable links (`#/plan/A+B/Target`). Warns when a merge pairs two same-gender pals from your roster or when no starter carries a desired passive.
+- **Roster** — your actual pals: species, gender, nickname, passives (full autocomplete), IVs, notes. Searchable, sortable, filterable; JSON export/import backup. Deleting the last of a species offers to un-star it.
+- **Hatchery** — everything you can breed in one step from pals you own, with a "new species only" filter. Click a result to expand your pairs inline, with gender-feasibility warnings from roster data.
 - **Paldex** — all 299 pals (including Terraria collab), sortable and filterable by element and work suitability, with full pal cards (stats, partner skill ranks, drops, egg type) — plus a browsable list of all 251 unique combos.
 - **Guide** — breeding mechanics explained twice: ELI5 and deep-dive, including egg mutations (1%/3%) and the mutation-exclusive passives.
 - **Breeding trees** — planner routes render as branching tree diagrams; merge steps show approximate passive-inheritance odds.
-- **Shareable URLs** — calcs and pal cards are linkable (`#/breed/Lamball/PinkCat`, `#/pal/Anubis`); browser back/forward navigates tabs.
-- **PWA** — installable on phone/desktop and fully offline once loaded (service worker; network-first shell, cached icons).
-- **Accessible** — WCAG 2.0/2.1 A+AA clean under axe-core in every UI state; fully keyboard-operable with managed focus.
+- **Shareable URLs** — calcs, pal cards and planner routes are linkable (`#/breed/Lamball/PinkCat`, `#/pal/Anubis`, `#/plan/SheepBall+ElecCat/Anubis`); browser back/forward navigates tabs, including in-app jumps.
+- **PWA** — installable on phone/desktop and fully offline once loaded (service worker; network-first shell, cached icons). Mobile keeps a single-row, horizontally scrollable tab bar and an icon-grid pal picker.
+- **Accessible** — WCAG 2.0/2.1 A+AA clean under axe-core in every UI state; fully keyboard-operable with managed focus, including arrow-key tablists.
+- **Ownership model** — ★ stars mark species you own; the Roster tracks individual pals. Every "Owned" filter reads both (stars ∪ roster). Pal pickers show ★ and a Recent section; a dismissible first-visit tip bar teaches the basics.
 
 ## Running it
 
