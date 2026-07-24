@@ -691,6 +691,15 @@ moreSheetEl.addEventListener('click', e => {
   const b = e.target.closest('button[data-v]');
   if (b) navTab(b.dataset.v); // showTab closes the sheet
 });
+// The logo goes home like any other site's does. It's a real <a href="./"> so
+// ctrl/middle-click and "open in new tab" behave normally; a plain click stays
+// in-app rather than reloading the whole PWA.
+document.querySelector('.logo a').addEventListener('click', e => {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  navTab('breed');
+  scrollTo({top: 0, behavior: SMOOTH});
+});
 document.addEventListener('click', e => {
   if (moreSheetEl.classList.contains('open') && !moreSheetEl.contains(e.target)) closeMoreSheet();
 });
