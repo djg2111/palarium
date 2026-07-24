@@ -87,6 +87,14 @@ function tierBadge(p) {
   const s = document.createElement('span'); s.className = 'tier ' + t; s.textContent = t; s.title = 'Rarity ' + p.rar;
   return s;
 }
+const EGG_NAMES = {neutral:'Common', fire:'Scorching', water:'Damp', grass:'Verdant', electric:'Electric', ice:'Frozen', ground:'Rocky', dark:'Dark', dragon:'Dragon'};
+const eggOf = p => (p.rar >= 8 ? 'Huge ' : p.rar >= 5 ? 'Large ' : '') + (EGG_NAMES[p.t[0]] || 'Common') + ' Egg';
+function eggChip(p) {
+  const c = document.createElement('span'); c.className = 'mchip';
+  c.textContent = '🥚 ' + eggOf(p);
+  c.title = 'Egg this pal hatches from (bigger and rarer eggs incubate longer — match its temperature preference to speed up)';
+  return c;
+}
 function typeDots(p) {
   const w = document.createElement('span'); w.className = 'types';
   for (const t of p.t) { const d = document.createElement('i'); d.className = 'dot'; d.style.background = TYPE_COLORS[t] || 'var(--dim)'; d.title = t; w.appendChild(d); }
@@ -190,6 +198,7 @@ function openModal(p) {
   const bs = sec('Breeding');
   const bm = document.createElement('div'); bm.className = 'breedmeta';
   const power = document.createElement('span'); power.className = 'mchip'; power.textContent = 'Breeding power ' + p.r; bm.appendChild(power);
+  bm.appendChild(eggChip(p));
   if (p.ic || uniqueChildren.has(p.k)) {
     const u = document.createElement('span'); u.className = 'badge unique'; u.textContent = 'Unique combos only'; bm.appendChild(u);
   }
@@ -201,6 +210,12 @@ function openModal(p) {
   btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(); pickB.set(p, true); renderBreed(); showTab('breed'); }));
   btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(); pickPT.set(p, true); showTab('plan'); }));
   btns.appendChild(mkBtn('＋ Add to roster', false, () => { closeModal(); openRosterEditor(null, p); }));
+  btns.appendChild(mkBtn('🔗 Copy link', false, async () => {
+    try {
+      await navigator.clipboard.writeText(location.href.split('#')[0] + '#/pal/' + p.k);
+      toast('Link to ' + p.n + ' copied');
+    } catch { toast('Copy failed — clipboard blocked by browser'); }
+  }));
   bs.appendChild(btns);
   modalEl.appendChild(bs);
 
@@ -384,6 +399,7 @@ function save() {
   localStorage.setItem('palbreed', JSON.stringify({
     tab: currentTab, a: pickA.get()?.k, b: pickB.get()?.k, t: pickT.get()?.k, l: pickL.get()?.k,
     ownedOnly, dexOwnedOnly, rgroup: typeof groupBySpecies !== 'undefined' && groupBySpecies }));
+  updateHash();
 }
 
 // ---------- tabs ----------
@@ -396,9 +412,45 @@ function showTab(v) {
     b.classList.toggle('active', b.dataset.v === v);
     b.setAttribute('aria-selected', String(b.dataset.v === v));
   });
+  if (v === 'hatch') renderHatch();
   save();
 }
-tabsEl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.v); });
+// ---------- shareable URLs ----------
+function updateHash() {
+  let h = '#/' + currentTab;
+  if (currentTab === 'breed') {
+    const a = pickA.get(), b = pickB.get();
+    if (a || b) h += '/' + (a ? a.k : '-') + '/' + (b ? b.k : '-');
+  } else if (currentTab === 'reverse') {
+    const t = pickT.get();
+    if (t) h += '/' + t.k;
+  }
+  if (location.hash !== h) history.replaceState(null, '', h);
+}
+function applyHash() {
+  const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+  if (!parts.length) return false;
+  const [tab, x, y] = parts;
+  if (tab === 'pal' && x && byKey.has(x)) { showTab('dex'); openModal(byKey.get(x)); return true; }
+  if (!document.getElementById('view-' + tab)) return false;
+  if (tab === 'breed') {
+    if (x && byKey.has(x)) pickA.set(byKey.get(x), true);
+    if (y && byKey.has(y)) pickB.set(byKey.get(y), true);
+    renderBreed();
+  } else if (tab === 'reverse' && x && byKey.has(x)) {
+    pickT.set(byKey.get(x), true); reverseShown = 120; renderReverse();
+  }
+  showTab(tab);
+  return true;
+}
+window.addEventListener('hashchange', applyHash);
+tabsEl.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  history.pushState(null, '', '#/' + b.dataset.v); // back/forward navigates tabs
+  showTab(b.dataset.v);
+});
+window.addEventListener('popstate', () => applyHash());
 
 // ---------- breed view ----------
 const pickA = makePicker(document.getElementById('pickA'), {placeholder:'Parent 1', allowClear:true, ownedToggle:true,
@@ -419,6 +471,7 @@ function childCard(p, opts = {}) {
   const crow = document.createElement('div'); crow.className = 'crow';
   crow.appendChild(typeChips(p));
   if (opts.badge) { const bd = document.createElement('span'); bd.className = 'badge ' + opts.badge[0]; bd.textContent = opts.badge[1]; crow.appendChild(bd); }
+  crow.appendChild(eggChip(p));
   body.appendChild(crow);
   if (opts.gtag) { const t = document.createElement('div'); t.className = 'gtag'; t.textContent = opts.gtag; body.appendChild(t); }
   body.appendChild(genderBar(p));
@@ -433,6 +486,11 @@ function renderBreed() {
   const a = pickA.get(), b = pickB.get();
   if (!a || !b) { zone.innerHTML = '<div class="hint">Pick two parents to see their child. Click any pal picture for its full card.</div>'; return; }
   const res = breed(a, b);
+  const mutNote = () => {
+    const m = document.createElement('div'); m.className = 'mathline';
+    m.textContent = '🧬 ~1% of bred eggs mutate (3% with an Extravagant Vegetable Cake) — see Guide → Egg mutations.';
+    zone.appendChild(m);
+  };
   if (res.kind === 'gender') {
     const note = document.createElement('div'); note.className = 'gender-note';
     note.textContent = 'This pair breeds differently depending on parent genders:';
@@ -444,6 +502,7 @@ function renderBreed() {
       wrap.appendChild(childCard(ch.pal, {badge:['gender','Gender combo'], gtag:`${pa.n} ${gsym(ch.ga)} × ${pb.n} ${gsym(ch.gb)}`}));
     }
     zone.appendChild(wrap);
+    mutNote();
     return;
   }
   const ch = res.children[0].pal;
@@ -454,6 +513,7 @@ function renderBreed() {
     m.innerHTML = `breeding power: <b>${a.r}</b> + <b>${b.r}</b> → target <b>${res.target}</b> → closest pal <b>${ch.n}</b> (${ch.r})`;
     zone.appendChild(m);
   }
+  mutNote();
   const lr = document.createElement('div'); lr.className = 'linkrow';
   const b1 = document.createElement('button'); b1.className = 'alink'; b1.textContent = `View ${ch.n}'s card`;
   b1.addEventListener('click', () => openModal(ch));
@@ -578,9 +638,9 @@ function makePassivePicker(mount, max = 4) {
     if (!matches.length) { mount.classList.remove('open'); return; }
     for (const p of matches) {
       const r = document.createElement('button'); r.className = 'trow'; r.type = 'button';
-      const nm = document.createElement('span'); nm.textContent = p.n;
+      const nm = document.createElement('span'); nm.textContent = (p.mt ? '🧬 ' : '') + p.n;
       const tier = document.createElement('span'); tier.className = 'tr-r';
-      tier.textContent = (p.r > 0 ? '+'.repeat(Math.min(p.r, 4)) : p.r < 0 ? '−'.repeat(Math.min(-p.r, 4)) : '·') + (p.e ? '  ' + p.e : '');
+      tier.textContent = (p.r > 0 ? '+'.repeat(Math.min(p.r, 4)) : p.r < 0 ? '−'.repeat(Math.min(-p.r, 4)) : '·') + (p.e ? '  ' + p.e : '') + (p.mt ? '  (mutation-only)' : '');
       r.append(nm, tier);
       r.addEventListener('mousedown', e => e.preventDefault());
       r.addEventListener('click', () => {
@@ -1018,6 +1078,16 @@ document.getElementById('computeBtn').addEventListener('click', () => {
   }
   currentRoute = best === null ? null : {steps: best, tK: t.k, passives: carried};
   renderRoute(out, best, t, carried);
+  // passive odds for the classic two-carrier merge
+  if (best && best.length && starters.length === 2 && carried.length) {
+    const unionPool = [...new Set([...starters[0].ps, ...starters[1].ps])];
+    const odds = passiveOdds(unionPool.length, carried.length);
+    if (odds > 0) {
+      const o = document.createElement('div'); o.className = 'mathline';
+      o.textContent = `🎲 Merge-step passive odds: ≈${Math.round(odds * 100)}% per egg to inherit all ${carried.length} carried passive${carried.length === 1 ? '' : 's'} (≈${Math.max(1, Math.round(1 / odds))} eggs on average) — community-measured estimate.`;
+      out.appendChild(o);
+    }
+  }
   // warn when a merge step pairs two recorded same-gender starters
   if (best && starters.length > 1) {
     const gmap = new Map();
@@ -1071,6 +1141,51 @@ function stepEl(s, opts = {}) {
   if (opts.carrier) { const c = document.createElement('span'); c.className = 'carrier'; c.textContent = 'passive carrier line'; row.appendChild(c); }
   return row;
 }
+// binary-tree diagram of a route: merge branches join into the carrier line
+function routeTree(steps) {
+  const own = ownedSpeciesSet();
+  const gsym = g => g === 'Male' ? '♂' : g === 'Female' ? '♀' : '';
+  const chip = (k, g, final) => {
+    const p = byKey.get(k);
+    const c = document.createElement('span'); c.className = 'tchip' + (final ? ' final' : '');
+    c.appendChild(icon(p, 26));
+    const nm = document.createElement('span'); nm.textContent = p.n; c.appendChild(nm);
+    if (own.has(k) && !final) { const o = document.createElement('span'); o.className = 'own'; o.textContent = '★'; c.appendChild(o); }
+    if (g) { const gg = document.createElement('span'); gg.className = 'g'; gg.textContent = gsym(g); c.appendChild(gg); }
+    return c;
+  };
+  const made = new Map(); // species key -> subtree already built for it
+  const nodeFor = (k, g) => {
+    if (made.has(k)) { const n = made.get(k); made.delete(k); return n; }
+    return chip(k, g, false);
+  };
+  let root = null;
+  steps.forEach((s, i) => {
+    let ga = null, gb = null;
+    if (s.kind === 'gender' && s.pa) { ga = s.pa === s.aK ? s.ga : s.gb; gb = s.pb === s.bK ? s.gb : s.ga; }
+    const wrap = document.createElement('span'); wrap.className = 'tn';
+    const par = document.createElement('span'); par.className = 'tn-parents';
+    par.append(nodeFor(s.aK, ga), nodeFor(s.bK, gb));
+    const join = document.createElement('span'); join.className = 'tn-join';
+    wrap.append(par, join, chip(s.cK, null, i === steps.length - 1));
+    made.set(s.cK, wrap);
+    root = wrap;
+  });
+  const t = document.createElement('div'); t.className = 'tree'; t.appendChild(root);
+  return t;
+}
+// probability the child inherits all D desired passives from a combined parent pool of P
+// (community-measured inherit-count weights; approximate)
+function comb(n, k) { if (k < 0 || k > n) return 0; let r = 1; for (let i = 0; i < k; i++) r = r * (n - i) / (i + 1); return r; }
+function passiveOdds(P, D) {
+  if (!P || !D || D > P || D > 4) return 0;
+  const w = [0.4, 0.3, 0.2, 0.1];
+  const kmax = Math.min(4, P);
+  const tot = w.slice(0, kmax).reduce((a, b) => a + b, 0);
+  let p = 0;
+  for (let k = D; k <= kmax; k++) p += (w[k - 1] / tot) * comb(P - D, k - D) / comb(P, k);
+  return p;
+}
 function renderRoute(out, steps, target, carried) {
   out.innerHTML = '';
   if (steps === null) {
@@ -1088,6 +1203,7 @@ function renderRoute(out, steps, target, carried) {
   sum.appendChild(cnt);
   if (carried.length) { const sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = 'carrying:'; sum.appendChild(sub); sum.appendChild(passiveChips(carried)); }
   out.appendChild(sum);
+  if (steps.length > 1) out.appendChild(routeTree(steps));
   steps.forEach((s, i) => out.appendChild(stepEl(s, {stepNo: i + 1, carrier: true})));
   if (carried.length) {
     const n = document.createElement('div'); n.className = 'mathline';
@@ -1152,6 +1268,96 @@ function renderPlans() {
       card.appendChild(row);
     });
     list.appendChild(card);
+  }
+}
+
+// ---------- hatchery ----------
+const hatchSearch = document.getElementById('hatchSearch');
+const hatchNewBtn = document.getElementById('hatchNewOnly');
+let hatchNewOnly = false;
+hatchSearch.addEventListener('input', renderHatch);
+hatchNewBtn.addEventListener('click', () => { hatchNewOnly = !hatchNewOnly; setSwitch(hatchNewBtn, hatchNewOnly); renderHatch(); });
+function renderHatch() {
+  const list = document.getElementById('hatchList');
+  const stats = document.getElementById('hatchStats');
+  list.innerHTML = '';
+  const own = [...ownedSpeciesSet()].filter(k => byKey.has(k));
+  if (own.length < 1) {
+    stats.textContent = '';
+    list.innerHTML = '<div class="hint" style="grid-column:1/-1">Star pals in the Paldex or add them to your Roster first — then this page shows everything you can hatch from them.</div>';
+    return;
+  }
+  const kids = new Map(); // childK -> ways count
+  for (let i = 0; i < own.length; i++) for (let j = i; j < own.length; j++) {
+    const res = breed(byKey.get(own[i]), byKey.get(own[j]));
+    for (const c of res.children) kids.set(c.pal.k, (kids.get(c.pal.k) || 0) + 1);
+  }
+  const ownSet = new Set(own);
+  const q = hatchSearch.value.trim().toLowerCase();
+  let rows = [...kids.entries()].map(([k, ways]) => ({p: byKey.get(k), ways, isNew: !ownSet.has(k)}))
+    .filter(r => (!hatchNewOnly || r.isNew) && (!q || r.p.n.toLowerCase().includes(q)));
+  rows.sort((a, b) => (b.isNew - a.isNew) || a.p.z - b.p.z);
+  const newCount = rows.filter(r => r.isNew).length;
+  stats.textContent = `${rows.length} species from ${own.length} owned · ${newCount} new`;
+  if (!rows.length) { list.innerHTML = '<div class="hint" style="grid-column:1/-1">Nothing matches these filters.</div>'; return; }
+  for (const r of rows) {
+    const card = document.createElement('button'); card.className = 'hcard'; card.type = 'button';
+    card.appendChild(icon(r.p, 40, true));
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.p.n; card.appendChild(nm);
+    if (r.isNew) { const nb = document.createElement('span'); nb.className = 'newb'; nb.textContent = 'NEW'; card.appendChild(nb); }
+    const ways = document.createElement('span'); ways.className = 'ways';
+    ways.textContent = r.ways + (r.ways === 1 ? ' pair' : ' pairs'); card.appendChild(ways);
+    card.title = `See which of your pairs produce ${r.p.n}`;
+    card.addEventListener('click', () => {
+      pickT.set(r.p, true);
+      ownedOnly = true; setSwitch(ownedToggle, true);
+      reverseShown = 120; renderReverse(); showTab('reverse');
+    });
+    list.appendChild(card);
+  }
+}
+
+// ---------- unique combos browser ----------
+const dexModeEl = document.getElementById('dexMode');
+dexModeEl.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const m = b.dataset.m;
+  dexModeEl.querySelectorAll('button').forEach(x => {
+    x.classList.toggle('active', x === b);
+    x.setAttribute('aria-selected', String(x === b));
+  });
+  document.getElementById('dexPalsBlock').hidden = m !== 'pals';
+  document.getElementById('dexCombosBlock').hidden = m !== 'combos';
+  if (m === 'combos') renderCombos();
+});
+document.getElementById('comboSearch').addEventListener('input', renderCombos);
+function renderCombos() {
+  const list = document.getElementById('comboList');
+  list.innerHTML = '';
+  const q = document.getElementById('comboSearch').value.trim().toLowerCase();
+  const gsym = g => g === 'Male' ? ' ♂' : g === 'Female' ? ' ♀' : '';
+  let rows = DATA.combos
+    .map(c => ({a: byKey.get(c.a), b: byKey.get(c.b), c: byKey.get(c.c), ga: c.ga, gb: c.gb}))
+    .filter(r => !q || r.a.n.toLowerCase().includes(q) || r.b.n.toLowerCase().includes(q) || r.c.n.toLowerCase().includes(q));
+  rows.sort((x, y) => x.c.n.localeCompare(y.c.n));
+  document.getElementById('comboCount').textContent =
+    rows.length === DATA.combos.length ? DATA.combos.length + ' unique combos' : rows.length + ' of ' + DATA.combos.length + ' combos';
+  for (const r of rows) {
+    const row = document.createElement('button'); row.className = 'pair'; row.type = 'button';
+    const side = (pal, g) => {
+      const s = document.createElement('span'); s.className = 'pside';
+      s.appendChild(icon(pal, 30, true));
+      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = pal.n + (g ? gsym(g) : '');
+      s.appendChild(nm); return s;
+    };
+    row.appendChild(side(r.a, r.ga));
+    const x1 = document.createElement('span'); x1.className = 'x'; x1.textContent = '×'; row.appendChild(x1);
+    row.appendChild(side(r.b, r.gb));
+    const arr = document.createElement('span'); arr.className = 'x'; arr.textContent = '→'; row.appendChild(arr);
+    row.appendChild(side(r.c));
+    row.title = 'Load this pair in the Breed tab';
+    row.addEventListener('click', () => { pickA.set(r.a, true); pickB.set(r.b, true); renderBreed(); showTab('breed'); });
+    list.appendChild(row);
   }
 }
 
@@ -1251,4 +1457,8 @@ if (state.ownedOnly) { ownedOnly = true; setSwitch(ownedToggle, true); }
 if (state.dexOwnedOnly) { dexOwnedOnly = true; setSwitch(dexOwnedBtn, true); }
 if (state.rgroup) { groupBySpecies = true; setSwitch(groupToggle, true); }
 renderBreed(); renderReverse(); renderDex(); renderRoster(); renderPlans(); renderSlotChips();
-if (state.tab) showTab(state.tab);
+if (!applyHash() && state.tab) showTab(state.tab);
+// PWA: offline capability + installability (http(s) only — no-op when opened as a local file)
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}

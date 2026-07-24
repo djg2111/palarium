@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Palarium — Palworld Breeding Studio</title>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d1117">
 <meta name="description" content="Palarium — a Palworld breeding studio: calculator, reverse parent lookup, multi-step route planner, and pal roster manager. Fast, offline-capable, no ads.">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -16,6 +18,7 @@
     <button data-v="breed" class="active" role="tab" aria-selected="true">Breed</button>
     <button data-v="reverse" role="tab" aria-selected="false">Find Parents</button>
     <button data-v="plan" role="tab" aria-selected="false">Planner</button>
+    <button data-v="hatch" role="tab" aria-selected="false">Hatchery</button>
     <button data-v="roster" role="tab" aria-selected="false">Roster</button>
     <button data-v="dex" role="tab" aria-selected="false">Paldex</button>
     <button data-v="guide" role="tab" aria-selected="false">Guide</button>
@@ -45,6 +48,21 @@
       <div class="ctl"><label aria-hidden="true">&nbsp;</label><button type="button" class="toggle" id="ownedToggle" role="switch" aria-checked="false" title="Only show pairs where you own both parents (star pals in the Paldex)"><span class="kn"></span>Owned pals only</button></div>
     </div>
     <div id="reverseResult"><div class="hint">Pick a target pal to list every parent combination that produces it.</div></div>
+  </section>
+
+  <section class="view" id="view-hatch">
+    <div class="pcard">
+      <div class="collhead">
+        <h2>🥚 Hatchery</h2>
+        <span class="rstats" id="hatchStats" aria-live="polite"></span>
+      </div>
+      <div class="sub">Every species you can breed <b>right now</b>, in one step, from pals you own (★ starred or in your roster). Click a result to see which of your pairs produce it.</div>
+      <div class="dex-controls">
+        <input class="search-inp" id="hatchSearch" placeholder="Search results…" aria-label="Search hatchery results">
+        <button type="button" class="toggle" id="hatchNewOnly" role="switch" aria-checked="false" title="Hide species you already own"><span class="kn"></span>New species only</button>
+      </div>
+      <div class="hatchgrid" id="hatchList"></div>
+    </div>
   </section>
 
   <section class="view" id="view-roster">
@@ -109,6 +127,11 @@
   </section>
 
   <section class="view" id="view-dex">
+    <nav class="tabs subtabs" id="dexMode" role="tablist" aria-label="Paldex mode">
+      <button data-m="pals" class="active" role="tab" aria-selected="true">Pals</button>
+      <button data-m="combos" role="tab" aria-selected="false">Unique combos</button>
+    </nav>
+    <div id="dexPalsBlock">
     <div class="dex-controls">
       <input class="search-inp" id="dexSearch" placeholder="Search pals…" aria-label="Search pals">
       <select id="dexType" aria-label="Filter by element"><option value="">All elements</option></select>
@@ -124,6 +147,14 @@
       </tr></thead>
       <tbody id="dexBody"></tbody>
     </table>
+    </div>
+    <div id="dexCombosBlock" hidden>
+      <div class="dex-controls">
+        <input class="search-inp" id="comboSearch" placeholder="Search combos…" aria-label="Search unique combos">
+        <span class="rstats" id="comboCount" aria-live="polite"></span>
+      </div>
+      <div class="pairs" id="comboList"></div>
+    </div>
   </section>
 
   <section class="view" id="view-guide">
@@ -182,6 +213,15 @@
             <li>Each pal has hidden <b>IVs (0–100)</b> for HP, Attack and Defense. A child's IVs are usually inherited from one parent or the other, with a chance to roll fresh — so hatch several keepers and compare. (IV viewer mods or the in-game stat comparison help here.)</li>
             <li><b>Gender is rolled per species</b> — every pal card in this app shows the ♂/♀ odds. Some species are heavily skewed (useful to know when you need a specific gender for a gender-locked recipe or your next pairing).</li>
             <li>Alpha (oversized) status does <b>not</b> inherit; the <b>Lucky</b> passive from lucky pals inherits like any other passive.</li>
+          </ul>
+        </div></details>
+
+        <details><summary>Egg mutations 🧬</summary><div>
+          <ul>
+            <li>Every bred egg has a <b>~1% chance to mutate</b> — <b>~3%</b> if you use an <b>Extravagant Vegetable Cake</b> instead of a regular Cake.</li>
+            <li>A mutated pal can come with any of: up to <b>2 free condensation levels</b>, <b>Alpha</b> (oversized) status, one or more <b>mutation-exclusive passives</b>, or even hatch as a <b>different species</b> than the normal child.</li>
+            <li>The exclusive passives (marked 🧬 in this app's passive picker) can't be rolled any other way: <b>Babysitter</b> (+30% egg production &amp; incubation speed at base — the breeding meta pick), <b>Idiosyncratic</b>, <b>Immortality</b>, <b>Heavily Armored</b>, <b>Skymarcher</b>. Once obtained they inherit like normal passives.</li>
+            <li>Which species a mutated egg can turn into is <i>not fully understood yet</i> — community data collection is ongoing, so this app doesn't pretend to predict it. Treat species mutations as a lottery bonus.</li>
           </ul>
         </div></details>
 

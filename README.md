@@ -8,8 +8,13 @@
 - **Find Parents** — every parent pair that produces a target pal, with lock-a-parent, owned-only, and text filters.
 - **Planner** — pick up to 4 starting pals (merging their passives into one line, trying every merge order) and a target species; get the shortest breeding chain, preferring species you own as partners. Save plans as step-by-step checklists. Warns when a merge pairs two same-gender pals from your roster.
 - **Roster** — your actual pals: species, gender, nickname, passives (full autocomplete), IVs, notes. Searchable, sortable, filterable; JSON export/import backup.
-- **Paldex** — all 299 pals (including Terraria collab), sortable and filterable by element and work suitability, with full pal cards (stats, partner skill ranks, drops).
-- **Guide** — breeding mechanics explained twice: ELI5 and deep-dive.
+- **Hatchery** — everything you can breed in one step from pals you own, with a "new species only" filter.
+- **Paldex** — all 299 pals (including Terraria collab), sortable and filterable by element and work suitability, with full pal cards (stats, partner skill ranks, drops, egg type) — plus a browsable list of all 251 unique combos.
+- **Guide** — breeding mechanics explained twice: ELI5 and deep-dive, including egg mutations (1%/3%) and the mutation-exclusive passives.
+- **Breeding trees** — planner routes render as branching tree diagrams; merge steps show approximate passive-inheritance odds.
+- **Shareable URLs** — calcs and pal cards are linkable (`#/breed/Lamball/PinkCat`, `#/pal/Anubis`); browser back/forward navigates tabs.
+- **PWA** — installable on phone/desktop and fully offline once loaded (service worker; network-first shell, cached icons).
+- **Accessible** — WCAG 2.0/2.1 A+AA clean under axe-core in every UI state; fully keyboard-operable with managed focus.
 
 ## Running it
 
