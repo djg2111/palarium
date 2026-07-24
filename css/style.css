@@ -106,8 +106,9 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
   .moresheet button:hover{color:var(--text);background:var(--raised)}
   .moresheet button.active{color:var(--text);background:var(--raised)}
   main{padding:18px 12px calc(88px + env(safe-area-inset-bottom))}
-  .toasts{bottom:calc(76px + env(safe-area-inset-bottom))}
-  footer{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+  /* .toasts and footer also have to clear the nav, but their base rules are
+     declared further down the file and would win this tie — those two live in
+     the phone block at the end instead */
 }
 
 /* ---------- picker ---------- */
@@ -541,6 +542,13 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
    The rules below give each row one column of equal, full-bleed widths.
    Kept last in the file so they win the equal-specificity ties above. */
 @media(max-width:640px){
+  /* --- clear the fixed nav bar. These two belong with the bottom-nav rules
+         near the top of the file, but their base declarations come later and
+         would win the equal-specificity tie, leaving the footer's last line and
+         every toast underneath the nav. --- */
+  footer{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+  .toasts{bottom:calc(76px + env(safe-area-inset-bottom))}
+
   /* --- density: desktop gutters cost ~50px of a 390px screen --- */
   .pcard{padding:16px 14px}
   .gcard{padding:18px 16px}
