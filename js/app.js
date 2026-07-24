@@ -67,6 +67,7 @@ const owned = new Set(JSON.parse(localStorage.getItem('palbreed_owned') || '[]')
 function toggleOwned(k) {
   owned.has(k) ? owned.delete(k) : owned.add(k);
   localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
+  scheduleAuto(); // owned pool feeds the planner's partner list
 }
 
 // ---------- recently picked pals (shared across all pickers) ----------
@@ -850,7 +851,10 @@ function passiveChips(names, readonly = true) {
 // ---------- roster ----------
 let roster = JSON.parse(localStorage.getItem('palbreed_roster') || '[]')
   .filter(r => byKey.has(r.k)).map(r => ({g: null, nick: '', note: '', iv: null, ...r}));
-function saveRoster() { localStorage.setItem('palbreed_roster', JSON.stringify(roster)); }
+function saveRoster() {
+  localStorage.setItem('palbreed_roster', JSON.stringify(roster));
+  scheduleAuto(); // roster changes partner passives/genders the route may use
+}
 // gender feasibility from recorded roster genders (star-only species = unknown, no warning)
 function speciesGenderInfo(k) {
   const es = roster.filter(r => r.k === k);
