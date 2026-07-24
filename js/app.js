@@ -1928,6 +1928,20 @@ document.addEventListener('keydown', e => {
   if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
   if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName)) return;
   if (overlay.classList.contains('open') || roverlay.classList.contains('open') || openPicker) return;
+  // tabs without a search box open the most useful pal picker instead
+  if (currentTab === 'breed') {
+    e.preventDefault();
+    (pickA.get() && !pickB.get() ? pickB : pickA).openPop();
+    return;
+  }
+  if (currentTab === 'plan') {
+    e.preventDefault();
+    const n = SLOTS.find(i => !pickS[i].get());
+    const pk = n ? pickS[n] : (pickPT.get() ? pickS[1] : pickPT);
+    pk.root.scrollIntoView({block: 'center'});
+    pk.openPop();
+    return;
+  }
   let target = {dex: '#dexSearch', hatch: '#hatchSearch', roster: '#rosterSearch', reverse: '#pairFilter'}[currentTab];
   if (currentTab === 'dex' && document.getElementById('dexPalsBlock').hidden) target = '#comboSearch';
   const inp = target && document.querySelector(target);
