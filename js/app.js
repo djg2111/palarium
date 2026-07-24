@@ -461,6 +461,54 @@ document.getElementById('swapBtn').addEventListener('click', () => {
   pickA.set(b, true); pickB.set(a, true); renderBreed();
 });
 
+// ---------- breeding chain view (opened from Planner / saved plans) ----------
+let breedChain = null; // {steps, idx}
+function openChainStep(steps, idx) {
+  const st = steps[idx];
+  breedChain = {steps: steps.map(s => ({...s})), idx};
+  pickA.set(byKey.get(st.aK), true);
+  pickB.set(byKey.get(st.bK), true);
+  renderBreed();
+  showTab('breed');
+}
+function appendChainCard(zone, a, b) {
+  if (!breedChain) return;
+  const st = breedChain.steps[breedChain.idx];
+  if (!st || !a || !b || pairKey(a.k, b.k) !== pairKey(st.aK, st.bK)) { breedChain = null; return; }
+  const n = breedChain.steps.length;
+  const target = byKey.get(breedChain.steps[n - 1].cK);
+  const card = document.createElement('div'); card.className = 'chaincard';
+  const head = document.createElement('div'); head.className = 'chainhead';
+  const ttl = document.createElement('span'); ttl.className = 'ttl';
+  ttl.textContent = `🧭 Breeding chain — step ${breedChain.idx + 1} of ${n} toward ${target.n}`;
+  head.appendChild(ttl);
+  const nav = document.createElement('div'); nav.className = 'nav';
+  const go = d => {
+    const ni = breedChain.idx + d;
+    if (ni < 0 || ni >= n) return;
+    breedChain.idx = ni;
+    const s2 = breedChain.steps[ni];
+    pickA.set(byKey.get(s2.aK), true);
+    pickB.set(byKey.get(s2.bK), true);
+    renderBreed();
+  };
+  const mk = (txt, label, d, disabled) => {
+    const bt = document.createElement('button'); bt.type = 'button'; bt.textContent = txt;
+    bt.setAttribute('aria-label', label); bt.disabled = disabled;
+    bt.addEventListener('click', () => go(d));
+    return bt;
+  };
+  nav.append(mk('◀ Prev step', 'Previous chain step', -1, breedChain.idx === 0),
+             mk('Next step ▶', 'Next chain step', 1, breedChain.idx === n - 1));
+  head.appendChild(nav);
+  card.appendChild(head);
+  card.appendChild(treeViewport(routeTree(breedChain.steps, breedChain.idx)));
+  const exit = document.createElement('button'); exit.className = 'alink'; exit.textContent = '✕ Leave chain view';
+  exit.addEventListener('click', () => { breedChain = null; renderBreed(); });
+  card.appendChild(exit);
+  zone.appendChild(card);
+}
+
 function childCard(p, opts = {}) {
   const card = document.createElement('div'); card.className = 'child-card';
   card.appendChild(icon(p, 84, true));
@@ -503,6 +551,7 @@ function renderBreed() {
     }
     zone.appendChild(wrap);
     mutNote();
+    appendChainCard(zone, a, b);
     return;
   }
   const ch = res.children[0].pal;
@@ -521,6 +570,7 @@ function renderBreed() {
   b2.addEventListener('click', () => { pickT.set(ch, true); reverseShown = 120; renderReverse(); showTab('reverse'); });
   lr.append(b1, b2);
   zone.appendChild(lr);
+  appendChainCard(zone, a, b);
 }
 
 // ---------- reverse view ----------
@@ -1139,25 +1189,33 @@ function stepEl(s, opts = {}) {
     row.appendChild(bd);
   }
   if (opts.carrier) { const c = document.createElement('span'); c.className = 'carrier'; c.textContent = 'passive carrier line'; row.appendChild(c); }
+  if (opts.onOpen) {
+    const ob = document.createElement('button'); ob.className = 'stepopen'; ob.type = 'button'; ob.textContent = '↗';
+    ob.title = 'Open this pairing in the Breed tab with the full chain';
+    ob.setAttribute('aria-label', 'Open this pairing in the Breed tab with the full chain');
+    ob.addEventListener('click', opts.onOpen);
+    row.appendChild(ob);
+  }
   return row;
 }
-// binary-tree diagram of a route: merge branches join into the carrier line
-function routeTree(steps) {
+// binary-tree diagram of a route: merge branches join into the carrier line.
+// hlIdx highlights that step's child (used by the Breed tab's chain view).
+function routeTree(steps, hlIdx = -1) {
   const own = ownedSpeciesSet();
   const gsym = g => g === 'Male' ? '♂' : g === 'Female' ? '♀' : '';
-  const chip = (k, g, final) => {
+  const chip = (k, g, cls) => {
     const p = byKey.get(k);
-    const c = document.createElement('span'); c.className = 'tchip' + (final ? ' final' : '');
-    c.appendChild(icon(p, 26));
+    const c = document.createElement('span'); c.className = 'tchip' + cls;
+    c.appendChild(icon(p, 26, true));
     const nm = document.createElement('span'); nm.textContent = p.n; c.appendChild(nm);
-    if (own.has(k) && !final) { const o = document.createElement('span'); o.className = 'own'; o.textContent = '★'; c.appendChild(o); }
+    if (own.has(k) && !cls.includes('final')) { const o = document.createElement('span'); o.className = 'own'; o.textContent = '★'; c.appendChild(o); }
     if (g) { const gg = document.createElement('span'); gg.className = 'g'; gg.textContent = gsym(g); c.appendChild(gg); }
     return c;
   };
   const made = new Map(); // species key -> subtree already built for it
   const nodeFor = (k, g) => {
     if (made.has(k)) { const n = made.get(k); made.delete(k); return n; }
-    return chip(k, g, false);
+    return chip(k, g, '');
   };
   let root = null;
   steps.forEach((s, i) => {
@@ -1167,12 +1225,67 @@ function routeTree(steps) {
     const par = document.createElement('span'); par.className = 'tn-parents';
     par.append(nodeFor(s.aK, ga), nodeFor(s.bK, gb));
     const join = document.createElement('span'); join.className = 'tn-join';
-    wrap.append(par, join, chip(s.cK, null, i === steps.length - 1));
+    const cls = (i === steps.length - 1 ? ' final' : '') + (i === hlIdx ? ' cur' : '');
+    wrap.append(par, join, chip(s.cK, null, cls));
     made.set(s.cK, wrap);
     root = wrap;
   });
   const t = document.createElement('div'); t.className = 'tree'; t.appendChild(root);
   return t;
+}
+// interactive viewport: drag to pan, wheel/buttons to zoom, pinch-friendly
+function treeViewport(treeEl) {
+  const vp = document.createElement('div'); vp.className = 'tvp';
+  const inner = document.createElement('div'); inner.className = 'tvp-inner';
+  inner.appendChild(treeEl);
+  vp.appendChild(inner);
+  let scale = 1, tx = 0, ty = 0;
+  const apply = () => { inner.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`; };
+  const zoomAt = (cx, cy, factor) => {
+    const ns = Math.min(3, Math.max(0.35, scale * factor));
+    tx = cx - (cx - tx) * (ns / scale);
+    ty = cy - (cy - ty) * (ns / scale);
+    scale = ns; apply();
+  };
+  vp.addEventListener('wheel', e => {
+    e.preventDefault();
+    const r = vp.getBoundingClientRect();
+    zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.15 : 1 / 1.15);
+  }, { passive: false });
+  let drag = null;
+  vp.addEventListener('pointerdown', e => {
+    if (e.target.closest('.tvp-ctrl') || e.target.classList.contains('click')) return;
+    drag = { x: e.clientX - tx, y: e.clientY - ty };
+    vp.setPointerCapture(e.pointerId);
+    vp.classList.add('grabbing');
+  });
+  vp.addEventListener('pointermove', e => { if (drag) { tx = e.clientX - drag.x; ty = e.clientY - drag.y; apply(); } });
+  const endDrag = () => { drag = null; vp.classList.remove('grabbing'); };
+  vp.addEventListener('pointerup', endDrag);
+  vp.addEventListener('pointercancel', endDrag);
+  const ctrl = document.createElement('div'); ctrl.className = 'tvp-ctrl';
+  const mid = () => { const r = vp.getBoundingClientRect(); return [r.width / 2, r.height / 2]; };
+  for (const [txt, label, fn] of [
+    ['+', 'Zoom in', () => zoomAt(...mid(), 1.25)],
+    ['−', 'Zoom out', () => zoomAt(...mid(), 1 / 1.25)],
+    ['⤾', 'Reset view', () => { scale = 1; tx = ty = 0; apply(); }],
+  ]) {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = txt;
+    b.title = label; b.setAttribute('aria-label', label);
+    b.addEventListener('click', fn);
+    ctrl.appendChild(b);
+  }
+  vp.appendChild(ctrl);
+  const hint = document.createElement('span'); hint.className = 'tvp-hint'; hint.textContent = 'drag to pan · scroll to zoom';
+  vp.appendChild(hint);
+  requestAnimationFrame(() => {
+    const h = Math.min(Math.max(inner.offsetHeight, 140), 420);
+    vp.style.height = h + 'px';
+    // start centered horizontally if the tree is narrower than the viewport
+    const w = vp.clientWidth;
+    if (inner.offsetWidth < w) { tx = (w - inner.offsetWidth) / 2; apply(); }
+  });
+  return vp;
 }
 // probability the child inherits all D desired passives from a combined parent pool of P
 // (community-measured inherit-count weights; approximate)
@@ -1203,8 +1316,8 @@ function renderRoute(out, steps, target, carried) {
   sum.appendChild(cnt);
   if (carried.length) { const sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = 'carrying:'; sum.appendChild(sub); sum.appendChild(passiveChips(carried)); }
   out.appendChild(sum);
-  if (steps.length > 1) out.appendChild(routeTree(steps));
-  steps.forEach((s, i) => out.appendChild(stepEl(s, {stepNo: i + 1, carrier: true})));
+  if (steps.length > 1) out.appendChild(treeViewport(routeTree(steps)));
+  steps.forEach((s, i) => out.appendChild(stepEl(s, {stepNo: i + 1, carrier: true, onOpen: () => openChainStep(steps, i)})));
   if (carried.length) {
     const n = document.createElement('div'); n.className = 'mathline';
     n.textContent = 'At each step, hatch until a child inherits your passives (and the right gender for the next pairing), then continue with that child.';
@@ -1212,6 +1325,7 @@ function renderRoute(out, steps, target, carried) {
   }
   const saver = document.createElement('div'); saver.className = 'saverow';
   const nameInp = document.createElement('input'); nameInp.className = 'search-inp'; nameInp.style.width = '240px';
+  nameInp.setAttribute('aria-label', 'Plan name');
   nameInp.value = `${target.n}${carried.length ? ' + ' + carried.join('/') : ''}`;
   const saveBtn = document.createElement('button'); saveBtn.className = 'alink primary'; saveBtn.textContent = 'Save plan';
   saveBtn.addEventListener('click', () => {
@@ -1244,6 +1358,16 @@ function renderPlans() {
     prog.textContent = doneCnt === plan.steps.length ? '✓ complete' : `${doneCnt}/${plan.steps.length} steps`;
     head.appendChild(prog);
     if (plan.passives.length) head.appendChild(passiveChips(plan.passives));
+    const treeBtn = document.createElement('button'); treeBtn.className = 'del'; treeBtn.textContent = '🌳 tree';
+    treeBtn.title = 'Show this plan as an interactive tree';
+    treeBtn.setAttribute('aria-expanded', 'false');
+    const treeBox = document.createElement('div'); treeBox.className = 'plantree'; treeBox.hidden = true;
+    treeBtn.addEventListener('click', () => {
+      treeBox.hidden = !treeBox.hidden;
+      treeBtn.setAttribute('aria-expanded', String(!treeBox.hidden));
+      if (!treeBox.hidden && !treeBox.childElementCount) treeBox.appendChild(treeViewport(routeTree(plan.steps)));
+    });
+    head.appendChild(treeBtn);
     const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕ delete';
     del.setAttribute('aria-label', 'Delete plan ' + plan.name);
     del.addEventListener('click', () => {
@@ -1258,8 +1382,9 @@ function renderPlans() {
     });
     head.appendChild(del);
     card.appendChild(head);
+    card.appendChild(treeBox);
     plan.steps.forEach((s, i) => {
-      const row = stepEl(s, {stepNo: i + 1});
+      const row = stepEl(s, {stepNo: i + 1, onOpen: () => openChainStep(plan.steps, i)});
       if (plan.done[i]) row.classList.add('done');
       const chk = document.createElement('input'); chk.type = 'checkbox'; chk.className = 'chk'; chk.checked = !!plan.done[i];
       chk.title = 'Mark step done';
