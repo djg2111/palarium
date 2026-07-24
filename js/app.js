@@ -164,11 +164,30 @@ function worksEl(p, highlightKey) {
   if (!w.children.length) { const s = document.createElement('span'); s.textContent = 'No base work'; w.appendChild(s); }
   return w;
 }
+// gender glyphs carry their color everywhere: ♂ = --male, ♀ = --female
+function gEl(sym) {
+  const s = document.createElement('span');
+  s.className = 'g ' + (sym === '♂' ? 'gm' : 'gf');
+  s.textContent = sym;
+  return s;
+}
+// wrap any ♂/♀ inside a plain string in colored spans (warnings, tags)
+function genderize(text) {
+  const f = document.createDocumentFragment();
+  let buf = '';
+  for (const ch of text) {
+    if (ch === '♂' || ch === '♀') { if (buf) { f.append(buf); buf = ''; } f.append(gEl(ch)); }
+    else buf += ch;
+  }
+  if (buf) f.append(buf);
+  return f;
+}
 function genderBar(p) {
   const g = document.createElement('div'); g.className = 'gbar';
   const tr = document.createElement('span'); tr.className = 'gtrack';
   const i = document.createElement('i'); i.style.width = p.m + '%'; tr.appendChild(i);
-  const lab = document.createElement('span'); lab.textContent = `♂ ${p.m}% · ♀ ${100 - p.m}%`;
+  const lab = document.createElement('span');
+  lab.append(gEl('♂'), ` ${p.m}% · `, gEl('♀'), ` ${100 - p.m}%`);
   g.append(tr, lab); return g;
 }
 
@@ -210,7 +229,7 @@ document.addEventListener('keydown', e => {
 function roverlayOpen() { const r = document.getElementById('roverlay'); return r && r.classList.contains('open'); }
 function sec(title) { const s = document.createElement('div'); s.className = 'msec'; const h = document.createElement('h3'); h.textContent = title; s.appendChild(h); return s; }
 
-function openModal(p) {
+function openModal(p, rentry) {
   const wasOpen = overlay.classList.contains('open');
   if (!wasOpen) lastFocusModal = document.activeElement;
   currentModalPal = p;
@@ -253,6 +272,29 @@ function openModal(p) {
   hb.appendChild(genderBar(p));
   head.appendChild(hb);
   modalEl.appendChild(head);
+
+  // opened from a roster card: show that individual's recorded details
+  if (rentry) {
+    const rs = sec('In your roster');
+    const box = document.createElement('div'); box.className = 'rosentry';
+    const r1 = document.createElement('div'); r1.className = 'row1';
+    if (rentry.g) r1.appendChild(gEl(rentry.g === 'M' ? '♂' : '♀'));
+    if (rentry.nick) { const nk = document.createElement('b'); nk.textContent = '“' + rentry.nick + '”'; r1.appendChild(nk); }
+    if (rentry.iv) {
+      const ivc = document.createElement('span'); ivc.className = 'ivchip';
+      ivc.textContent = 'IV ' + rentry.iv.map(v => v === null ? '–' : v).join('·');
+      ivc.title = 'HP · Attack · Defense IVs'; r1.appendChild(ivc);
+    }
+    const ed = document.createElement('button'); ed.className = 'alink'; ed.style.marginLeft = 'auto';
+    ed.textContent = '✎ Edit'; ed.title = 'Edit this roster entry';
+    ed.addEventListener('click', () => { leaveModal(); openRosterEditor(rentry); });
+    r1.appendChild(ed);
+    box.appendChild(r1);
+    if (rentry.ps.length) box.appendChild(passiveChips(rentry.ps));
+    if (rentry.note) { const nt = document.createElement('div'); nt.className = 'rnote'; nt.textContent = rentry.note; box.appendChild(nt); }
+    rs.appendChild(box);
+    modalEl.appendChild(rs);
+  }
 
   if (p.d) { const d = document.createElement('div'); d.className = 'mdesc'; d.textContent = p.d; modalEl.appendChild(d); }
 
@@ -747,7 +789,7 @@ function childCard(p, opts = {}) {
   if (opts.badge) { const bd = document.createElement('span'); bd.className = 'badge ' + opts.badge[0]; bd.textContent = opts.badge[1]; crow.appendChild(bd); }
   crow.appendChild(eggChip(p));
   body.appendChild(crow);
-  if (opts.gtag) { const t = document.createElement('div'); t.className = 'gtag'; t.textContent = opts.gtag; body.appendChild(t); }
+  if (opts.gtag) { const t = document.createElement('div'); t.className = 'gtag'; t.appendChild(genderize(opts.gtag)); body.appendChild(t); }
   body.appendChild(genderBar(p));
   body.appendChild(worksEl(p));
   card.appendChild(body);
@@ -905,7 +947,6 @@ function renderReverse() {
   }
 
   const grid = document.createElement('div'); grid.className = 'pairs';
-  const gsym = g => g === 'Male' ? ' ♂' : g === 'Female' ? ' ♀' : '';
   for (const p of pairs.slice(0, reverseShown)) {
     const row = document.createElement('button'); row.className = 'pair'; row.type = 'button';
     const side = (pal, g) => {
@@ -914,7 +955,7 @@ function renderReverse() {
       const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = pal.n;
       s.appendChild(nm);
       if (os.has(pal.k)) { const o = document.createElement('span'); o.className = 'own'; o.textContent = '★'; o.title = 'Owned'; s.appendChild(o); }
-      if (g) { const gg = document.createElement('span'); gg.className = 'g'; gg.textContent = gsym(g); s.appendChild(gg); }
+      if (g) s.appendChild(gEl(g === 'Male' ? '♂' : '♀'));
       return s;
     };
     row.appendChild(side(p.a, p.ga));
@@ -928,7 +969,7 @@ function renderReverse() {
     }
     if (ownedOnly) {
       const issue = pairGenderIssue(p.a.k, p.b.k);
-      if (issue) { const w = document.createElement('span'); w.className = 'warnchip'; w.textContent = '⚠ ' + issue; row.appendChild(w); }
+      if (issue) { const w = document.createElement('span'); w.className = 'warnchip'; w.append('⚠ ', genderize(issue)); row.appendChild(w); }
     }
     row.addEventListener('click', () => { pickA.set(p.a, true); pickB.set(p.b, true); renderBreed(); navTab('breed'); });
     grid.appendChild(row);
@@ -1251,7 +1292,13 @@ function renderRoster() {
       const p = byKey.get(k);
       const g = document.createElement('div'); g.className = 'rosgroup';
       const head = document.createElement('div'); head.className = 'ghead';
-      head.appendChild(icon(p, 36, true));
+      const entry1 = entries.length === 1 ? entries[0] : null;
+      head.tabIndex = 0;
+      head.setAttribute('aria-label', 'View ' + p.n + ' details');
+      head.title = 'View ' + p.n + '’s full card';
+      head.addEventListener('click', e => { if (e.target.closest('button, input, a')) return; openModal(p, entry1); });
+      head.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === head) { e.preventDefault(); openModal(p, entry1); } });
+      head.appendChild(icon(p, 36));
       const nm = document.createElement('span'); nm.textContent = p.n; head.appendChild(nm);
       const cnt = document.createElement('span'); cnt.className = 'cntb'; cnt.textContent = '×' + entries.length; head.appendChild(cnt);
       g.appendChild(head);
@@ -1271,7 +1318,14 @@ function renderRoster() {
     for (const r of rows) {
       const p = byKey.get(r.k);
       const card = document.createElement('div'); card.className = 'rospal' + (r.id === editingId ? ' editing' : '');
-      card.appendChild(icon(p, 44, true));
+      // the whole card opens the pal's page with this entry's details;
+      // inner action buttons keep their own behavior
+      card.tabIndex = 0;
+      card.setAttribute('aria-label', 'View ' + (r.nick || p.n) + ' details');
+      card.title = 'View ' + p.n + '’s full card';
+      card.addEventListener('click', e => { if (e.target.closest('button, input, a')) return; openModal(p, r); });
+      card.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === card) { e.preventDefault(); openModal(p, r); } });
+      card.appendChild(icon(p, 44));
       const body = document.createElement('div'); body.className = 'body';
       const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = p.n + ' ';
       const id = identity(r);
@@ -1621,7 +1675,7 @@ function computeRoute() {
         warned.add(key);
         const sym = ga[0] === 'M' ? '♂' : '♀';
         const w = document.createElement('div'); w.className = 'warnbox';
-        w.textContent = `⚠ Your ${byKey.get(st.aK).n} and ${byKey.get(st.bK).n} are both recorded as ${sym} — a breeding pair needs one ♂ and one ♀. You'll need an opposite-gender ${byKey.get(st.aK).n} or ${byKey.get(st.bK).n} (catch or hatch one) before this merge step.`;
+        w.appendChild(genderize(`⚠ Your ${byKey.get(st.aK).n} and ${byKey.get(st.bK).n} are both recorded as ${sym} — a breeding pair needs one ♂ and one ♀. You'll need an opposite-gender ${byKey.get(st.aK).n} or ${byKey.get(st.bK).n} (catch or hatch one) before this merge step.`));
         out.prepend(w);
       }
     }
@@ -1641,7 +1695,7 @@ function stepEl(s, opts = {}) {
     u.appendChild(icon(p, 34, true));
     const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = p.n; u.appendChild(nm);
     if (isPartner && own.has(k)) { const o = document.createElement('span'); o.className = 'own'; o.textContent = '★'; o.title = 'You own this species'; u.appendChild(o); }
-    if (g) { const gg = document.createElement('span'); gg.className = 'g'; gg.textContent = gsym(g); gg.title = 'Required gender'; u.appendChild(gg); }
+    if (g) { const gg = gEl(gsym(g)); gg.title = 'Required gender'; u.appendChild(gg); }
     return u;
   };
   // orient gender info: pa/pb tell which species needs which gender
@@ -1694,7 +1748,7 @@ function routeTree(steps, hlIdx = -1) {
     c.appendChild(icon(p, 26, true));
     const nm = document.createElement('span'); nm.textContent = p.n; c.appendChild(nm);
     if (own.has(k) && !cls.includes('final')) { const o = document.createElement('span'); o.className = 'own'; o.textContent = '★'; c.appendChild(o); }
-    if (g) { const gg = document.createElement('span'); gg.className = 'g'; gg.textContent = gsym(g); c.appendChild(gg); }
+    if (g) c.appendChild(gEl(gsym(g)));
     return c;
   };
   const made = new Map(); // species key -> subtree already built for it
@@ -2164,7 +2218,7 @@ function hatchPanel(r) {
     const x = document.createElement('span'); x.className = 'x'; x.textContent = '×'; row.appendChild(x);
     row.appendChild(side(b));
     const issue = pairGenderIssue(aK, bK);
-    if (issue) { const w = document.createElement('span'); w.className = 'warnchip'; w.textContent = '⚠ ' + issue; row.appendChild(w); }
+    if (issue) { const w = document.createElement('span'); w.className = 'warnchip'; w.append('⚠ ', genderize(issue)); row.appendChild(w); }
     row.addEventListener('click', () => { pickA.set(a, true); pickB.set(b, true); renderBreed(); navTab('breed'); });
     wrap.appendChild(row);
   }
@@ -2203,7 +2257,6 @@ function renderCombos() {
   const list = document.getElementById('comboList');
   list.innerHTML = '';
   const q = document.getElementById('comboSearch').value.trim().toLowerCase();
-  const gsym = g => g === 'Male' ? ' ♂' : g === 'Female' ? ' ♀' : '';
   let rows = DATA.combos
     .map(c => ({a: byKey.get(c.a), b: byKey.get(c.b), c: byKey.get(c.c), ga: c.ga, gb: c.gb}))
     .filter(r => !q || r.a.n.toLowerCase().includes(q) || r.b.n.toLowerCase().includes(q) || r.c.n.toLowerCase().includes(q));
@@ -2215,8 +2268,10 @@ function renderCombos() {
     const side = (pal, g) => {
       const s = document.createElement('span'); s.className = 'pside';
       s.appendChild(icon(pal, 30, true));
-      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = pal.n + (g ? gsym(g) : '');
-      s.appendChild(nm); return s;
+      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = pal.n;
+      s.appendChild(nm);
+      if (g) s.appendChild(gEl(g === 'Male' ? '♂' : '♀'));
+      return s;
     };
     row.appendChild(side(r.a, r.ga));
     const x1 = document.createElement('span'); x1.className = 'x'; x1.textContent = '×'; row.appendChild(x1);
