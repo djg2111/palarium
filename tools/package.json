@@ -1,0 +1,20 @@
+{
+  "name": "palarium-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Extraction + generation pipeline for Palarium's pal data, icons and map tiles. Not part of the site build — the site itself has no build step.",
+  "scripts": {
+    "gen": "node gen-data.js ../js/data.js",
+    "map": "node --max-old-space-size=6144 parse-map.js",
+    "tiles": "node tile-map.js ../assets/map lossless",
+    "diff": "node breeding-diff.js",
+    "calibrate": "node calibrate.js",
+    "bench": "node format-bench.js"
+  },
+  "dependencies": {
+    "sharp": "^0.34.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.0"
+  }
+}
