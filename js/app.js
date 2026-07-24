@@ -49,7 +49,7 @@ function updateChecklist() {
   const done = {
     star: ownedSpeciesSet().size > 0,
     breed: !!localStorage.getItem('palbreed_bred'),
-    plan: plans.length > 0,
+    plan: plans.length > 0 || !!localStorage.getItem('palbreed_planned'),
   };
   let all = true;
   for (const b of bar.querySelectorAll('.step')) {
@@ -59,7 +59,10 @@ function updateChecklist() {
     b.textContent = d ? '✓ ' + base : base;
     all = all && d;
   }
-  if (all) { bar.hidden = true; localStorage.setItem('palbreed_tipseen', '1'); }
+  if (all) {
+    bar.hidden = true; localStorage.setItem('palbreed_tipseen', '1');
+    if (!booting) toast('Setup complete — happy hatching!');
+  }
 }
 
 const pairKey = (a,b) => a < b ? a+'|'+b : b+'|'+a;
@@ -1567,6 +1570,7 @@ function computeRoute() {
     }
   }
   currentRoute = best === null ? null : {steps: best, tK: t.k, passives: goal};
+  if (best !== null) { localStorage.setItem('palbreed_planned', '1'); updateChecklist(); }
   const wo = best ? walkOdds(best, starters, goal) : null;
   renderRoute(out, best, t, goal, {
     label: desired.length ? 'goal:' : 'carrying:',
@@ -2253,13 +2257,19 @@ renderBreed(); renderReverse(); renderDex(); renderRoster(); renderPlans(); rend
     document.getElementById('tipDismiss').addEventListener('click', () => {
       bar.hidden = true; localStorage.setItem('palbreed_tipseen', '1');
     });
-    bar.querySelector('[data-su="star"]').addEventListener('click', () => navTab('dex'));
+    bar.querySelector('[data-su="star"]').addEventListener('click', () => {
+      navTab('dex');
+      toast('Tap ☆ next to any pal you own — stars power every “Owned” filter.');
+    });
     bar.querySelector('[data-su="breed"]').addEventListener('click', () => {
       const a = PALS.find(p => p.n === 'Relaxaurus'), b = PALS.find(p => p.n === 'Sparkit');
       if (a && b) { pickA.set(a, true); pickB.set(b, true); renderBreed(); }
       navTab('breed');
     });
-    bar.querySelector('[data-su="plan"]').addEventListener('click', () => navTab('plan'));
+    bar.querySelector('[data-su="plan"]').addEventListener('click', () => {
+      navTab('plan');
+      toast('Pick Start pal 1 and a target species — the route computes by itself.');
+    });
     updateChecklist();
   }
 }

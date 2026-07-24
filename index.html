@@ -7,6 +7,7 @@
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0d1117">
+<meta name="color-scheme" content="dark">
 <meta name="description" content="Palarium — a Palworld breeding studio: calculator, reverse parent lookup, multi-step route planner, and pal roster manager. Fast, offline-capable, no ads.">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -34,9 +35,9 @@
 <main id="main">
   <div class="setup" id="setupbar" hidden>
     <span class="lb">Get set up:</span>
-    <button type="button" class="step" data-su="star">★ Star pals you own</button>
-    <button type="button" class="step" data-su="breed">Try a breed: Relaxaurus × Sparkit</button>
-    <button type="button" class="step" data-su="plan">Plan a route</button>
+    <button type="button" class="step" data-su="star" title="Opens the Paldex — tap ☆ on species you own">★ Star pals you own</button>
+    <button type="button" class="step" data-su="breed" title="Loads an example pair in the Breed tab">Try a breed: Relaxaurus × Sparkit</button>
+    <button type="button" class="step" data-su="plan" title="Opens the Planner — pick a start pal and a target species">Plan a route</button>
     <button class="dismiss" id="tipDismiss" aria-label="Dismiss setup checklist">✕</button>
   </div>
   <section class="view active" id="view-breed">
