@@ -414,6 +414,34 @@ function openModal(p, rentry) {
 let openPicker = null;
 document.addEventListener('click', e => { if (openPicker && !openPicker.root.contains(e.target)) openPicker.close(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && openPicker) openPicker.close(); });
+// the popup is anchored to its trigger, so scrolling the page underneath it can
+// walk it back under the nav bar — re-fit it (rAF-throttled) while it's open
+let refitQueued = false;
+addEventListener('scroll', () => {
+  if (!openPicker || refitQueued) return;
+  refitQueued = true;
+  requestAnimationFrame(() => { refitQueued = false; openPicker && openPicker.refit(); });
+}, {passive: true});
+
+// ---------- popup placement ----------
+// (bottomNavEl is declared with the nav wiring below; fitPopup only runs on click)
+// A tap shouldn't summon the on-screen keyboard over the very list the popup
+// opened to show, so only autofocus a search field when a keyboard is already
+// in play — pointer:fine, or an explicit true from a keyboard-driven caller.
+const wantsSearchFocus = () => matchMedia('(pointer: fine)').matches;
+// Fit a popup between its trigger and the fixed mobile nav bar (which floats
+// above the page and would otherwise clip the last rows), flipping it above the
+// trigger when the space below is too cramped to be worth using.
+function fitPopup(root, pop, list, cap) {
+  const rr = root.getBoundingClientRect();
+  const headH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--hh')) || 0;
+  const chrome = pop.offsetHeight - list.offsetHeight; // search field, source row
+  const below = window.innerHeight - bottomNavEl.offsetHeight - rr.bottom - 14;
+  const above = rr.top - headH - 14;
+  const up = below < 200 && above > below;
+  pop.classList.toggle('up', up);
+  list.style.maxHeight = Math.max(120, Math.min(cap, (up ? above : below) - chrome)) + 'px';
+}
 
 function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, ariaLabel}) {
   const root = document.createElement('div'); root.className = 'picker';
@@ -429,7 +457,7 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
     const row = document.createElement('div'); row.className = 'srcrow';
     srcAll = document.createElement('button'); srcAll.type = 'button'; srcAll.textContent = 'All pals'; srcAll.className = 'on';
     srcOwn = document.createElement('button'); srcOwn.type = 'button';
-    const setSrc = v => { ownedOnlyPick = v; srcAll.classList.toggle('on', !v); srcOwn.classList.toggle('on', v); renderList(); inp.focus(); };
+    const setSrc = v => { ownedOnlyPick = v; srcAll.classList.toggle('on', !v); srcOwn.classList.toggle('on', v); renderList(); if (wantsSearchFocus()) inp.focus(); };
     srcAll.addEventListener('click', () => setSrc(false));
     srcOwn.addEventListener('click', () => setSrc(true));
     row.append(srcAll, srcOwn); pop.appendChild(row);
@@ -439,6 +467,7 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
   let sel = null, hl = 0, rows = [];
   const api = { root, get: () => sel,
     set(p, silent) { sel = p; renderBtn(); if (p && !silent) pushRecent(p.k); if (!silent) onChange && onChange(p); },
+    refit() { if (root.classList.contains('open')) fitPopup(root, pop, list, 340); },
     close() {
       // if focus is inside the popup (keyboard select, Escape, row click), hand it
       // back to the trigger button so keyboard users aren't dropped at <body>.
@@ -510,19 +539,28 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
     rows.forEach((r, j) => r.el.classList.toggle('hl', j === hl));
     rows[hl].el.scrollIntoView({block:'nearest'});
   }
-  api.openPop = () => {
+  // Autofocusing the search box summons the on-screen keyboard, which covers
+  // the pal grid the popup just opened to show. Only do it when a keyboard is
+  // already in play; on touch the user taps the field when they want to type.
+  api.openPop = (focusSearch = wantsSearchFocus()) => {
     if (openPicker && openPicker !== api) openPicker.close();
     root.classList.add('open'); openPicker = api;
     btn.setAttribute('aria-expanded', 'true');
     pop.style.left = ''; pop.style.right = '';
     pop.classList.toggle('flip', root.getBoundingClientRect().left + 340 > window.innerWidth - 12);
-    inp.value = ''; renderList(); inp.focus();
+    inp.value = ''; renderList();
+    if (focusSearch) inp.focus();
     // clamp to the viewport — on narrow screens flip can push the popup off-screen
     const pr = pop.getBoundingClientRect(), rr = root.getBoundingClientRect();
     if (pr.left < 8) { pop.style.left = (8 - rr.left) + 'px'; pop.style.right = 'auto'; }
     else if (pr.right > window.innerWidth - 8) { pop.style.left = 'auto'; pop.style.right = (rr.right - (window.innerWidth - 8)) + 'px'; }
+    fitPopup(root, pop, list, 340);
   };
-  btn.addEventListener('click', () => { root.classList.contains('open') ? api.close() : api.openPop(); });
+  btn.addEventListener('click', e => {
+    if (root.classList.contains('open')) { api.close(); return; }
+    // detail 0 means Enter/Space activated the button, so a keyboard is in use
+    api.openPop(e.detail === 0 || wantsSearchFocus());
+  });
   inp.addEventListener('input', renderList);
   inp.addEventListener('keydown', e => {
     if (e.key === 'ArrowDown') { e.preventDefault(); highlight(hl + 1); }
@@ -1051,6 +1089,7 @@ function makePassivePicker(mount, max = 4, onChange) {
       pop.appendChild(r);
     }
     mount.classList.add('open');
+    fitPopup(mount, pop, pop, 260); // this popup is its own scroller — no chrome
   }
   inp.addEventListener('input', renderPop);
   inp.addEventListener('focus', renderPop);
@@ -2512,7 +2551,7 @@ document.addEventListener('keydown', e => {
   // tabs without a search box open the most useful pal picker instead
   if (currentTab === 'breed') {
     e.preventDefault();
-    (pickA.get() && !pickB.get() ? pickB : pickA).openPop();
+    (pickA.get() && !pickB.get() ? pickB : pickA).openPop(true);
     return;
   }
   if (currentTab === 'plan') {
@@ -2521,13 +2560,13 @@ document.addEventListener('keydown', e => {
     const n = SLOTS.find(i => !pickS[i].get());
     const pk = n ? pickS[n] : (pickPT.get() ? pickS[1] : pickPT);
     pk.root.scrollIntoView({block: 'center'});
-    pk.openPop();
+    pk.openPop(true);
     return;
   }
   if (currentTab === 'reverse' && !pickT.get()) {
     // no target yet — filtering pairs is useless; open the target picker instead
     e.preventDefault();
-    pickT.openPop();
+    pickT.openPop(true);
     return;
   }
   let target = {dex: '#dexSearch', hatch: '#hatchSearch', roster: '#rosterSearch', reverse: '#pairFilter'}[currentTab];

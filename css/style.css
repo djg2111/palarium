@@ -125,6 +125,8 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .picker-btn .caret{margin-left:auto;color:var(--muted);flex-shrink:0}
 .pop{position:absolute;top:calc(100% + 6px);left:0;width:min(340px,calc(100vw - 24px));z-index:60;background:var(--overlay);border:1px solid var(--border-strong);border-radius:var(--r-lg);box-shadow:0 12px 40px rgba(0,0,0,.5);overflow:hidden;display:none}
 .pop.flip{left:auto;right:0}
+/* opens upward when the trigger sits too close to the bottom nav (see fitPopup) */
+.pop.up,.ptag .tpop.up{top:auto;bottom:calc(100% + 6px)}
 .picker.open .pop{display:block}
 .pop input{width:100%;background:var(--raised);border:none;border-bottom:1px solid var(--border);padding:10px 14px;outline:none}
 .pop .list{max-height:340px;overflow-y:auto;overscroll-behavior:contain}
