@@ -69,6 +69,7 @@ function icon(p, size, clickable) {
   const img = document.createElement('img');
   img.className = 'pico' + (clickable ? ' click' : '');
   img.width = size; img.height = size;
+  img.draggable = false;
   img.loading = 'lazy'; img.src = IMG + p.img; img.alt = p.n;
   if (clickable) { img.title = 'View ' + p.n; img.addEventListener('click', e => { e.stopPropagation(); openModal(p); }); }
   img.onerror = () => {
@@ -1255,6 +1256,7 @@ function treeViewport(treeEl) {
   let drag = null;
   vp.addEventListener('pointerdown', e => {
     if (e.target.closest('.tvp-ctrl') || e.target.classList.contains('click')) return;
+    e.preventDefault(); // stop native text-selection / image-drag from hijacking the pan
     drag = { x: e.clientX - tx, y: e.clientY - ty };
     vp.setPointerCapture(e.pointerId);
     vp.classList.add('grabbing');
