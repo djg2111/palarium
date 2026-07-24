@@ -36,9 +36,9 @@
   </div>
   <section class="view active" id="view-breed">
     <div class="parents">
-      <div id="pickA"></div>
+      <div class="pwrap"><div class="slotlb">Parent 1</div><div id="pickA"></div></div>
       <span class="op">×</span>
-      <div id="pickB"></div>
+      <div class="pwrap"><div class="slotlb">Parent 2</div><div id="pickB"></div></div>
       <button class="swap" id="swapBtn" title="Swap parents">⇄</button>
     </div>
     <div class="result-zone" id="breedResult"><div class="hint">Pick two parents to see their child.</div></div>
@@ -49,7 +49,7 @@
       <div class="ctl"><label>Target child</label><div id="pickT"></div></div>
       <div class="ctl"><label>Must include parent (optional)</label><div id="pickL"></div></div>
       <div class="ctl"><label for="pairFilter">Filter pairs</label><input type="search" class="search-inp" id="pairFilter" placeholder="Type a parent name…"></div>
-      <div class="ctl"><label aria-hidden="true">&nbsp;</label><button type="button" class="toggle" id="ownedToggle" role="switch" aria-checked="false" title="Only show pairs where you own both parents (star pals in the Paldex)"><span class="kn"></span>Owned pals only</button></div>
+      <div class="ctl"><label aria-hidden="true">&nbsp;</label><button type="button" class="toggle" id="ownedToggle" role="switch" aria-checked="false" title="Only show pairs where you own both parents (star pals in the Paldex or add them to your roster)"><span class="kn"></span>Pairs I can make</button></div>
     </div>
     <div id="reverseResult"><div class="hint">Pick a target pal to list every parent combination that produces it.</div></div>
   </section>
@@ -114,18 +114,20 @@
         <div class="slot"><div class="slotlb">Start 3 · optional</div><div id="pickS3"></div><div id="passS3"></div></div>
         <div class="slot"><div class="slotlb">Start 4 · optional</div><div id="pickS4"></div><div id="passS4"></div></div>
       </div>
-      <div class="plansec">2 · Target</div>
+      <div class="plansec">2 · Target &amp; options</div>
       <div class="targetrow">
         <div class="slot"><div class="slotlb">Target species</div><div id="pickPT"></div>
           <div class="slotlb mt">Desired passives · optional</div><div id="desiredPass"></div></div>
+        <div class="slot opts"><div class="slotlb">Route options</div>
+          <button type="button" class="toggle" id="partnerToggle" role="switch" aria-checked="false" title="Only use species you own (starred or in roster) as chain partners"><span class="kn"></span>Only use my pals as partners</button>
+        </div>
       </div>
       <div class="plansec">3 · Route</div>
       <div class="actionbar">
         <button class="cta" id="computeBtn">Compute route ➜</button>
         <button class="alink" id="clearSlots" title="Clear all start slots and the target">✕ Clear</button>
-        <button type="button" class="toggle" id="partnerToggle" role="switch" aria-checked="false" title="Only use species you own (starred or in roster) as chain partners"><span class="kn"></span>Only use my pals as partners</button>
       </div>
-      <div class="routewrap" id="routeOut"><div class="hint">Choose starting pal(s) and a target, then hit Compute.</div></div>
+      <div class="routewrap" id="routeOut"><div class="hint">Pick at least Start pal 1 and a target species — the route appears here automatically.</div></div>
     </div>
 
     <div class="pcard">

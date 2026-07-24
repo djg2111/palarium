@@ -306,7 +306,7 @@ let openPicker = null;
 document.addEventListener('click', e => { if (openPicker && !openPicker.root.contains(e.target)) openPicker.close(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && openPicker) openPicker.close(); });
 
-function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle}) {
+function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, ariaLabel}) {
   const root = document.createElement('div'); root.className = 'picker';
   const btn = document.createElement('button'); btn.className = 'picker-btn'; btn.type = 'button';
   btn.setAttribute('aria-haspopup', 'listbox'); btn.setAttribute('aria-expanded', 'false');
@@ -334,7 +334,7 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle}) {
 
   function renderBtn() {
     btn.innerHTML = '';
-    btn.setAttribute('aria-label', placeholder + ': ' + (sel ? sel.n : 'none selected'));
+    btn.setAttribute('aria-label', (ariaLabel || placeholder) + ': ' + (sel ? sel.n : 'none selected'));
     if (!sel) {
       const s = document.createElement('span'); s.className = 'ph'; s.textContent = placeholder; btn.appendChild(s);
       const c = document.createElement('span'); c.className = 'caret'; c.textContent = '▾'; btn.appendChild(c);
@@ -533,9 +533,9 @@ tabsEl.addEventListener('click', e => {
 window.addEventListener('popstate', () => applyHash());
 
 // ---------- breed view ----------
-const pickA = makePicker(document.getElementById('pickA'), {placeholder:'Parent 1', allowClear:true, ownedToggle:true,
+const pickA = makePicker(document.getElementById('pickA'), {placeholder:'Pick a species…', ariaLabel:'Parent 1', allowClear:true, ownedToggle:true,
   onChange: p => { renderBreed(); if (p && !pickB.get()) setTimeout(() => pickB.openPop(), 0); }});
-const pickB = makePicker(document.getElementById('pickB'), {placeholder:'Parent 2', allowClear:true, ownedToggle:true, onChange:renderBreed});
+const pickB = makePicker(document.getElementById('pickB'), {placeholder:'Pick a species…', ariaLabel:'Parent 2', allowClear:true, ownedToggle:true, onChange:renderBreed});
 document.getElementById('swapBtn').addEventListener('click', () => {
   const a = pickA.get(), b = pickB.get();
   pickA.set(b, true); pickB.set(a, true); renderBreed();
@@ -1187,11 +1187,20 @@ function scheduleAuto() {
 }
 for (const n of SLOTS) {
   pickS[n] = makePicker(document.getElementById('pickS' + n), {
-    placeholder: n === 1 ? 'Pick species or use roster' : 'None',
+    placeholder: n === 1 ? 'Pick a species…' : 'Add another starter…',
     allowClear: true, ownedToggle: true,
-    onChange: () => { slotPassives[n] = []; slotGenders[n] = null; slotPass[n].set([]); save(); scheduleAuto(); }});
+    onChange: () => { slotPassives[n] = []; slotGenders[n] = null; slotPass[n].set([]); updateSlotUI(); save(); scheduleAuto(); }});
   slotPass[n] = makePassivePicker(document.getElementById('passS' + n), 4,
     () => { slotPassives[n] = slotPass[n].get(); save(); scheduleAuto(); });
+}
+// progressive disclosure: show the next empty slot only once the previous one is
+// filled, and each slot's passive input only once its species is chosen
+function updateSlotUI() {
+  for (const n of SLOTS) {
+    const has = !!pickS[n].get();
+    if (n > 1) document.getElementById('pickS' + n).closest('.slot').hidden = !has && !pickS[n - 1].get();
+    document.getElementById('passS' + n).hidden = !has;
+  }
 }
 const pickPT = makePicker(document.getElementById('pickPT'), {placeholder:'Target species', allowClear:true, ownedToggle:true, onChange: () => { save(); scheduleAuto(); }});
 const desiredPick = makePassivePicker(document.getElementById('desiredPass'), 4, () => { save(); scheduleAuto(); });
@@ -1200,7 +1209,7 @@ document.getElementById('clearSlots').addEventListener('click', () => {
   for (const n of SLOTS) { pickS[n].set(null, true); slotPassives[n] = []; slotGenders[n] = null; }
   pickPT.set(null, true); desiredPick.clear();
   currentRoute = null; renderSlotChips();
-  document.getElementById('routeOut').innerHTML = '<div class="hint">Choose starting pal(s) and a target, then hit Compute.</div>';
+  document.getElementById('routeOut').innerHTML = '<div class="hint">Pick at least Start pal 1 and a target species — the route appears here automatically.</div>';
   save();
 });
 function setSlotAuto(rosterEntry) {
@@ -1216,6 +1225,7 @@ function setSlotAuto(rosterEntry) {
 }
 function renderSlotChips() {
   for (const n of SLOTS) slotPass[n].set(slotPassives[n]);
+  updateSlotUI();
 }
 let partnerOwnedOnly = false;
 const partnerToggle = document.getElementById('partnerToggle');
