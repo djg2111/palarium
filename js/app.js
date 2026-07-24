@@ -363,11 +363,13 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
     set(p, silent) { sel = p; renderBtn(); if (p && !silent) pushRecent(p.k); if (!silent) onChange && onChange(p); },
     close() {
       // if focus is inside the popup (keyboard select, Escape, row click), hand it
-      // back to the trigger button so keyboard users aren't dropped at <body>
+      // back to the trigger button so keyboard users aren't dropped at <body>.
+      // Deferred: focusing the button during the Enter keydown would make the
+      // browser deliver the synthesized click to it and reopen the popup.
       const inside = root.contains(document.activeElement);
       root.classList.remove('open'); btn.setAttribute('aria-expanded', 'false');
       if (openPicker === api) openPicker = null;
-      if (inside) btn.focus();
+      if (inside) setTimeout(() => { if (!root.classList.contains('open')) btn.focus(); }, 0);
     } };
 
   function renderBtn() {
@@ -403,7 +405,9 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
       r.append(nm, z);
       if (os.has(p.k)) { const o = document.createElement('span'); o.className = 'own'; o.textContent = '★'; o.title = 'Owned'; r.appendChild(o); }
       r.appendChild(typeDots(p));
-      r.addEventListener('click', () => { api.set(p); api.close(); });
+      // close first: close() schedules its deferred refocus before any popup a
+      // set() side effect opens (e.g. Parent 2 auto-open), which must win focus
+      r.addEventListener('click', () => { api.close(); api.set(p); });
       list.appendChild(r); rows.push({el:r, p});
     };
     const addGroup = label => {
@@ -445,7 +449,7 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
   inp.addEventListener('keydown', e => {
     if (e.key === 'ArrowDown') { e.preventDefault(); highlight(hl + 1); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(hl - 1); }
-    else if (e.key === 'Enter' && rows.length) { api.set(rows[hl].p); api.close(); }
+    else if (e.key === 'Enter' && rows.length) { api.close(); api.set(rows[hl].p); }
   });
   renderBtn();
   return api;
@@ -474,7 +478,7 @@ function save() {
   const s = {
     tab: currentTab, a: pickA.get()?.k, b: pickB.get()?.k, t: pickT.get()?.k, l: pickL.get()?.k,
     ownedOnly, dexOwnedOnly, rgroup: typeof groupBySpecies !== 'undefined' && groupBySpecies,
-    pt: pickPT.get()?.k, po: partnerOwnedOnly, sp: slotPassives, sg: slotGenders,
+    pt: pickPT.get()?.k, po: partnerOwnedOnly, ac: avoidCollab, sp: slotPassives, sg: slotGenders,
     dp: desiredPick.get(),
     ro: !!currentRoute, chain: breedChain,
     hn: typeof hatchNewOnly !== 'undefined' && hatchNewOnly,
@@ -1347,6 +1351,9 @@ function renderSlotChips() {
 let partnerOwnedOnly = false;
 const partnerToggle = document.getElementById('partnerToggle');
 partnerToggle.addEventListener('click', () => { partnerOwnedOnly = !partnerOwnedOnly; setSwitch(partnerToggle, partnerOwnedOnly); save(); scheduleAuto(); });
+let avoidCollab = false;
+const collabToggle = document.getElementById('collabToggle');
+collabToggle.addEventListener('click', () => { avoidCollab = !avoidCollab; setSwitch(collabToggle, avoidCollab); save(); scheduleAuto(); });
 
 function ownedSpeciesSet() {
   const s = new Set(owned);
@@ -1356,9 +1363,13 @@ function ownedSpeciesSet() {
 function partnerPool() {
   const own = ownedSpeciesSet();
   if (partnerOwnedOnly) return [...own];
+  let keys = PALS.map(p => p.k);
+  // collab-exclusive species aren't catchable in every game version — when
+  // asked, only use them as partners if the player already owns them
+  if (avoidCollab) keys = keys.filter(k => !byKey.get(k).cb || own.has(k));
   // owned species first, then common catchable pals before rare/collab ones,
   // so equal-length routes prefer partners the player can realistically get
-  return PALS.map(p => p.k).sort((a, b) => {
+  return keys.sort((a, b) => {
     const A = byKey.get(a), B = byKey.get(b);
     return (own.has(b) ? 1 : 0) - (own.has(a) ? 1 : 0)
       || (A.cb ? 1 : 0) - (B.cb ? 1 : 0)
@@ -1722,7 +1733,8 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
     const h = document.createElement('div'); h.className = 'hint';
     h.textContent = (target.ic || uniqueChildren.has(target.k))
       ? `${target.n} can only come from its unique combo — no averaging chain reaches it${partnerOwnedOnly ? ' with only your pals' : ''}. Check its pairs in Find Parents.`
-      : `No route found${partnerOwnedOnly ? ' using only your pals — try turning off "only my pals as partners"' : ' within 8 steps'}.`;
+      : `No route found${partnerOwnedOnly ? ' using only your pals — try turning off "Only use my pals as partners"'
+        : avoidCollab ? ' without collab partners — try turning off "Avoid Terraria collab partners"' : ' within 8 steps'}.`;
     out.appendChild(h); return;
   }
   if (!steps.length) {
@@ -1737,7 +1749,8 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
   const need = neededSpecies(steps, ropts.starterKs || []);
   if (need.length) out.appendChild(neededRow(need));
   if (steps.length > 1) out.appendChild(treeViewport(routeTree(steps)));
-  steps.forEach((s, i) => out.appendChild(stepEl(s, {stepNo: i + 1, carrier: true, odds: stepOdds[i], onOpen: () => openChainStep(steps, i)})));
+  // the "passive carrier line" tag only means something when passives are tracked
+  steps.forEach((s, i) => out.appendChild(stepEl(s, {stepNo: i + 1, carrier: carried.length > 0, odds: stepOdds[i], onOpen: () => openChainStep(steps, i)})));
   if (carried.length) {
     const n = document.createElement('div'); n.className = 'mathline';
     n.textContent = 'At each step, hatch until a child inherits your passives (and the right gender for the next pairing), then continue with that child.';
@@ -2115,6 +2128,7 @@ for (const n of SLOTS) {
 if (state.pt && byKey.has(state.pt)) pickPT.set(byKey.get(state.pt), true);
 if (Array.isArray(state.dp) && state.dp.length) desiredPick.set(state.dp);
 if (state.po) { partnerOwnedOnly = true; setSwitch(partnerToggle, true); }
+if (state.ac) { avoidCollab = true; setSwitch(collabToggle, true); }
 if (state.hn) { hatchNewOnly = true; setSwitch(hatchNewBtn, true); }
 if (state.dt) dexType.value = state.dt;
 if (state.dw) dexWork.value = state.dw;
