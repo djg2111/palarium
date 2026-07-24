@@ -521,8 +521,14 @@ function appendChainCard(zone, a, b) {
 }
 
 function childCard(p, opts = {}) {
-  const card = document.createElement('div'); card.className = 'child-card';
-  card.appendChild(icon(p, 84, true));
+  const card = document.createElement('div'); card.className = 'child-card clickable';
+  card.tabIndex = 0;
+  card.setAttribute('role', 'button');
+  card.setAttribute('aria-label', 'View ' + p.n + ' details');
+  card.title = 'View ' + p.n + '’s full card';
+  card.addEventListener('click', () => openModal(p));
+  card.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === card) { e.preventDefault(); openModal(p); } });
+  card.appendChild(icon(p, 84));
   const body = document.createElement('div');
   const h = document.createElement('h2'); h.textContent = p.n;
   const z = document.createElement('span'); z.className = 'zk'; z.textContent = zk(p); h.appendChild(z);
@@ -543,7 +549,7 @@ function renderBreed() {
   const zone = document.getElementById('breedResult');
   zone.innerHTML = '';
   const a = pickA.get(), b = pickB.get();
-  if (!a || !b) { zone.innerHTML = '<div class="hint">Pick two parents to see their child. Click any pal picture for its full card.</div>'; return; }
+  if (!a || !b) { zone.innerHTML = '<div class="hint">Pick two parents to see their child. Click the result card for full details.</div>'; return; }
   const res = breed(a, b);
   const mutNote = () => {
     const m = document.createElement('div'); m.className = 'mathline';
@@ -575,8 +581,6 @@ function renderBreed() {
   }
   mutNote();
   const lr = document.createElement('div'); lr.className = 'linkrow';
-  const b1 = document.createElement('button'); b1.className = 'alink'; b1.textContent = `View ${ch.n}'s card`;
-  b1.addEventListener('click', () => openModal(ch));
   const b2 = document.createElement('button'); b2.className = 'alink'; b2.textContent = `Find all parents of ${ch.n}`;
   b2.addEventListener('click', () => { pickT.set(ch, true); reverseShown = 120; renderReverse(); showTab('reverse'); });
   const b3 = document.createElement('button'); b3.className = 'alink'; b3.textContent = `Continue: breed ${ch.n} with…`;
@@ -586,7 +590,7 @@ function renderBreed() {
     pickA.set(ch, true); pickB.set(null, true); renderBreed();
     setTimeout(() => pickB.openPop(), 0);
   });
-  lr.append(b1, b2, b3);
+  lr.append(b2, b3);
   zone.appendChild(lr);
   appendChainCard(zone, a, b);
 }

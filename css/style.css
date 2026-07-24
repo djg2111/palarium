@@ -74,6 +74,8 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .swap:hover{color:var(--text);border-color:var(--border2)}
 .result-zone{margin-top:26px;display:flex;flex-direction:column;align-items:center;gap:16px}
 .child-card{width:min(560px,100%);background:linear-gradient(180deg,var(--bg3),var(--bg2));border:1px solid var(--border2);border-radius:18px;padding:24px 28px;display:flex;gap:22px;align-items:center;animation:pop .18s ease-out}
+.child-card.clickable{cursor:pointer;transition:border-color .15s,transform .15s}
+.child-card.clickable:hover{border-color:var(--accent);transform:translateY(-1px)}
 @keyframes pop{from{transform:scale(.97);opacity:0}to{transform:scale(1);opacity:1}}
 .child-card .pico{width:84px;height:84px;font-size:30px}
 .child-card h2{font-size:23px;line-height:1.2}
