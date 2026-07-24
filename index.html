@@ -16,10 +16,12 @@
   <h1 class="logo">Pal<span>arium</span></h1>
   <nav class="tabs" id="tabs" role="tablist" aria-label="App sections">
     <button data-v="breed" class="active" role="tab" aria-selected="true">Breed</button>
-    <button data-v="reverse" role="tab" aria-selected="false">Find Parents</button>
+    <button data-v="reverse" role="tab" aria-selected="false">Find parents</button>
     <button data-v="plan" role="tab" aria-selected="false">Planner</button>
+    <span class="sep" aria-hidden="true"></span>
     <button data-v="hatch" role="tab" aria-selected="false">Breedable now</button>
     <button data-v="roster" role="tab" aria-selected="false">Roster</button>
+    <span class="sep" aria-hidden="true"></span>
     <button data-v="dex" role="tab" aria-selected="false">Paldex</button>
     <button data-v="guide" role="tab" aria-selected="false">Guide</button>
   </nav>
@@ -30,9 +32,12 @@
 </div></header>
 
 <main id="main">
-  <div class="tipbar" id="tipbar" hidden>
-    <span>👋 First time here? Press <code>/</code> to search — it opens the pal picker right here. Star <b>★</b> pals in the Paldex to mark what you own — every “Owned” filter uses them. Works fully offline once loaded.</span>
-    <button id="tipDismiss" aria-label="Dismiss tips">✕</button>
+  <div class="setup" id="setupbar" hidden>
+    <span class="lb">Get set up:</span>
+    <button type="button" class="step" data-su="star">★ Star pals you own</button>
+    <button type="button" class="step" data-su="breed">Try a breed: Relaxaurus × Sparkit</button>
+    <button type="button" class="step" data-su="plan">Plan a route</button>
+    <button class="dismiss" id="tipDismiss" aria-label="Dismiss setup checklist">✕</button>
   </div>
   <section class="view active" id="view-breed">
     <div class="parents">
@@ -46,7 +51,7 @@
 
   <section class="view" id="view-reverse">
     <div class="controls">
-      <div class="ctl"><label>Target child</label><div id="pickT"></div></div>
+      <div class="ctl"><label>Target species</label><div id="pickT"></div></div>
       <div class="ctl"><label>Must include parent (optional)</label><div id="pickL"></div></div>
       <div class="ctl"><label for="pairFilter">Filter pairs</label><input type="search" class="search-inp" id="pairFilter" placeholder="Type a parent name…"></div>
       <div class="ctl"><label aria-hidden="true">&nbsp;</label><button type="button" class="toggle" id="ownedToggle" role="switch" aria-checked="false" title="Only show pairs where you own both parents (star pals in the Paldex or add them to your roster)"><span class="kn"></span>Pairs I can make</button></div>
@@ -57,7 +62,6 @@
   <section class="view" id="view-hatch">
     <div class="pcard">
       <div class="collhead">
-        <h2>🥚 Breedable now</h2>
         <span class="rstats" id="hatchStats" aria-live="polite"></span>
       </div>
       <div class="sub">Every species you can breed <b>right now</b>, in one step, from pals you own (★ starred or in your roster). Click a result to see which of your pairs produce it.</div>
@@ -72,12 +76,11 @@
   <section class="view" id="view-roster">
     <div class="pcard">
       <div class="collhead">
-        <h2>📦 Roster</h2>
         <span class="rstats" id="rosterStats" aria-live="polite"></span>
         <div class="collacts">
           <button class="alink primary" id="rosterOpenAdd">+ Add pal</button>
-          <button class="alink" id="exportBtn" title="Download roster, plans and owned list as a JSON backup">⬇ Export</button>
-          <button class="alink" id="importBtn" title="Restore a JSON backup">⬆ Import</button>
+          <button class="alink" id="exportBtn" title="Download roster, plans and owned list as a JSON backup">Export</button>
+          <button class="alink" id="importBtn" title="Restore a JSON backup">Import</button>
           <input type="file" id="importFile" accept="application/json" style="display:none">
         </div>
       </div>
@@ -100,19 +103,19 @@
 
   <section class="view" id="view-plan">
     <div class="pcard">
-      <h2>🗺️ Plan a breeding route</h2>
+      <h2>Plan a breeding route</h2>
       <div class="sub">Pick starting pal(s) and a target species — the planner finds the shortest breeding chain and tracks the passives you want to carry along it.</div>
       <details class="moredet plannerhow"><summary>How the planner works</summary>
         <div><p>Pick up to four starting pals (from your roster, or any species — add the passives each one carries under its slot). The planner merges your starters into one line, trying every merge order, then finds the shortest chain of partners to reach the target. At every step, hatch until a child inherited the passives you're carrying, then continue with that child. Set <b>desired passives</b> on the target to track a specific goal set — the route steps show the approximate odds per egg.</p></div>
       </details>
-      <div class="plansec">1 · Starting pals</div>
+      <div class="plansec">1 · Starting pals<button class="alink" id="clearSlots" title="Clear all start slots and the target">✕ Clear inputs</button></div>
       <div class="quicklb">Quick add from your roster — click a pal to fill the next free slot:</div>
       <div class="strip" id="rosterStrip"></div>
       <div class="slotgrid">
         <div class="slot"><div class="slotlb">Start pal 1</div><div id="pickS1"></div><div id="passS1"></div></div>
-        <div class="slot"><div class="slotlb">Start 2 · optional</div><div id="pickS2"></div><div id="passS2"></div></div>
-        <div class="slot"><div class="slotlb">Start 3 · optional</div><div id="pickS3"></div><div id="passS3"></div></div>
-        <div class="slot"><div class="slotlb">Start 4 · optional</div><div id="pickS4"></div><div id="passS4"></div></div>
+        <div class="slot"><div class="slotlb">Start pal 2 · optional</div><div id="pickS2"></div><div id="passS2"></div></div>
+        <div class="slot"><div class="slotlb">Start pal 3 · optional</div><div id="pickS3"></div><div id="passS3"></div></div>
+        <div class="slot"><div class="slotlb">Start pal 4 · optional</div><div id="pickS4"></div><div id="passS4"></div></div>
       </div>
       <div class="plansec">2 · Target &amp; options</div>
       <div class="targetrow">
@@ -125,14 +128,11 @@
         </div>
       </div>
       <div class="plansec">3 · Route</div>
-      <div class="actionbar">
-        <button class="alink" id="clearSlots" title="Clear all start slots and the target">✕ Clear inputs</button>
-      </div>
       <div class="routewrap" id="routeOut"><div class="hint">Pick at least Start pal 1 and a target species — the route appears here automatically.</div></div>
     </div>
 
     <div class="pcard">
-      <h2>📋 Saved plans</h2>
+      <h2>Saved plans</h2>
       <div class="sub">Your breeding to-do lists. Tick off steps as you hatch them.</div>
       <div id="plansList"><div class="hint">No saved plans yet — compute a route and save it.</div></div>
     </div>
@@ -147,8 +147,8 @@
     <div class="viewsub">Star ★ a species to mark it as owned — stars power every “Owned” filter across the app. Pals in your Roster count as owned automatically.</div>
     <div class="dex-controls">
       <input type="search" class="search-inp" id="dexSearch" placeholder="Search pals…" aria-label="Search pals">
-      <select id="dexType" aria-label="Filter by element"><option value="">All elements</option></select>
-      <select id="dexWork" aria-label="Filter by work suitability"><option value="">Any work suitability</option></select>
+      <select id="dexType" aria-label="Filter by element"><option value="">Any element</option></select>
+      <select id="dexWork" aria-label="Filter by work suitability"><option value="">Any work</option></select>
       <button type="button" class="toggle" id="dexOwned" role="switch" aria-checked="false" title="Only show starred pals"><span class="kn"></span>Owned only</button>
       <span class="rstats" id="dexCount" aria-live="polite"></span>
       <button type="button" class="alink" id="dexClear" hidden>✕ Clear filters</button>
@@ -202,7 +202,7 @@
         <h2><span>🧬</span>Deep dive</h2>
         <div class="sub">How the game actually decides what hatches — the same rules this calculator runs.</div>
 
-        <details open><summary>The species formula (breeding power)</summary><div>
+        <details open id="g-formula"><summary>The species formula (breeding power)</summary><div>
           <p>Every species has a hidden number called <b>breeding power</b> (internally <code>CombiRank</code> — you can see it for every pal in the Paldex tab). When two different species breed:</p>
           <p><code>target = floor((powerA + powerB + 1) ÷ 2)</code></p>
           <p>The child is the species whose breeding power is <b>closest to that target</b>. If two species are exactly equally close, a hidden priority value decides the winner. That's it — the whole species system is one averaging formula. <button type="button" class="alink gjump" data-nav="dex">See breeding power in the Paldex</button></p>
@@ -214,7 +214,7 @@
           </ul>
         </div></details>
 
-        <details><summary>Passive skill inheritance (the real endgame)</summary><div>
+        <details id="g-passives"><summary>Passive skill inheritance (the real endgame)</summary><div>
           <p>The child can inherit up to <b>4 passive skills</b> drawn from the combined pool of both parents' passives, and it can also roll <b>random passives</b> that neither parent has.</p>
           <ul>
             <li>Roughly speaking (community-measured, the game doesn't show the odds): if the parents together have <i>exactly</i> the 4 passives you want and nothing else, about <b>1 in 10</b> eggs is a perfect 4/4 baby.</li>
@@ -224,7 +224,7 @@
           </ul>
         </div></details>
 
-        <details><summary>IVs, genders and stats</summary><div>
+        <details id="g-ivs"><summary>IVs, genders and stats</summary><div>
           <ul>
             <li>Each pal has hidden <b>IVs (0–100)</b> for HP, Attack and Defense. A child's IVs are usually inherited from one parent or the other, with a chance to roll fresh — so hatch several keepers and compare. (IV viewer mods or the in-game stat comparison help here.)</li>
             <li><b>Gender is rolled per species</b> — every pal card in this app shows the ♂/♀ odds. Some species are heavily skewed (useful to know when you need a specific gender for a gender-locked recipe or your next pairing).</li>
@@ -232,7 +232,7 @@
           </ul>
         </div></details>
 
-        <details><summary>Egg mutations 🧬</summary><div>
+        <details id="g-mutations"><summary>Egg mutations 🧬</summary><div>
           <ul>
             <li>Every bred egg has a <b>~1% chance to mutate</b> — <b>~3%</b> if you use an <b>Extravagant Vegetable Cake</b> instead of a regular Cake.</li>
             <li>A mutated pal can come with any of: up to <b>2 free condensation levels</b>, <b>Alpha</b> (oversized) status, one or more <b>mutation-exclusive passives</b>, or even hatch as a <b>different species</b> than the normal child.</li>
@@ -241,7 +241,7 @@
           </ul>
         </div></details>
 
-        <details><summary>Eggs, incubation and throughput</summary><div>
+        <details id="g-eggs"><summary>Eggs, incubation and throughput</summary><div>
           <ul>
             <li>Egg type and size depend on the child (element + rarity). Bigger/rarer eggs take longer — huge eggs can take many real-time hours at default settings.</li>
             <li>Eggs have a <b>temperature preference</b> ("feels a little cold…"). Match it — put the incubator near a heater or campfire for warm-loving eggs, a cooler for cold-loving ones — and incubation speeds up significantly.</li>
@@ -254,7 +254,20 @@
     </div>
   </section>
 </main>
-<footer>Palarium · a personal fan project — pal data &amp; icons extracted from palpedia.net (game v1.0.0) · Palworld © Pocketpair · works fully offline · star pals in the Paldex to build your owned list · press <code>/</code> to search</footer>
+<footer>Palarium · a personal fan project — pal data &amp; icons extracted from palpedia.net (game v1.0.0) · Palworld © Pocketpair · works fully offline · star pals in the Paldex to build your owned list<span class="kbdonly"> · press <code>/</code> to search</span></footer>
+
+<nav class="bottomnav" id="bottomnav" aria-label="Quick navigation">
+  <button data-v="breed" type="button"><span class="bi" aria-hidden="true">🐣</span>Breed</button>
+  <button data-v="reverse" type="button"><span class="bi" aria-hidden="true">🔍</span>Find</button>
+  <button data-v="plan" type="button"><span class="bi" aria-hidden="true">🗺️</span>Plan</button>
+  <button id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false"><span class="bi" aria-hidden="true">⋯</span>More</button>
+</nav>
+<div class="moresheet" id="moresheet">
+  <button data-v="hatch" type="button">Breedable now</button>
+  <button data-v="roster" type="button">Roster</button>
+  <button data-v="dex" type="button">Paldex</button>
+  <button data-v="guide" type="button">Guide</button>
+</div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
@@ -273,7 +286,7 @@
       </div>
     </div>
     <div class="fld"><label>Passives <span class="opt">· optional, up to 4</span></label><div class="ptag" id="passivePick"></div></div>
-    <div class="fld"><label for="nickInp">Nickname <span class="opt">· optional</span></label><input class="search-inp" id="nickInp" placeholder="—"></div>
+    <div class="fld"><label for="nickInp">Nickname <span class="opt">· optional</span></label><input class="search-inp" id="nickInp"></div>
     <details class="moredet" id="moreDetails">
       <summary>More details — IVs &amp; notes</summary>
       <div>

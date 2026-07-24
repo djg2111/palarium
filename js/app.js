@@ -13,6 +13,8 @@ function resolvePal(x) {
 const TYPE_COLORS = {normal:'var(--neutral)',fire:'var(--fire)',water:'var(--water)',electric:'var(--electric)',grass:'var(--grass)',dark:'var(--dark)',dragon:'var(--dragon)',ground:'var(--ground)',ice:'var(--ice)'};
 const WORKS = {kindling:'🔥 Kindling',watering:'💧 Watering',planting:'🌱 Planting',generatingElectricity:'⚡ Electricity',handiwork:'🛠️ Handiwork',gathering:'🧺 Gathering',lumbering:'🪓 Lumbering',mining:'⛏️ Mining',medicineProduction:'💊 Medicine',cooling:'❄️ Cooling',transporting:'📦 Transporting',farming:'🐄 Farming'};
 const workIcon = k => (WORKS[k] || k).split(' ')[0];
+// honor prefers-reduced-motion in JS-driven scrolls (CSS handles animations)
+const SMOOTH = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
 
 // ---------- toasts (aria-live region) & switch helper ----------
 const toastsEl = document.getElementById('toasts');
@@ -38,6 +40,27 @@ function toast(msg, undoFn, action) {
   toastsEl.appendChild(t);
 }
 function setSwitch(el, on) { el.classList.toggle('on', on); el.setAttribute('aria-checked', String(on)); }
+
+// ---------- first-run setup checklist ----------
+// chips mark themselves done from real signals; all three done → gone for good
+function updateChecklist() {
+  const bar = document.getElementById('setupbar');
+  if (!bar || bar.hidden) return;
+  const done = {
+    star: ownedSpeciesSet().size > 0,
+    breed: !!localStorage.getItem('palbreed_bred'),
+    plan: plans.length > 0,
+  };
+  let all = true;
+  for (const b of bar.querySelectorAll('.step')) {
+    const d = !!done[b.dataset.su];
+    const base = b.dataset.base || (b.dataset.base = b.textContent);
+    b.classList.toggle('done', d);
+    b.textContent = d ? '✓ ' + base : base;
+    all = all && d;
+  }
+  if (all) { bar.hidden = true; localStorage.setItem('palbreed_tipseen', '1'); }
+}
 
 const pairKey = (a,b) => a < b ? a+'|'+b : b+'|'+a;
 const comboByPair = new Map(), comboByChild = new Map();
@@ -76,6 +99,7 @@ function toggleOwned(k) {
   owned.has(k) ? owned.delete(k) : owned.add(k);
   localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
   scheduleAuto(); // owned pool feeds the planner's partner list
+  updateChecklist();
 }
 
 // ---------- recently picked pals (shared across all pickers) ----------
@@ -119,12 +143,12 @@ function eggChip(p) {
 }
 function typeDots(p) {
   const w = document.createElement('span'); w.className = 'types';
-  for (const t of p.t) { const d = document.createElement('i'); d.className = 'dot'; d.style.background = TYPE_COLORS[t] || 'var(--dim)'; d.title = t; w.appendChild(d); }
+  for (const t of p.t) { const d = document.createElement('i'); d.className = 'dot'; d.style.background = TYPE_COLORS[t] || 'var(--muted)'; d.title = t; w.appendChild(d); }
   return w;
 }
 function typeChips(p) {
   const f = document.createDocumentFragment();
-  for (const t of p.t) { const c = document.createElement('span'); c.className = 'chip'; c.style.background = TYPE_COLORS[t] || 'var(--dim)'; c.textContent = t; f.appendChild(c); }
+  for (const t of p.t) { const c = document.createElement('span'); c.className = 'chip'; c.style.background = TYPE_COLORS[t] || 'var(--muted)'; c.textContent = t; f.appendChild(c); }
   return f;
 }
 function worksEl(p, highlightKey) {
@@ -245,7 +269,7 @@ function openModal(p) {
   btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(true); pickB.set(p, true); renderBreed(); navTab('breed'); }));
   btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(true); pickPT.set(p, true); navTab('plan'); scheduleAuto(); }));
   btns.appendChild(mkBtn('+ Add to roster', false, () => { leaveModal(); openRosterEditor(null, p); }));
-  btns.appendChild(mkBtn('🔗 Copy link', false, async () => {
+  btns.appendChild(mkBtn('Copy link', false, async () => {
     try {
       await navigator.clipboard.writeText(location.href.split('#')[0] + '#/pal/' + p.k);
       toast('Link to ' + p.n + ' copied');
@@ -502,6 +526,8 @@ function showTab(v) {
     b.tabIndex = on ? 0 : -1;
     if (on) b.scrollIntoView({block: 'nearest', inline: 'nearest'});
   });
+  syncBottomNav(v);
+  closeMoreSheet();
   if (v === 'hatch') renderHatch();
   save();
 }
@@ -526,6 +552,42 @@ function tablistKeys(container) {
   });
 }
 tablistKeys(tabsEl);
+// ---------- mobile bottom tab bar (≤640px; hidden by CSS elsewhere) ----------
+const bottomNavEl = document.getElementById('bottomnav');
+const moreSheetEl = document.getElementById('moresheet');
+const moreBtnEl = document.getElementById('moreBtn');
+const MORE_TABS = ['hatch', 'roster', 'dex', 'guide'];
+function closeMoreSheet() {
+  moreSheetEl.classList.remove('open');
+  moreBtnEl.setAttribute('aria-expanded', 'false');
+}
+function syncBottomNav(v) {
+  bottomNavEl.querySelectorAll('button[data-v]').forEach(b => {
+    const on = b.dataset.v === v;
+    b.classList.toggle('active', on);
+    if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
+  moreBtnEl.classList.toggle('active', MORE_TABS.includes(v));
+  moreSheetEl.querySelectorAll('button[data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+}
+moreBtnEl.addEventListener('click', e => {
+  e.stopPropagation(); // keep the document-level close handler from undoing the toggle
+  const open = !moreSheetEl.classList.contains('open');
+  moreSheetEl.classList.toggle('open', open);
+  moreBtnEl.setAttribute('aria-expanded', String(open));
+});
+bottomNavEl.addEventListener('click', e => {
+  const b = e.target.closest('button[data-v]');
+  if (b) navTab(b.dataset.v);
+});
+moreSheetEl.addEventListener('click', e => {
+  const b = e.target.closest('button[data-v]');
+  if (b) navTab(b.dataset.v); // showTab closes the sheet
+});
+document.addEventListener('click', e => {
+  if (moreSheetEl.classList.contains('open') && !moreSheetEl.contains(e.target)) closeMoreSheet();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMoreSheet(); });
 // ---------- shareable URLs ----------
 let booting = true;                    // suppress hash writes until init has applied the incoming hash
 const initialHash = location.hash;
@@ -632,7 +694,7 @@ function appendChainCard(zone, a, b) {
   const card = document.createElement('div'); card.className = 'chaincard';
   const head = document.createElement('div'); head.className = 'chainhead';
   const ttl = document.createElement('span'); ttl.className = 'ttl';
-  ttl.textContent = `🧭 Breeding chain — step ${breedChain.idx + 1} of ${n} toward ${target.n}`;
+  ttl.textContent = `Breeding chain — step ${breedChain.idx + 1} of ${n} toward ${target.n}`;
   head.appendChild(ttl);
   const nav = document.createElement('div'); nav.className = 'nav';
   const go = d => {
@@ -698,22 +760,31 @@ function renderBreed() {
     const exA = PALS.find(p => p.n === 'Relaxaurus'), exB = PALS.find(p => p.n === 'Sparkit');
     if (exA && exB) {
       const ex = document.createElement('button'); ex.className = 'alink';
-      ex.textContent = '✨ Try an example: Relaxaurus × Sparkit';
+      ex.textContent = 'Try an example: Relaxaurus × Sparkit';
       ex.title = 'A unique combo — the gold UNIQUE badge means the pair ignores the breeding math';
       ex.addEventListener('click', () => { pickA.set(exA, true); pickB.set(exB, true); renderBreed(); });
       lr.appendChild(ex);
     }
     const rev = document.createElement('button'); rev.className = 'alink';
-    rev.textContent = '🔍 …or work backwards from a target pal';
+    rev.textContent = '…or work backwards from a target pal';
     rev.addEventListener('click', () => navTab('reverse'));
     lr.appendChild(rev);
     zone.appendChild(lr);
     return;
   }
+  localStorage.setItem('palbreed_bred', '1'); updateChecklist();
   const res = breed(a, b);
   const mutNote = () => {
     const m = document.createElement('div'); m.className = 'mathline';
-    m.textContent = '🧬 ~1% of bred eggs mutate (3% with an Extravagant Vegetable Cake) — see Guide → Egg mutations.';
+    m.append('🧬 ~1% of bred eggs mutate (3% with an Extravagant Vegetable Cake) — ');
+    const g = document.createElement('button'); g.type = 'button'; g.className = 'alink gjump';
+    g.textContent = 'Egg mutations ↗'; g.title = 'Open the Guide section on egg mutations';
+    g.addEventListener('click', () => {
+      navTab('guide');
+      const d = document.getElementById('g-mutations');
+      if (d) { d.open = true; d.scrollIntoView({block: 'start', behavior: SMOOTH}); }
+    });
+    m.appendChild(g);
     zone.appendChild(m);
   };
   if (res.kind === 'gender') {
@@ -764,7 +835,7 @@ function renderBreed() {
 }
 
 // ---------- reverse view ----------
-const pickT = makePicker(document.getElementById('pickT'), {placeholder:'Target child', allowClear:true, ownedToggle:true, onChange:() => { reverseShown = 120; renderReverse(); }});
+const pickT = makePicker(document.getElementById('pickT'), {placeholder:'Pick a species…', ariaLabel:'Target species', allowClear:true, ownedToggle:true, onChange:() => { reverseShown = 120; renderReverse(); }});
 const pickL = makePicker(document.getElementById('pickL'), {placeholder:'Any parent', allowClear:true, ownedToggle:true, onChange:() => { reverseShown = 120; renderReverse(); }});
 const pairFilter = document.getElementById('pairFilter');
 pairFilter.addEventListener('input', () => { reverseShown = 120; renderReverse(); });
@@ -814,7 +885,7 @@ function renderReverse() {
   cnt.textContent = `${pairs.length}${pairs.length !== total ? ' of ' + total : ''} combination${total === 1 ? '' : 's'}`;
   const sub = document.createElement('span'); sub.className = 'sub';
   sub.textContent = `produce ${t.n}` + (makeable && !ownedOnly ? ` · ★ ${makeable} makeable with your pals (listed first)` : '')
-    + (pairs.length ? ' · click a pair to load it in the Breed tab' : '');
+    + (pairs.length ? ' · tap a pair to open it in Breed' : '');
   sum.append(cnt, sub); zone.appendChild(sum);
   if (!pairs.length) {
     const h = document.createElement('div'); h.className = 'hint';
@@ -937,6 +1008,7 @@ let roster = JSON.parse(localStorage.getItem('palbreed_roster') || '[]')
 function saveRoster() {
   localStorage.setItem('palbreed_roster', JSON.stringify(roster));
   scheduleAuto(); // roster changes partner passives/genders the route may use
+  updateChecklist();
 }
 // gender feasibility from recorded roster genders (star-only species = unknown, no warning)
 function speciesGenderInfo(k) {
@@ -959,7 +1031,7 @@ function pairGenderIssue(aK, bK) {
   return null;
 }
 const pickR = makePicker(document.getElementById('pickR'), {placeholder:'Pick a species…', allowClear:true, ownedToggle:true, onChange: p => {
-  if (p) { document.getElementById('rosterErr').hidden = true; pickR.root.querySelector('.picker-btn').style.borderColor = ''; }
+  if (p) { document.getElementById('rosterErr').hidden = true; pickR.root.querySelector('.picker-btn').classList.remove('invalid'); }
 }});
 const rosterPassives = makePassivePicker(document.getElementById('passivePick'));
 const nickInp = document.getElementById('nickInp');
@@ -999,7 +1071,7 @@ function openRosterEditor(entry, presetPal) {
     rmTitle.textContent = presetPal ? 'Add ' + presetPal.n + ' to roster' : 'Add a pal';
     rosterAddBtn.textContent = '+ Add to roster';
   }
-  pickR.root.querySelector('.picker-btn').style.borderColor = '';
+  pickR.root.querySelector('.picker-btn').classList.remove('invalid');
   document.getElementById('rosterErr').hidden = true;
   document.getElementById('rosterAddAnother').style.display = entry ? 'none' : '';
   lastFocusEditor = document.activeElement;
@@ -1043,7 +1115,7 @@ rosterCancelBtn.addEventListener('click', closeRosterEditor);
 function commitRosterEntry() {
   const p = pickR.get();
   if (!p) {
-    pickR.root.querySelector('.picker-btn').style.borderColor = 'var(--pink)';
+    pickR.root.querySelector('.picker-btn').classList.add('invalid');
     document.getElementById('rosterErr').hidden = false; // color alone isn't a message
     return null;
   }
@@ -1275,6 +1347,8 @@ const SLOTS = [1, 2, 3, 4];
 const slotPassives = {1: [], 2: [], 3: [], 4: []};
 const slotGenders = {1: null, 2: null, 3: null, 4: null};
 const pickS = {}, slotPass = {};
+// one string for the empty-route state, wherever it's shown
+const ROUTE_HINT = '<div class="hint">Pick at least Start pal 1 and a target species — the route appears here automatically.</div>';
 // recompute automatically (debounced) once a starter and target are both set
 let autoTimer = null;
 function scheduleAuto() {
@@ -1284,7 +1358,7 @@ function scheduleAuto() {
     if (pickPT.get() && SLOTS.some(n => pickS[n].get())) computeRoute();
     else if (currentRoute) { // inputs no longer complete — drop the stale route
       currentRoute = null;
-      document.getElementById('routeOut').innerHTML = '<div class="hint">Pick at least Start pal 1 and a target species — the route appears here automatically.</div>';
+      document.getElementById('routeOut').innerHTML = ROUTE_HINT;
       save();
     }
   }, 600);
@@ -1306,7 +1380,7 @@ function updateSlotUI() {
     document.getElementById('passS' + n).hidden = !has;
   }
 }
-const pickPT = makePicker(document.getElementById('pickPT'), {placeholder:'Target species', allowClear:true, ownedToggle:true, onChange: () => { save(); scheduleAuto(); }});
+const pickPT = makePicker(document.getElementById('pickPT'), {placeholder:'Pick a species…', ariaLabel:'Target species', allowClear:true, ownedToggle:true, onChange: () => { save(); scheduleAuto(); }});
 const desiredPick = makePassivePicker(document.getElementById('desiredPass'), 4, () => { save(); scheduleAuto(); });
 document.getElementById('clearSlots').addEventListener('click', () => {
   clearTimeout(autoTimer);
@@ -1320,7 +1394,7 @@ document.getElementById('clearSlots').addEventListener('click', () => {
   for (const n of SLOTS) { pickS[n].set(null, true); slotPassives[n] = []; slotGenders[n] = null; }
   pickPT.set(null, true); desiredPick.clear();
   currentRoute = null; renderSlotChips();
-  document.getElementById('routeOut').innerHTML = '<div class="hint">Pick at least Start pal 1 and a target species — the route appears here automatically.</div>';
+  document.getElementById('routeOut').innerHTML = ROUTE_HINT;
   save();
   if (had) toast('Planner inputs cleared', () => {
     for (const n of SLOTS) { pickS[n].set(snap.slots[n - 1], true); slotPassives[n] = snap.sp[n - 1]; slotGenders[n] = snap.sg[n - 1]; }
@@ -1342,7 +1416,7 @@ function setSlotAuto(rosterEntry) {
   save();
   navTab('plan');
   scheduleAuto();
-  document.getElementById('pickS1').scrollIntoView({block:'center', behavior:'smooth'});
+  document.getElementById('pickS1').scrollIntoView({block:'center', behavior: SMOOTH});
 }
 function renderSlotChips() {
   for (const n of SLOTS) slotPass[n].set(slotPassives[n]);
@@ -1459,7 +1533,7 @@ function computeRoute() {
   const t = pickPT.get();
   const starters = [];
   for (const n of SLOTS) { const p = pickS[n].get(); if (p) starters.push({k: p.k, ps: slotPassives[n], g: slotGenders[n]}); }
-  if (!starters.length || !t) { out.innerHTML = '<div class="hint">Pick at least Start pal 1 and a Target species.</div>'; return; }
+  if (!starters.length || !t) { out.innerHTML = ROUTE_HINT; return; }
   const pool = partnerPool();
   if (partnerOwnedOnly && pool.length < 2) { out.innerHTML = '<div class="hint">Your owned pool is too small — star more pals or turn off "only my pals".</div>'; return; }
   const carried = [...new Set(starters.flatMap(s => s.ps))];
@@ -1503,7 +1577,7 @@ function computeRoute() {
   const uncovered = best && best.length && wo ? desired.filter(x => !wo.carry.includes(x)) : missing;
   if (uncovered.length) {
     const w = document.createElement('div'); w.className = 'warnbox';
-    w.textContent = `⚠ Nothing on this route carries ${uncovered.join(', ')} — no starter or roster partner has ${uncovered.length === 1 ? 'it' : 'them'}. Add a starter or roster pal that does, or plan to catch/hatch a carrier mid-chain. Odds below only track the passives the route actually has.`;
+    w.textContent = `⚠ Nothing on this route carries ${uncovered.join(', ')}. Add a starter or roster pal that has ${uncovered.length === 1 ? 'it' : 'them'}, or catch a carrier mid-chain. Odds below track only what the route carries.`;
     out.prepend(w);
   }
   // warn when a merge step pairs two recorded same-gender starters
@@ -1525,7 +1599,7 @@ function computeRoute() {
       }
     }
   }
-  out.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+  out.scrollIntoView({block: 'nearest', behavior: SMOOTH});
   save();
 }
 
@@ -1562,7 +1636,7 @@ function stepEl(s, opts = {}) {
     // a button, not a tooltip-only span: touch users have no hover
     const o = document.createElement('button'); o.type = 'button'; o.className = 'odds';
     o.textContent = `🎲 ≈${Math.max(1, Math.round(opts.odds.p * 100))}%/egg`;
-    const expl = `≈${Math.round(opts.odds.p * 100)}% chance per egg the child inherits all ${opts.odds.keep} tracked passive${opts.odds.keep === 1 ? '' : 's'} from this pairing (pool of ${opts.odds.pool}; ${opts.odds.rp ? 'includes the passives of your best roster pal used as the partner' : 'assumes a passive-free partner'}) — ≈${Math.max(1, Math.round(1 / opts.odds.p))} eggs on average. Community-measured estimate.`;
+    const expl = `≈${Math.round(opts.odds.p * 100)}% per egg to inherit all ${opts.odds.keep} tracked passive${opts.odds.keep === 1 ? '' : 's'} (pool of ${opts.odds.pool}). Expect ≈${Math.max(1, Math.round(1 / opts.odds.p))} eggs. ${opts.odds.rp ? 'Partner passives from your roster are included.' : 'Assumes a passive-free partner.'} Community-measured.`;
     o.title = expl;
     o.setAttribute('aria-expanded', 'false');
     o.addEventListener('click', () => {
@@ -1617,7 +1691,7 @@ function routeTree(steps, hlIdx = -1) {
   const t = document.createElement('div'); t.className = 'tree'; t.appendChild(root);
   return t;
 }
-// interactive viewport: drag to pan, wheel/buttons to zoom, pinch-friendly
+// interactive viewport: drag to pan; wheel, buttons or two-finger pinch to zoom
 function treeViewport(treeEl) {
   const vp = document.createElement('div'); vp.className = 'tvp';
   const inner = document.createElement('div'); inner.className = 'tvp-inner';
@@ -1636,16 +1710,46 @@ function treeViewport(treeEl) {
     const r = vp.getBoundingClientRect();
     zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.15 : 1 / 1.15);
   }, { passive: false });
-  let drag = null;
+  // one pointer pans, two pinch-zoom around their midpoint
+  const pts = new Map(); // pointerId -> viewport-relative position
+  let drag = null, pinch = null;
+  const rel = e => { const r = vp.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; };
+  const startGesture = () => {
+    const ps = [...pts.values()];
+    if (ps.length >= 2) {
+      drag = null;
+      pinch = {d: Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y),
+               cx: (ps[0].x + ps[1].x) / 2, cy: (ps[0].y + ps[1].y) / 2};
+    } else if (ps.length === 1) {
+      pinch = null;
+      drag = {x: ps[0].x - tx, y: ps[0].y - ty};
+    } else { pinch = null; drag = null; }
+  };
   vp.addEventListener('pointerdown', e => {
     if (e.target.closest('.tvp-ctrl') || e.target.classList.contains('click')) return;
     e.preventDefault(); // stop native text-selection / image-drag from hijacking the pan
-    drag = { x: e.clientX - tx, y: e.clientY - ty };
+    pts.set(e.pointerId, rel(e));
     vp.setPointerCapture(e.pointerId);
     vp.classList.add('grabbing');
+    startGesture();
   });
-  vp.addEventListener('pointermove', e => { if (drag) { tx = e.clientX - drag.x; ty = e.clientY - drag.y; apply(); } });
-  const endDrag = () => { drag = null; vp.classList.remove('grabbing'); };
+  vp.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, rel(e));
+    const ps = [...pts.values()];
+    if (pinch && ps.length >= 2) {
+      const d = Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y);
+      const cx = (ps[0].x + ps[1].x) / 2, cy = (ps[0].y + ps[1].y) / 2;
+      if (pinch.d > 0 && d > 0) zoomAt(cx, cy, d / pinch.d);
+      tx += cx - pinch.cx; ty += cy - pinch.cy; apply(); // midpoint drift pans too
+      pinch = {d, cx, cy};
+    } else if (drag) { tx = ps[0].x - drag.x; ty = ps[0].y - drag.y; apply(); }
+  });
+  const endDrag = e => {
+    pts.delete(e.pointerId);
+    if (!pts.size) vp.classList.remove('grabbing');
+    startGesture(); // a remaining pointer seamlessly resumes as a pan
+  };
   vp.addEventListener('pointerup', endDrag);
   vp.addEventListener('pointercancel', endDrag);
   const ctrl = document.createElement('div'); ctrl.className = 'tvp-ctrl';
@@ -1661,7 +1765,8 @@ function treeViewport(treeEl) {
     ctrl.appendChild(b);
   }
   vp.appendChild(ctrl);
-  const hint = document.createElement('span'); hint.className = 'tvp-hint'; hint.textContent = 'drag to pan · scroll to zoom';
+  const hint = document.createElement('span'); hint.className = 'tvp-hint';
+  hint.textContent = matchMedia('(pointer: coarse)').matches ? 'drag to pan · pinch to zoom' : 'drag to pan · scroll to zoom';
   vp.appendChild(hint);
   requestAnimationFrame(() => {
     const h = Math.min(Math.max(inner.offsetHeight, 140), 420);
@@ -1780,7 +1885,7 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
     toast('Plan “' + name + '” saved');
     saveBtn.textContent = 'Saved ✓'; setTimeout(() => saveBtn.textContent = 'Save plan', 1500);
   });
-  const linkBtn = document.createElement('button'); linkBtn.className = 'alink'; linkBtn.textContent = '🔗 Copy route link';
+  const linkBtn = document.createElement('button'); linkBtn.className = 'alink'; linkBtn.textContent = 'Copy route link';
   linkBtn.title = 'Copy a shareable link to this route (starters + target — passives stay local)';
   linkBtn.addEventListener('click', async () => {
     const ph = planHash();
@@ -1796,7 +1901,7 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
 
 // ---------- planner: saved plans ----------
 let plans = JSON.parse(localStorage.getItem('palbreed_plans') || '[]').filter(p => byKey.has(p.tK));
-function savePlans() { localStorage.setItem('palbreed_plans', JSON.stringify(plans)); }
+function savePlans() { localStorage.setItem('palbreed_plans', JSON.stringify(plans)); updateChecklist(); }
 function renderPlans() {
   const list = document.getElementById('plansList');
   list.innerHTML = '';
@@ -1811,13 +1916,14 @@ function renderPlans() {
     prog.textContent = doneCnt === plan.steps.length ? '✓ complete' : `${doneCnt}/${plan.steps.length} steps`;
     head.appendChild(prog);
     if (plan.passives.length) head.appendChild(passiveChips(plan.passives));
-    const treeBtn = document.createElement('button'); treeBtn.className = 'del pushr'; treeBtn.textContent = '🌳 Tree';
+    const treeBtn = document.createElement('button'); treeBtn.className = 'stepopen pushr'; treeBtn.textContent = 'Tree ⌄';
     treeBtn.title = 'Show this plan as an interactive tree';
     treeBtn.setAttribute('aria-expanded', 'false');
     const treeBox = document.createElement('div'); treeBox.className = 'plantree'; treeBox.hidden = true;
     treeBtn.addEventListener('click', () => {
       treeBox.hidden = !treeBox.hidden;
       treeBtn.setAttribute('aria-expanded', String(!treeBox.hidden));
+      treeBtn.textContent = treeBox.hidden ? 'Tree ⌄' : 'Tree ⌃';
       if (!treeBox.hidden && !treeBox.childElementCount) treeBox.appendChild(treeViewport(routeTree(plan.steps)));
     });
     head.appendChild(treeBtn);
@@ -2139,19 +2245,22 @@ if (state.chain && Array.isArray(state.chain.steps)
   breedChain = state.chain;
 }
 renderBreed(); renderReverse(); renderDex(); renderRoster(); renderPlans(); renderSlotChips();
-// first-visit tips (dismissible; the footer keeps the short version)
+// first-visit setup checklist (dismissible; auto-hides once all steps are done)
 {
-  const tipbar = document.getElementById('tipbar');
-  // touch devices have no "/" key — lead with the tip they can actually use
-  if (matchMedia('(pointer: coarse)').matches) {
-    tipbar.querySelector('span').innerHTML =
-      '👋 First time here? Star <b>★</b> pals in the Paldex to mark what you own — every “Owned” filter uses them. Works fully offline once loaded.';
-  }
+  const bar = document.getElementById('setupbar');
   if (!localStorage.getItem('palbreed_tipseen')) {
-    tipbar.hidden = false;
+    bar.hidden = false;
     document.getElementById('tipDismiss').addEventListener('click', () => {
-      tipbar.hidden = true; localStorage.setItem('palbreed_tipseen', '1');
+      bar.hidden = true; localStorage.setItem('palbreed_tipseen', '1');
     });
+    bar.querySelector('[data-su="star"]').addEventListener('click', () => navTab('dex'));
+    bar.querySelector('[data-su="breed"]').addEventListener('click', () => {
+      const a = PALS.find(p => p.n === 'Relaxaurus'), b = PALS.find(p => p.n === 'Sparkit');
+      if (a && b) { pickA.set(a, true); pickB.set(b, true); renderBreed(); }
+      navTab('breed');
+    });
+    bar.querySelector('[data-su="plan"]').addEventListener('click', () => navTab('plan'));
+    updateChecklist();
   }
 }
 // guide jump links: hand the reader to the tab being described
