@@ -428,8 +428,8 @@ select#genderSel{padding:10px 12px}
 @media(max-width:640px){.subtabs{display:flex}}
 .subtabs[hidden]{display:none}
 .hatchpanel .rstep{background:var(--surface)}
-#hatchDepth{flex-shrink:0}
-#hatchDepth button{white-space:nowrap;flex:0 0 auto;padding:9px 12px}
+#hatchDepth,#comboKind{flex-shrink:0}
+#hatchDepth button,#comboKind button{white-space:nowrap;flex:0 0 auto;padding:9px 12px}
 .hatchgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr));gap:10px}
 /* the NEW and "n pairs" chips don't shrink, so let them wrap and let a long
    species name give ground rather than push the card past the screen edge */
@@ -582,7 +582,7 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
   /* an &nbsp; label exists only to bottom-align the desktop row — on a stack
      it renders as a phantom gap above the toggle */
   .controls .ctl label[aria-hidden="true"]{display:none}
-  #hatchDepth button{flex:1 1 0;padding:9px 6px}
+  #hatchDepth button,#comboKind button{flex:1 1 0;padding:9px 6px}
 
   /* --- breed: equal full-width parent slots, swap between them --- */
   .parents{flex-direction:column;align-items:stretch;gap:10px;margin-bottom:4px}

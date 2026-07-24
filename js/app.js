@@ -613,6 +613,7 @@ function save() {
     hd: typeof hatchDepth !== 'undefined' ? hatchDepth : 1,
     pm: typeof planMode !== 'undefined' ? planMode : 'new',
     dt: dexType.value, dw: dexWork.value, dsort: dexSort,
+    ck: typeof comboKind !== 'undefined' ? comboKind : '',
   };
   for (const n of SLOTS) s['s' + n] = pickS[n].get()?.k;
   localStorage.setItem('palbreed', JSON.stringify(s));
@@ -2329,12 +2330,26 @@ dexModeEl.addEventListener('click', e => {
 tablistKeys(dexModeEl);
 setDexMode('pals');
 document.getElementById('comboSearch').addEventListener('input', renderCombos);
+// '' all · 'mix' two different species · 'self' bred from two of itself
+let comboKind = '';
+const comboKindEl = document.getElementById('comboKind');
+function setComboKind(k, silent) {
+  comboKind = k || '';
+  comboKindEl.querySelectorAll('button').forEach(b => {
+    const on = b.dataset.k === comboKind;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+  if (!silent) { save(); renderCombos(); }
+}
+comboKindEl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setComboKind(b.dataset.k); });
 function renderCombos() {
   const list = document.getElementById('comboList');
   list.innerHTML = '';
   const q = document.getElementById('comboSearch').value.trim().toLowerCase();
   let rows = DATA.combos
     .map(c => ({a: byKey.get(c.a), b: byKey.get(c.b), c: byKey.get(c.c), ga: c.ga, gb: c.gb}))
+    .filter(r => !comboKind || (comboKind === 'self' ? r.a === r.b : r.a !== r.b))
     .filter(r => !q || r.a.n.toLowerCase().includes(q) || r.b.n.toLowerCase().includes(q) || r.c.n.toLowerCase().includes(q));
   rows.sort((x, y) => x.c.n.localeCompare(y.c.n));
   document.getElementById('comboCount').textContent =
@@ -2517,6 +2532,7 @@ if (state.hd === 0 || state.hd === 2) setHatchDepth(state.hd, true);
 if (state.dt) dexType.value = state.dt;
 if (state.dw) dexWork.value = state.dw;
 if (state.dsort && state.dsort.key) dexSort = state.dsort;
+if (state.ck === 'mix' || state.ck === 'self') setComboKind(state.ck, true);
 if (state.chain && Array.isArray(state.chain.steps)
     && state.chain.steps.every(s => byKey.has(s.aK) && byKey.has(s.bK) && byKey.has(s.cK))
     && state.chain.idx >= 0 && state.chain.idx < state.chain.steps.length) {

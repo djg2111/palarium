@@ -182,6 +182,11 @@
     <div id="dexCombosBlock" hidden>
       <div class="dex-controls">
         <input type="search" class="search-inp" id="comboSearch" placeholder="Search combos…" aria-label="Search unique combos">
+        <div class="segrow" id="comboKind" role="group" aria-label="Combo type">
+          <button type="button" data-k="" class="on" aria-pressed="true" title="Every unique recipe">All</button>
+          <button type="button" data-k="mix" aria-pressed="false" title="Recipes that need two different species — the ones you can plan a route to">Two species</button>
+          <button type="button" data-k="self" aria-pressed="false" title="Legendaries and sub-species that can only be bred from two of themselves">Two of the same</button>
+        </div>
         <span class="rstats" id="comboCount" aria-live="polite"></span>
       </div>
       <div class="combos" id="comboList"></div>
