@@ -27,8 +27,11 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // network-first with cache fallback for everything else (app shell)
-  e.respondWith(fetch(e.request).then(res => {
+  // network-first with cache fallback for everything else (app shell).
+  // cache:'no-cache' forces ETag revalidation — a plain fetch() reads through
+  // the HTTP cache (max-age=600 on GitHub Pages), which could pair a fresh
+  // index.html with a stale stylesheet for up to 10 minutes after a deploy
+  e.respondWith(fetch(e.request, {cache: 'no-cache'}).then(res => {
     const copy = res.clone();
     caches.open(VERSION).then(c => c.put(e.request, copy));
     return res;
