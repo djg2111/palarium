@@ -31,7 +31,7 @@
 
 <main id="main">
   <div class="tipbar" id="tipbar" hidden>
-    <span>👋 First time here? Press <code>/</code> to search — it opens the pal picker right here · star <b>★</b> pals in the Paldex to mark what you own — every “Owned” filter uses them · works fully offline once loaded.</span>
+    <span>👋 First time here? Press <code>/</code> to search — it opens the pal picker right here. Star <b>★</b> pals in the Paldex to mark what you own — every “Owned” filter uses them. Works fully offline once loaded.</span>
     <button id="tipDismiss" aria-label="Dismiss tips">✕</button>
   </div>
   <section class="view active" id="view-breed">
@@ -73,9 +73,9 @@
     <div class="pcard">
       <div class="collhead">
         <h2>📦 Roster</h2>
-        <span class="rstats" id="rosterStats"></span>
+        <span class="rstats" id="rosterStats" aria-live="polite"></span>
         <div class="collacts">
-          <button class="alink primary" id="rosterOpenAdd">＋ Add pal</button>
+          <button class="alink primary" id="rosterOpenAdd">+ Add pal</button>
           <button class="alink" id="exportBtn" title="Download roster, plans and owned list as a JSON backup">⬇ Export</button>
           <button class="alink" id="importBtn" title="Restore a JSON backup">⬆ Import</button>
           <input type="file" id="importFile" accept="application/json" style="display:none">
@@ -117,7 +117,8 @@
       <div class="plansec">2 · Target &amp; options</div>
       <div class="targetrow">
         <div class="slot"><div class="slotlb">Target species</div><div id="pickPT"></div>
-          <div class="slotlb mt">Desired passives · optional</div><div id="desiredPass"></div></div>
+          <div class="slotlb mt">Desired passives · optional</div><div id="desiredPass"></div>
+          <div class="fldhint">Leave empty to track every passive your starters carry.</div></div>
         <div class="slot opts"><div class="slotlb">Route options</div>
           <button type="button" class="toggle" id="partnerToggle" role="switch" aria-checked="false" title="Only use species you own (starred or in roster) as chain partners"><span class="kn"></span>Only use my pals as partners</button>
         </div>
@@ -149,7 +150,9 @@
       <select id="dexWork" aria-label="Filter by work suitability"><option value="">Any work suitability</option></select>
       <button type="button" class="toggle" id="dexOwned" role="switch" aria-checked="false" title="Only show starred pals"><span class="kn"></span>Owned only</button>
       <span class="rstats" id="dexCount" aria-live="polite"></span>
+      <button type="button" class="alink" id="dexClear" hidden>✕ Clear filters</button>
     </div>
+    <div class="tablewrap">
     <table>
       <thead><tr>
         <th data-s="own" title="Owned">★</th>
@@ -158,6 +161,7 @@
       </tr></thead>
       <tbody id="dexBody"></tbody>
     </table>
+    </div>
     </div>
     <div id="dexCombosBlock" hidden>
       <div class="dex-controls">
@@ -184,8 +188,8 @@
           <li><b>Which pal comes out?</b> Three simple rules:
             <ul>
               <li>Same species parents → <b>same species baby</b>. Lamball + Lamball = Lamball.</li>
-              <li>Different species → the game does secret math (see the deep dive). Just use the <b>Breed</b> tab — it tells you exactly what you'll get.</li>
-              <li>A few pairs are <span class="gold">special recipes</span> that ignore the math — they're marked with a gold <b>UNIQUE</b> badge in this app. Example: Relaxaurus + Sparkit = Relaxaurus Lux.</li>
+              <li>Different species → the game does secret math (see the deep dive). Just use the <b>Breed</b> tab — it tells you exactly what you'll get. <button type="button" class="alink gjump" data-nav="breed">Open Breed</button></li>
+              <li>A few pairs are <span class="gold">special recipes</span> that ignore the math — they're marked with a gold <b>UNIQUE</b> badge in this app. Example: Relaxaurus + Sparkit = Relaxaurus Lux. <button type="button" class="alink gjump" data-nav="combos">Browse all unique combos</button></li>
             </ul>
           </li>
           <li><b>Why bother?</b> Babies can <b>inherit passive skills</b> from both parents. Breed a pal with great passives into a strong species and you get a super-pal you could never catch in the wild.</li>
@@ -200,12 +204,12 @@
         <details open><summary>The species formula (breeding power)</summary><div>
           <p>Every species has a hidden number called <b>breeding power</b> (internally <code>CombiRank</code> — you can see it for every pal in the Paldex tab). When two different species breed:</p>
           <p><code>target = floor((powerA + powerB + 1) ÷ 2)</code></p>
-          <p>The child is the species whose breeding power is <b>closest to that target</b>. If two species are exactly equally close, a hidden priority value decides the winner. That's it — the whole species system is one averaging formula.</p>
+          <p>The child is the species whose breeding power is <b>closest to that target</b>. If two species are exactly equally close, a hidden priority value decides the winner. That's it — the whole species system is one averaging formula. <button type="button" class="alink gjump" data-nav="dex">See breeding power in the Paldex</button></p>
           <ul>
             <li>Not every pal can be a "math result": <b>legendaries and all sub-species</b> (Relaxaurus Lux, Incineram Noct, etc.) are excluded from the pool — only 183 of the 288 species can hatch from averaging. The excluded ones need their unique recipe or same-species parents.</li>
             <li><b>Unique recipes override the math.</b> This app checks them first, exactly like the game.</li>
             <li>A handful of recipes are <b>gender-dependent</b>: Katress ♀ × Wixen ♂ gives Katress Ignis, but Katress ♂ × Wixen ♀ gives Wixen Noct. The Breed tab shows both outcomes when it matters.</li>
-            <li>Because it's an average, you can often reach the same child from hundreds of different pairs — that's what the <b>Find Parents</b> tab enumerates.</li>
+            <li>Because it's an average, you can often reach the same child from hundreds of different pairs — that's what the <b>Find Parents</b> tab enumerates. <button type="button" class="alink gjump" data-nav="reverse">Open Find Parents</button></li>
           </ul>
         </div></details>
 
@@ -283,6 +287,7 @@
       </div>
     </details>
   </div>
+  <div class="warnbox" id="rosterErr" aria-live="polite" hidden>Pick a species first — the roster needs to know which pal this is.</div>
   <div class="formacts">
     <button class="alink primary" id="rosterAdd">+ Add to roster</button>
     <button class="alink" id="rosterAddAnother">+ Save &amp; add another</button>

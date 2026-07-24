@@ -2,7 +2,15 @@ const DATA = window.PALDATA;
 const IMG = 'assets/';
 const PALS = DATA.pals;
 const byKey = new Map(PALS.map(p => [p.k, p]));
-const TYPE_COLORS = {neutral:'var(--neutral)',fire:'var(--fire)',water:'var(--water)',electric:'var(--electric)',grass:'var(--grass)',dark:'var(--dark)',dragon:'var(--dragon)',ground:'var(--ground)',ice:'var(--ice)'};
+const byName = new Map(PALS.map(p => [p.n.toLowerCase(), p]));
+// deep links accept internal keys or display names (case-insensitive)
+function resolvePal(x) {
+  if (!x) return null;
+  if (byKey.has(x)) return byKey.get(x);
+  try { x = decodeURIComponent(x); } catch {}
+  return byName.get(x.toLowerCase()) || null;
+}
+const TYPE_COLORS = {normal:'var(--neutral)',fire:'var(--fire)',water:'var(--water)',electric:'var(--electric)',grass:'var(--grass)',dark:'var(--dark)',dragon:'var(--dragon)',ground:'var(--ground)',ice:'var(--ice)'};
 const WORKS = {kindling:'🔥 Kindling',watering:'💧 Watering',planting:'🌱 Planting',generatingElectricity:'⚡ Electricity',handiwork:'🛠️ Handiwork',gathering:'🧺 Gathering',lumbering:'🪓 Lumbering',mining:'⛏️ Mining',medicineProduction:'💊 Medicine',cooling:'❄️ Cooling',transporting:'📦 Transporting',farming:'🐄 Farming'};
 const workIcon = k => (WORKS[k] || k).split(' ')[0];
 
@@ -101,7 +109,7 @@ function tierBadge(p) {
   const s = document.createElement('span'); s.className = 'tier ' + t; s.textContent = t; s.title = 'Rarity ' + p.rar;
   return s;
 }
-const EGG_NAMES = {neutral:'Common', fire:'Scorching', water:'Damp', grass:'Verdant', electric:'Electric', ice:'Frozen', ground:'Rocky', dark:'Dark', dragon:'Dragon'};
+const EGG_NAMES = {normal:'Common', fire:'Scorching', water:'Damp', grass:'Verdant', electric:'Electric', ice:'Frozen', ground:'Rocky', dark:'Dark', dragon:'Dragon'};
 const eggOf = p => (p.rar >= 8 ? 'Huge ' : p.rar >= 5 ? 'Large ' : '') + (EGG_NAMES[p.t[0]] || 'Common') + ' Egg';
 function eggChip(p) {
   const c = document.createElement('span'); c.className = 'mchip';
@@ -142,12 +150,25 @@ const overlay = document.getElementById('overlay');
 const modalEl = document.getElementById('modal');
 overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal(); });
-let currentModalPal = null, lastFocusModal = null;
-function closeModal() {
+let currentModalPal = null, lastFocusModal = null, modalPushed = false;
+// keepHistory: the caller is navigating anyway (hash change / navTab), so leave
+// the history stack alone; otherwise pop the entry the modal pushed so Back
+// behaves as if the modal was never opened.
+function closeModal(keepHistory) {
+  if (!overlay.classList.contains('open')) { modalPushed = false; return; }
   overlay.classList.remove('open'); document.body.style.overflow = '';
   currentModalPal = null;
   if (lastFocusModal && document.contains(lastFocusModal)) lastFocusModal.focus();
   lastFocusModal = null;
+  if (keepHistory) { modalPushed = false; return; }
+  if (modalPushed) { modalPushed = false; history.back(); }
+  else if (location.hash.startsWith('#/pal/')) history.replaceState(null, '', '#/' + currentTab);
+}
+// close without touching history, then point the hash back at the current tab
+// (used when another overlay opens on top, e.g. the roster editor)
+function leaveModal() {
+  closeModal(true);
+  if (location.hash.startsWith('#/pal/')) history.replaceState(null, '', '#/' + currentTab);
 }
 document.addEventListener('keydown', e => {
   if (!overlay.classList.contains('open') || roverlayOpen()) return;
@@ -219,11 +240,11 @@ function openModal(p) {
   bs.appendChild(bm);
   const btns = document.createElement('div'); btns.className = 'mbtns';
   const mkBtn = (label, primary, fn) => { const b = document.createElement('button'); b.className = 'alink' + (primary ? ' primary' : ''); b.textContent = label; b.addEventListener('click', fn); return b; };
-  btns.appendChild(mkBtn('Find parents', true, () => { closeModal(); pickT.set(p, true); reverseShown = 120; renderReverse(); navTab('reverse'); }));
-  btns.appendChild(mkBtn('Set as Parent 1', false, () => { closeModal(); pickA.set(p, true); renderBreed(); navTab('breed'); }));
-  btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(); pickB.set(p, true); renderBreed(); navTab('breed'); }));
-  btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(); pickPT.set(p, true); navTab('plan'); scheduleAuto(); }));
-  btns.appendChild(mkBtn('＋ Add to roster', false, () => { closeModal(); openRosterEditor(null, p); }));
+  btns.appendChild(mkBtn('Find parents', true, () => { closeModal(true); pickT.set(p, true); reverseShown = 120; renderReverse(); navTab('reverse'); }));
+  btns.appendChild(mkBtn('Set as Parent 1', false, () => { closeModal(true); pickA.set(p, true); renderBreed(); navTab('breed'); }));
+  btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(true); pickB.set(p, true); renderBreed(); navTab('breed'); }));
+  btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(true); pickPT.set(p, true); navTab('plan'); scheduleAuto(); }));
+  btns.appendChild(mkBtn('+ Add to roster', false, () => { leaveModal(); openRosterEditor(null, p); }));
   btns.appendChild(mkBtn('🔗 Copy link', false, async () => {
     try {
       await navigator.clipboard.writeText(location.href.split('#')[0] + '#/pal/' + p.k);
@@ -300,6 +321,15 @@ function openModal(p) {
   overlay.scrollTop = 0;
   document.body.style.overflow = 'hidden';
   if (!wasOpen) close.focus();
+  // reflect the open pal in the URL so browser Back closes the modal
+  const ph = '#/pal/' + p.k;
+  if (location.hash !== ph) {
+    // hash already points at this pal under a non-canonical name (#/pal/anubis):
+    // pushing would make Back land on that alias and reopen the modal
+    const aliasSame = location.hash.startsWith('#/pal/') && resolvePal(location.hash.slice(6))?.k === p.k;
+    if (wasOpen || modalPushed || aliasSame) history.replaceState(null, '', ph);
+    else { history.pushState(null, '', ph); modalPushed = true; }
+  }
 }
 
 // ---------- picker ----------
@@ -331,7 +361,14 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
   let sel = null, hl = 0, rows = [];
   const api = { root, get: () => sel,
     set(p, silent) { sel = p; renderBtn(); if (p && !silent) pushRecent(p.k); if (!silent) onChange && onChange(p); },
-    close() { root.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); if (openPicker === api) openPicker = null; } };
+    close() {
+      // if focus is inside the popup (keyboard select, Escape, row click), hand it
+      // back to the trigger button so keyboard users aren't dropped at <body>
+      const inside = root.contains(document.activeElement);
+      root.classList.remove('open'); btn.setAttribute('aria-expanded', 'false');
+      if (openPicker === api) openPicker = null;
+      if (inside) btn.focus();
+    } };
 
   function renderBtn() {
     btn.innerHTML = '';
@@ -395,8 +432,13 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
     if (openPicker && openPicker !== api) openPicker.close();
     root.classList.add('open'); openPicker = api;
     btn.setAttribute('aria-expanded', 'true');
+    pop.style.left = ''; pop.style.right = '';
     pop.classList.toggle('flip', root.getBoundingClientRect().left + 340 > window.innerWidth - 12);
     inp.value = ''; renderList(); inp.focus();
+    // clamp to the viewport — on narrow screens flip can push the popup off-screen
+    const pr = pop.getBoundingClientRect(), rr = root.getBoundingClientRect();
+    if (pr.left < 8) { pop.style.left = (8 - rr.left) + 'px'; pop.style.right = 'auto'; }
+    else if (pr.right > window.innerWidth - 8) { pop.style.left = 'auto'; pop.style.right = (rr.right - (window.innerWidth - 8)) + 'px'; }
   };
   btn.addEventListener('click', () => { root.classList.contains('open') ? api.close() : api.openPop(); });
   inp.addEventListener('input', renderList);
@@ -416,6 +458,15 @@ function syncHeaderHeight() {
 }
 new ResizeObserver(syncHeaderHeight).observe(headerEl);
 syncHeaderHeight();
+// fade the tab bar's clipped edge on narrow screens so hidden tabs are discoverable
+const tabsFadeEl = document.getElementById('tabs');
+function updateTabsFade() {
+  tabsFadeEl.classList.toggle('fadeL', tabsFadeEl.scrollLeft > 4);
+  tabsFadeEl.classList.toggle('fadeR', tabsFadeEl.scrollLeft + tabsFadeEl.clientWidth < tabsFadeEl.scrollWidth - 4);
+}
+tabsFadeEl.addEventListener('scroll', updateTabsFade, {passive: true});
+new ResizeObserver(updateTabsFade).observe(tabsFadeEl);
+updateTabsFade();
 
 // ---------- state ----------
 const state = JSON.parse(localStorage.getItem('palbreed') || '{}');
@@ -481,6 +532,7 @@ function planHash() {
 }
 function updateHash() {
   if (booting) return;
+  if (overlay.classList.contains('open')) return; // the modal owns the hash (#/pal/…) while open
   let h = '#/' + currentTab;
   if (currentTab === 'breed') {
     const a = pickA.get(), b = pickB.get();
@@ -493,14 +545,27 @@ function updateHash() {
   }
   if (location.hash !== h) history.replaceState(null, '', h);
 }
+let lastBadLink = '';
+function badLink(msg) {
+  // hashchange + popstate both fire for one navigation — toast it once
+  if (location.hash !== lastBadLink) { lastBadLink = location.hash; toast(msg); }
+  return false;
+}
 function applyHash(hash) {
   const parts = (hash ?? location.hash).replace(/^#\/?/, '').split('/').filter(Boolean);
   if (!parts.length) return false;
   const [tab, x, y] = parts;
-  if (tab === 'pal' && x && byKey.has(x)) { showTab('dex'); openModal(byKey.get(x)); return true; }
-  if (!document.getElementById('view-' + tab)) return false;
+  if (tab === 'pal') {
+    const p = resolvePal(x);
+    if (!p) return badLink('Link not recognized — unknown pal' + (x ? ' “' + x + '”' : ''));
+    showTab('dex'); openModal(p); return true;
+  }
+  // navigating anywhere else dismisses whichever dialog is up (browser Back = close)
+  closeModal(true);
+  if (roverlay.classList.contains('open')) closeRosterEditor();
+  if (!document.getElementById('view-' + tab)) return badLink('Link not recognized');
   if (tab === 'plan' && x) {
-    const ks = x.split('+').filter(k => byKey.has(k)).slice(0, 4);
+    const ks = x.split('+').map(resolvePal).filter(Boolean).map(p => p.k).slice(0, 4);
     if (ks.length) {
       for (const n of SLOTS) {
         const k = ks[n - 1] || null;
@@ -511,17 +576,19 @@ function applyHash(hash) {
       }
       renderSlotChips();
     }
-    if (y && byKey.has(y)) pickPT.set(byKey.get(y), true);
+    const tp = resolvePal(y);
+    if (tp) pickPT.set(tp, true);
     showTab('plan');
-    if (ks.length && y && byKey.has(y)) computeRoute();
+    if (ks.length && tp) computeRoute();
     return true;
   }
   if (tab === 'breed') {
-    if (x && byKey.has(x)) pickA.set(byKey.get(x), true);
-    if (y && byKey.has(y)) pickB.set(byKey.get(y), true);
+    const a = resolvePal(x), b = resolvePal(y);
+    if (a) pickA.set(a, true);
+    if (b) pickB.set(b, true);
     renderBreed();
-  } else if (tab === 'reverse' && x && byKey.has(x)) {
-    pickT.set(byKey.get(x), true); reverseShown = 120; renderReverse();
+  } else if (tab === 'reverse' && resolvePal(x)) {
+    pickT.set(resolvePal(x), true); reverseShown = 120; renderReverse();
   }
   showTab(tab);
   return true;
@@ -672,8 +739,7 @@ function renderBreed() {
       .sort((x, y) => x.d - y.d || y.c.pr - x.c.pr).slice(0, 2);
     if (alts.length) {
       const m2 = document.createElement('div'); m2.className = 'mathline';
-      m2.textContent = 'next closest: ' + alts.map(al => `${al.c.n} (${al.c.r})`).join(' · ');
-      m2.title = 'Species whose breeding power is next-nearest to the target — they lose the tie to ' + ch.n;
+      m2.textContent = 'next closest — they lose the tie to ' + ch.n + ': ' + alts.map(al => `${al.c.n} (${al.c.r})`).join(' · ');
       zone.appendChild(m2);
     }
   }
@@ -743,11 +809,17 @@ function renderReverse() {
   const cnt = document.createElement('span'); cnt.className = 'cnt';
   cnt.textContent = `${pairs.length}${pairs.length !== total ? ' of ' + total : ''} combination${total === 1 ? '' : 's'}`;
   const sub = document.createElement('span'); sub.className = 'sub';
-  sub.textContent = `produce ${t.n}` + (makeable && !ownedOnly ? ` · ★ ${makeable} makeable with your pals (listed first)` : '') + ' · click a pair to load it in the Breed tab';
+  sub.textContent = `produce ${t.n}` + (makeable && !ownedOnly ? ` · ★ ${makeable} makeable with your pals (listed first)` : '')
+    + (pairs.length ? ' · click a pair to load it in the Breed tab' : '');
   sum.append(cnt, sub); zone.appendChild(sum);
   if (!pairs.length) {
     const h = document.createElement('div'); h.className = 'hint';
-    h.textContent = ownedOnly && !os.size ? 'You haven’t starred any pals yet — mark owned pals in the Paldex tab.' : 'No combinations with these filters.';
+    if (ownedOnly && !os.size) {
+      h.append('You haven’t starred any pals yet — mark owned pals in the ');
+      const b = document.createElement('button'); b.className = 'alink'; b.textContent = 'Paldex';
+      b.addEventListener('click', () => navTab('dex'));
+      h.appendChild(b); h.append(' or add them to your Roster.');
+    } else h.textContent = 'No combinations with these filters.';
     zone.appendChild(h); return;
   }
 
@@ -791,6 +863,9 @@ function renderReverse() {
 
 // ---------- planner: passive tag input ----------
 const PASSIVES = DATA.passives || [];
+// display order: regular passives alphabetically, mutation-exclusives last —
+// raw data order would greet users with obscure boss passives first
+const PASSIVES_SORTED = [...PASSIVES].sort((a, b) => (a.mt ? 1 : 0) - (b.mt ? 1 : 0) || a.n.localeCompare(b.n));
 function makePassivePicker(mount, max = 4, onChange) {
   mount.classList.add('ptag');
   const inp = document.createElement('input'); inp.className = 'taginp'; inp.placeholder = 'Add passives (e.g. Artisan)…';
@@ -813,7 +888,7 @@ function makePassivePicker(mount, max = 4, onChange) {
   function renderPop() {
     const q = inp.value.trim().toLowerCase();
     pop.innerHTML = '';
-    const matches = PASSIVES.filter(p => !selected.includes(p.n) && (!q || p.n.toLowerCase().includes(q))).slice(0, 30);
+    const matches = PASSIVES_SORTED.filter(p => !selected.includes(p.n) && (!q || p.n.toLowerCase().includes(q))).slice(0, 30);
     if (!matches.length) { mount.classList.remove('open'); return; }
     for (const p of matches) {
       const r = document.createElement('button'); r.className = 'trow'; r.type = 'button';
@@ -824,7 +899,10 @@ function makePassivePicker(mount, max = 4, onChange) {
       r.addEventListener('mousedown', e => e.preventDefault());
       r.addEventListener('click', () => {
         if (selected.length >= max) return;
-        selected.push(p.n); renderChips(); inp.value = ''; renderPop(); inp.focus();
+        // close after each pick: a lingering full-width list would swallow the
+        // next click on whatever sits beneath it (typing again reopens it)
+        selected.push(p.n); renderChips(); inp.value = '';
+        mount.classList.remove('open'); inp.focus();
         onChange && onChange();
       });
       pop.appendChild(r);
@@ -833,6 +911,7 @@ function makePassivePicker(mount, max = 4, onChange) {
   }
   inp.addEventListener('input', renderPop);
   inp.addEventListener('focus', renderPop);
+  inp.addEventListener('click', () => { if (!mount.classList.contains('open')) renderPop(); });
   inp.addEventListener('blur', () => setTimeout(() => mount.classList.remove('open'), 150));
   return { get: () => [...selected], set(v) { selected = [...v]; renderChips(); }, clear() { selected = []; inp.value = ''; renderChips(); } };
 }
@@ -875,7 +954,9 @@ function pairGenderIssue(aK, bK) {
   if (aOne && bOne && !!A.M === !!B.M) return `both recorded ${A.M ? '♂' : '♀'}`;
   return null;
 }
-const pickR = makePicker(document.getElementById('pickR'), {placeholder:'Pick a species…', allowClear:true, ownedToggle:true, onChange:()=>{}});
+const pickR = makePicker(document.getElementById('pickR'), {placeholder:'Pick a species…', allowClear:true, ownedToggle:true, onChange: p => {
+  if (p) { document.getElementById('rosterErr').hidden = true; pickR.root.querySelector('.picker-btn').style.borderColor = ''; }
+}});
 const rosterPassives = makePassivePicker(document.getElementById('passivePick'));
 const nickInp = document.getElementById('nickInp');
 const noteInp = document.getElementById('noteInp');
@@ -915,6 +996,7 @@ function openRosterEditor(entry, presetPal) {
     rosterAddBtn.textContent = '+ Add to roster';
   }
   pickR.root.querySelector('.picker-btn').style.borderColor = '';
+  document.getElementById('rosterErr').hidden = true;
   document.getElementById('rosterAddAnother').style.display = entry ? 'none' : '';
   lastFocusEditor = document.activeElement;
   roverlay.classList.add('open'); roverlay.scrollTop = 0;
@@ -956,7 +1038,11 @@ function readIVs() {
 rosterCancelBtn.addEventListener('click', closeRosterEditor);
 function commitRosterEntry() {
   const p = pickR.get();
-  if (!p) { pickR.root.querySelector('.picker-btn').style.borderColor = 'var(--pink)'; return null; }
+  if (!p) {
+    pickR.root.querySelector('.picker-btn').style.borderColor = 'var(--pink)';
+    document.getElementById('rosterErr').hidden = false; // color alone isn't a message
+    return null;
+  }
   const entry = {k: p.k, ps: rosterPassives.get(), g: genderVal || null, nick: nickInp.value.trim(),
     note: noteInp.value.trim(), iv: readIVs()};
   if (editingId) {
@@ -1027,7 +1113,7 @@ function renderRoster() {
   rows.sort(ROSTER_SORTS[rosterSort.value] || ROSTER_SORTS.z);
   if (!rows.length) {
     list.innerHTML = '<div class="hint" style="grid-column:1/-1;padding:14px 0">' +
-      (roster.length ? 'No roster pals match these filters.' : 'No pals registered yet — hit "＋ Add pal", or use "Add to roster" on any pal card.') + '</div>';
+      (roster.length ? 'No roster pals match these filters.' : 'No pals registered yet — hit "+ Add pal", or use "Add to roster" on any pal card.') + '</div>';
     renderRosterStrip(); return;
   }
   const mkActs = r => {
@@ -1162,14 +1248,19 @@ document.getElementById('importFile').addEventListener('change', e => {
     try {
       const d = JSON.parse(rd.result);
       if (d.app !== 'palarium' && d.app !== 'palbreed') throw new Error('not a Palarium backup');
-      if (!confirm('Replace your current roster, plans and owned list with this backup?')) return;
-      roster = (d.roster || []).filter(r => byKey.has(r.k)).map(r => ({g: null, nick: '', note: '', iv: null, ...r}));
-      plans = (d.plans || []).filter(p => byKey.has(p.tK));
-      owned.clear(); for (const k of d.owned || []) if (byKey.has(k)) owned.add(k);
-      saveRoster(); savePlans(); localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
-      renderRoster(); renderPlans(); renderDex(); renderReverse();
-      toast('Backup imported — ' + roster.length + ' pals, ' + plans.length + ' plans restored');
-    } catch (err) { alert('Import failed: ' + err.message); }
+      const nr = (d.roster || []).length, np = (d.plans || []).length;
+      toast(`Import backup (${nr} pal${nr === 1 ? '' : 's'}, ${np} plan${np === 1 ? '' : 's'})? This replaces your current roster, plans and owned list.`, null, {
+        label: 'Import',
+        fn: () => {
+          roster = (d.roster || []).filter(r => byKey.has(r.k)).map(r => ({g: null, nick: '', note: '', iv: null, ...r}));
+          plans = (d.plans || []).filter(p => byKey.has(p.tK));
+          owned.clear(); for (const k of d.owned || []) if (byKey.has(k)) owned.add(k);
+          saveRoster(); savePlans(); localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
+          renderRoster(); renderPlans(); renderDex(); renderReverse();
+          toast('Backup imported — ' + roster.length + ' pals, ' + plans.length + ' plans restored');
+        },
+      });
+    } catch (err) { toast('Import failed: ' + err.message); }
     e.target.value = '';
   };
   rd.readAsText(f);
@@ -1215,14 +1306,31 @@ const pickPT = makePicker(document.getElementById('pickPT'), {placeholder:'Targe
 const desiredPick = makePassivePicker(document.getElementById('desiredPass'), 4, () => { save(); scheduleAuto(); });
 document.getElementById('clearSlots').addEventListener('click', () => {
   clearTimeout(autoTimer);
+  const had = SLOTS.some(n => pickS[n].get()) || pickPT.get() || desiredPick.get().length;
+  const snap = {
+    slots: SLOTS.map(n => pickS[n].get()),
+    sp: SLOTS.map(n => [...slotPassives[n]]),
+    sg: SLOTS.map(n => slotGenders[n]),
+    pt: pickPT.get(), dp: desiredPick.get(),
+  };
   for (const n of SLOTS) { pickS[n].set(null, true); slotPassives[n] = []; slotGenders[n] = null; }
   pickPT.set(null, true); desiredPick.clear();
   currentRoute = null; renderSlotChips();
   document.getElementById('routeOut').innerHTML = '<div class="hint">Pick at least Start pal 1 and a target species — the route appears here automatically.</div>';
   save();
+  if (had) toast('Planner inputs cleared', () => {
+    for (const n of SLOTS) { pickS[n].set(snap.slots[n - 1], true); slotPassives[n] = snap.sp[n - 1]; slotGenders[n] = snap.sg[n - 1]; }
+    pickPT.set(snap.pt, true); desiredPick.set(snap.dp);
+    renderSlotChips(); save(); scheduleAuto();
+  });
 });
 function setSlotAuto(rosterEntry) {
-  let n = SLOTS.find(i => !pickS[i].get()) ?? 4;
+  const free = SLOTS.find(i => !pickS[i].get());
+  const n = free ?? 4;
+  if (!free) {
+    const old = pickS[4].get();
+    if (old) toast('All 4 start slots are full — replaced ' + old.n + ' in slot 4');
+  }
   pickS[n].set(byKey.get(rosterEntry.k), true);
   slotPassives[n] = [...rosterEntry.ps];
   slotGenders[n] = rosterEntry.g || null;
@@ -1248,7 +1356,40 @@ function ownedSpeciesSet() {
 function partnerPool() {
   const own = ownedSpeciesSet();
   if (partnerOwnedOnly) return [...own];
-  return [...PALS.map(p => p.k)].sort((a, b) => (own.has(b) ? 1 : 0) - (own.has(a) ? 1 : 0));
+  // owned species first, then common catchable pals before rare/collab ones,
+  // so equal-length routes prefer partners the player can realistically get
+  return PALS.map(p => p.k).sort((a, b) => {
+    const A = byKey.get(a), B = byKey.get(b);
+    return (own.has(b) ? 1 : 0) - (own.has(a) ? 1 : 0)
+      || (A.cb ? 1 : 0) - (B.cb ? 1 : 0)
+      || A.rar - B.rar
+      || A.z - B.z;
+  });
+}
+// species a route uses as parents that the player neither owns, breeds
+// mid-chain, nor supplied as a starter — i.e. the catch list
+function neededSpecies(steps, extraHave = []) {
+  const have = ownedSpeciesSet();
+  for (const k of extraHave) have.add(k);
+  const bred = new Set(steps.map(s => s.cK));
+  const need = [];
+  for (const s of steps) for (const k of [s.aK, s.bK])
+    if (!bred.has(k) && !have.has(k) && !need.includes(k)) need.push(k);
+  return need;
+}
+function neededRow(need) {
+  const nr = document.createElement('div'); nr.className = 'needrow';
+  nr.append('You’ll still need: ');
+  for (const k of need) {
+    const p = byKey.get(k);
+    const c = document.createElement('button'); c.type = 'button'; c.className = 'tchip';
+    c.appendChild(icon(p, 22));
+    const nm = document.createElement('span'); nm.textContent = p.n; c.appendChild(nm);
+    c.title = 'Not owned yet — view ' + p.n + '’s card';
+    c.addEventListener('click', () => openModal(p));
+    nr.appendChild(c);
+  }
+  return nr;
 }
 // BFS from startK to targetK over "current × partner -> child" edges
 function findRoute(startK, targetK, pool) {
@@ -1345,6 +1486,7 @@ function computeRoute() {
   renderRoute(out, best, t, goal, {
     label: desired.length ? 'goal:' : 'carrying:',
     stepOdds: wo ? wo.odds : null,
+    starterKs: starters.map(s => s.k),
   });
   // warn when desired passives are covered by neither a starter nor a roster partner on the route
   const uncovered = best && best.length && wo ? desired.filter(x => !wo.carry.includes(x)) : missing;
@@ -1406,9 +1548,18 @@ function stepEl(s, opts = {}) {
   }
   if (opts.carrier) { const c = document.createElement('span'); c.className = 'carrier'; c.textContent = 'passive carrier line'; row.appendChild(c); }
   if (opts.odds) {
-    const o = document.createElement('span'); o.className = 'odds';
+    // a button, not a tooltip-only span: touch users have no hover
+    const o = document.createElement('button'); o.type = 'button'; o.className = 'odds';
     o.textContent = `🎲 ≈${Math.max(1, Math.round(opts.odds.p * 100))}%/egg`;
-    o.title = `≈${Math.round(opts.odds.p * 100)}% chance per egg the child inherits all ${opts.odds.keep} tracked passive${opts.odds.keep === 1 ? '' : 's'} from this pairing (pool of ${opts.odds.pool}; ${opts.odds.rp ? 'includes the passives of your best roster pal used as the partner' : 'assumes a passive-free partner'}) — ≈${Math.max(1, Math.round(1 / opts.odds.p))} eggs on average. Community-measured estimate.`;
+    const expl = `≈${Math.round(opts.odds.p * 100)}% chance per egg the child inherits all ${opts.odds.keep} tracked passive${opts.odds.keep === 1 ? '' : 's'} from this pairing (pool of ${opts.odds.pool}; ${opts.odds.rp ? 'includes the passives of your best roster pal used as the partner' : 'assumes a passive-free partner'}) — ≈${Math.max(1, Math.round(1 / opts.odds.p))} eggs on average. Community-measured estimate.`;
+    o.title = expl;
+    o.setAttribute('aria-expanded', 'false');
+    o.addEventListener('click', () => {
+      const info = row.querySelector('.oddsinfo');
+      if (info) { info.remove(); o.setAttribute('aria-expanded', 'false'); return; }
+      const s = document.createElement('span'); s.className = 'oddsinfo'; s.textContent = expl;
+      row.appendChild(s); o.setAttribute('aria-expanded', 'true');
+    });
     row.appendChild(o);
   }
   if (opts.onOpen) {
@@ -1583,6 +1734,8 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
   sum.appendChild(cnt);
   if (carried.length) { const sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = ropts.label || 'carrying:'; sum.appendChild(sub); sum.appendChild(passiveChips(carried)); }
   out.appendChild(sum);
+  const need = neededSpecies(steps, ropts.starterKs || []);
+  if (need.length) out.appendChild(neededRow(need));
   if (steps.length > 1) out.appendChild(treeViewport(routeTree(steps)));
   steps.forEach((s, i) => out.appendChild(stepEl(s, {stepNo: i + 1, carrier: true, odds: stepOdds[i], onOpen: () => openChainStep(steps, i)})));
   if (carried.length) {
@@ -1604,6 +1757,9 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
   const saveBtn = document.createElement('button'); saveBtn.className = 'alink primary'; saveBtn.textContent = 'Save plan';
   saveBtn.addEventListener('click', () => {
     if (!currentRoute) return;
+    const sig = r => JSON.stringify([r.tK, r.steps.map(s => [s.aK, s.bK, s.cK])]);
+    const dup = plans.find(p => sig(p) === sig(currentRoute));
+    if (dup) { toast('This route is already saved as “' + dup.name + '”'); return; }
     const name = nameInp.value.trim() || target.n;
     plans.push({id: Date.now() + '', name, tK: currentRoute.tK,
       passives: currentRoute.passives, steps: currentRoute.steps, done: currentRoute.steps.map(() => false)});
@@ -1667,6 +1823,8 @@ function renderPlans() {
     head.appendChild(del);
     card.appendChild(head);
     card.appendChild(treeBox);
+    const need = neededSpecies(plan.steps);
+    if (need.length) card.appendChild(neededRow(need));
     plan.steps.forEach((s, i) => {
       const row = stepEl(s, {stepNo: i + 1, onOpen: () => openChainStep(plan.steps, i)});
       if (plan.done[i]) row.classList.add('done');
@@ -1694,7 +1852,14 @@ function renderHatch() {
   const own = [...ownedSpeciesSet()].filter(k => byKey.has(k));
   if (own.length < 1) {
     stats.textContent = '';
-    list.innerHTML = '<div class="hint" style="grid-column:1/-1">Star pals in the Paldex or add them to your Roster first — then this page shows everything you can hatch from them.</div>';
+    const h = document.createElement('div'); h.className = 'hint'; h.style.gridColumn = '1/-1';
+    h.append('Mark what you own first — then this page shows everything you can hatch from it. ');
+    const bd = document.createElement('button'); bd.className = 'alink'; bd.textContent = '★ Star pals in the Paldex';
+    bd.addEventListener('click', () => navTab('dex'));
+    const br = document.createElement('button'); br.className = 'alink'; br.textContent = '+ Add roster pals';
+    br.addEventListener('click', () => navTab('roster'));
+    h.append(bd, ' ', br);
+    list.appendChild(h);
     return;
   }
   const kids = new Map(); // childK -> {ways, pairs:[[aK,bK],…]}
@@ -1712,7 +1877,18 @@ function renderHatch() {
   rows.sort((a, b) => (b.isNew - a.isNew) || a.p.z - b.p.z);
   const newCount = rows.filter(r => r.isNew).length;
   stats.textContent = `${rows.length} species from ${own.length} owned · ${newCount} new`;
-  if (!rows.length) { list.innerHTML = '<div class="hint" style="grid-column:1/-1">Nothing matches these filters.</div>'; return; }
+  if (!rows.length) {
+    const h = document.createElement('div'); h.className = 'hint'; h.style.gridColumn = '1/-1';
+    h.append('Nothing matches these filters. ');
+    const b = document.createElement('button'); b.className = 'alink'; b.textContent = '✕ Clear filters';
+    b.addEventListener('click', () => {
+      hatchSearch.value = ''; hatchNewOnly = false; setSwitch(hatchNewBtn, false);
+      save(); renderHatch();
+    });
+    h.appendChild(b);
+    list.appendChild(h);
+    return;
+  }
   for (const r of rows) {
     const expanded = hatchOpen === r.p.k;
     const card = document.createElement('button'); card.className = 'hcard' + (expanded ? ' expanded' : ''); card.type = 'button';
@@ -1834,6 +2010,12 @@ dexWork.addEventListener('change', () => {
   save(); renderDex();
 });
 dexOwnedBtn.addEventListener('click', () => { dexOwnedOnly = !dexOwnedOnly; setSwitch(dexOwnedBtn, dexOwnedOnly); save(); renderDex(); });
+function clearDexFilters() {
+  dexSearch.value = ''; dexType.value = ''; dexWork.value = '';
+  dexOwnedOnly = false; setSwitch(dexOwnedBtn, false);
+  save(); renderDex();
+}
+document.getElementById('dexClear').addEventListener('click', clearDexFilters);
 document.querySelectorAll('th[data-s]').forEach(th => {
   th.addEventListener('click', () => {
     const k = th.dataset.s;
@@ -1867,14 +2049,21 @@ function renderDex() {
   });
   document.getElementById('dexCount').textContent =
     rows.length === PALS.length ? PALS.length + ' pals' : rows.length + ' of ' + PALS.length + ' pals';
+  // a visible way out of persisted filters ("1 of 299 pals" a week later)
+  document.getElementById('dexClear').hidden = !(q || ty || wk || dexOwnedOnly);
   dexBody.innerHTML = '';
   for (const p of rows) {
     const tr = document.createElement('tr');
+    tr.dataset.k = p.k;
     const td0 = document.createElement('td');
     const star = document.createElement('button'); star.className = 'star' + (owned.has(p.k) ? ' on' : '');
     star.textContent = owned.has(p.k) ? '★' : '☆'; star.title = 'Mark as owned';
     star.setAttribute('aria-label', 'Mark ' + p.n + ' as owned'); star.setAttribute('aria-pressed', String(owned.has(p.k)));
-    star.addEventListener('click', e => { e.stopPropagation(); toggleOwned(p.k); renderDex(); renderReverse(); });
+    star.addEventListener('click', e => {
+      e.stopPropagation(); toggleOwned(p.k); renderDex(); renderReverse();
+      // the re-render destroyed the clicked button — put focus back on its successor
+      dexBody.querySelector(`tr[data-k="${p.k}"] .star`)?.focus();
+    });
     td0.appendChild(star);
     const td1 = document.createElement('td'); td1.textContent = zk(p);
     const td2 = document.createElement('td');
@@ -1896,7 +2085,12 @@ function renderDex() {
   }
   if (!rows.length) {
     const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 7;
-    td.innerHTML = '<div class="hint">No pals match these filters.</div>'; tr.appendChild(td); tr.style.cursor = 'default';
+    const h = document.createElement('div'); h.className = 'hint';
+    h.append('No pals match these filters. ');
+    const b = document.createElement('button'); b.className = 'alink'; b.textContent = '✕ Clear filters';
+    b.addEventListener('click', clearDexFilters);
+    h.appendChild(b);
+    td.appendChild(h); tr.appendChild(td); tr.style.cursor = 'default';
     dexBody.appendChild(tr);
   }
 }
@@ -1934,6 +2128,11 @@ renderBreed(); renderReverse(); renderDex(); renderRoster(); renderPlans(); rend
 // first-visit tips (dismissible; the footer keeps the short version)
 {
   const tipbar = document.getElementById('tipbar');
+  // touch devices have no "/" key — lead with the tip they can actually use
+  if (matchMedia('(pointer: coarse)').matches) {
+    tipbar.querySelector('span').innerHTML =
+      '👋 First time here? Star <b>★</b> pals in the Paldex to mark what you own — every “Owned” filter uses them. Works fully offline once loaded.';
+  }
   if (!localStorage.getItem('palbreed_tipseen')) {
     tipbar.hidden = false;
     document.getElementById('tipDismiss').addEventListener('click', () => {
@@ -1941,6 +2140,11 @@ renderBreed(); renderReverse(); renderDex(); renderRoster(); renderPlans(); rend
     });
   }
 }
+// guide jump links: hand the reader to the tab being described
+document.querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', () => {
+  if (b.dataset.nav === 'combos') { navTab('dex'); setDexMode('combos'); }
+  else navTab(b.dataset.nav);
+}));
 booting = false;
 if (!applyHash(initialHash)) showTab(state.tab && document.getElementById('view-' + state.tab) ? state.tab : currentTab);
 if (state.ro && pickS[1].get() && pickPT.get()) computeRoute();
@@ -1961,6 +2165,12 @@ document.addEventListener('keydown', e => {
     const pk = n ? pickS[n] : (pickPT.get() ? pickS[1] : pickPT);
     pk.root.scrollIntoView({block: 'center'});
     pk.openPop();
+    return;
+  }
+  if (currentTab === 'reverse' && !pickT.get()) {
+    // no target yet — filtering pairs is useless; open the target picker instead
+    e.preventDefault();
+    pickT.openPop();
     return;
   }
   let target = {dex: '#dexSearch', hatch: '#hatchSearch', roster: '#rosterSearch', reverse: '#pairFilter'}[currentTab];
