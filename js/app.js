@@ -1183,6 +1183,11 @@ function scheduleAuto() {
   clearTimeout(autoTimer);
   autoTimer = setTimeout(() => {
     if (pickPT.get() && SLOTS.some(n => pickS[n].get())) computeRoute();
+    else if (currentRoute) { // inputs no longer complete — drop the stale route
+      currentRoute = null;
+      document.getElementById('routeOut').innerHTML = '<div class="hint">Pick at least Start pal 1 and a target species — the route appears here automatically.</div>';
+      save();
+    }
   }, 600);
 }
 for (const n of SLOTS) {
@@ -1293,14 +1298,6 @@ function pairOutcomes(aK, bK, prefixSteps) {
   const r = breed(byKey.get(aK), byKey.get(bK));
   return r.children.map(c => ({steps: [...prefixSteps, stepOf(aK, bK, c, r.kind)], k: c.pal.k}));
 }
-const computeBtn = document.getElementById('computeBtn');
-computeBtn.addEventListener('click', () => {
-  computeBtn.disabled = true; computeBtn.textContent = 'Computing…';
-  setTimeout(() => {
-    computeRoute();
-    computeBtn.disabled = false; computeBtn.textContent = 'Compute route ➜';
-  }, 20);
-});
 function computeRoute() {
   const out = document.getElementById('routeOut');
   const t = pickPT.get();
@@ -1641,7 +1638,7 @@ function renderPlans() {
     prog.textContent = doneCnt === plan.steps.length ? '✓ complete' : `${doneCnt}/${plan.steps.length} steps`;
     head.appendChild(prog);
     if (plan.passives.length) head.appendChild(passiveChips(plan.passives));
-    const treeBtn = document.createElement('button'); treeBtn.className = 'del'; treeBtn.textContent = '🌳 tree';
+    const treeBtn = document.createElement('button'); treeBtn.className = 'del pushr'; treeBtn.textContent = '🌳 Tree';
     treeBtn.title = 'Show this plan as an interactive tree';
     treeBtn.setAttribute('aria-expanded', 'false');
     const treeBox = document.createElement('div'); treeBox.className = 'plantree'; treeBox.hidden = true;
@@ -1651,7 +1648,7 @@ function renderPlans() {
       if (!treeBox.hidden && !treeBox.childElementCount) treeBox.appendChild(treeViewport(routeTree(plan.steps)));
     });
     head.appendChild(treeBtn);
-    const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕ delete';
+    const del = document.createElement('button'); del.className = 'del danger'; del.textContent = '✕ Delete';
     del.setAttribute('aria-label', 'Delete plan ' + plan.name);
     del.addEventListener('click', () => {
       const idx = plans.findIndex(x => x.id === plan.id);
