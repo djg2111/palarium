@@ -44,7 +44,7 @@
     <div class="controls">
       <div class="ctl"><label>Target child</label><div id="pickT"></div></div>
       <div class="ctl"><label>Must include parent (optional)</label><div id="pickL"></div></div>
-      <div class="ctl"><label for="pairFilter">Filter pairs</label><input class="search-inp" id="pairFilter" placeholder="Type a parent name…"></div>
+      <div class="ctl"><label for="pairFilter">Filter pairs</label><input type="search" class="search-inp" id="pairFilter" placeholder="Type a parent name…"></div>
       <div class="ctl"><label aria-hidden="true">&nbsp;</label><button type="button" class="toggle" id="ownedToggle" role="switch" aria-checked="false" title="Only show pairs where you own both parents (star pals in the Paldex)"><span class="kn"></span>Owned pals only</button></div>
     </div>
     <div id="reverseResult"><div class="hint">Pick a target pal to list every parent combination that produces it.</div></div>
@@ -58,7 +58,7 @@
       </div>
       <div class="sub">Every species you can breed <b>right now</b>, in one step, from pals you own (★ starred or in your roster). Click a result to see which of your pairs produce it.</div>
       <div class="dex-controls">
-        <input class="search-inp" id="hatchSearch" placeholder="Search results…" aria-label="Search hatchery results">
+        <input type="search" class="search-inp" id="hatchSearch" placeholder="Search results…" aria-label="Search hatchery results">
         <button type="button" class="toggle" id="hatchNewOnly" role="switch" aria-checked="false" title="Hide species you already own"><span class="kn"></span>New species only</button>
       </div>
       <div class="hatchgrid" id="hatchList"></div>
@@ -78,7 +78,7 @@
         </div>
       </div>
       <div class="dex-controls">
-        <input class="search-inp" id="rosterSearch" placeholder="Search name, nickname or passive…" aria-label="Search roster">
+        <input type="search" class="search-inp" id="rosterSearch" placeholder="Search name, nickname or passive…" aria-label="Search roster">
         <select id="rosterPassiveFilter" aria-label="Filter by passive"><option value="">Any passive</option></select>
         <select id="rosterSort" aria-label="Sort roster">
           <option value="z">Sort: Paldex #</option>
@@ -114,6 +114,7 @@
         <div class="tools">
           <button type="button" class="toggle" id="partnerToggle" role="switch" aria-checked="false" title="Only use species you own (starred or in roster) as chain partners"><span class="kn"></span>Only use my pals as partners</button>
           <button class="alink primary" id="computeBtn">Compute route ➜</button>
+          <button class="alink" id="clearSlots" title="Clear all start slots and the target">✕ Clear</button>
         </div>
       </div>
       <div class="routewrap" id="routeOut"><div class="hint">Choose starting pal(s) and a target, then hit Compute.</div></div>
@@ -133,7 +134,7 @@
     </nav>
     <div id="dexPalsBlock">
     <div class="dex-controls">
-      <input class="search-inp" id="dexSearch" placeholder="Search pals…" aria-label="Search pals">
+      <input type="search" class="search-inp" id="dexSearch" placeholder="Search pals…" aria-label="Search pals">
       <select id="dexType" aria-label="Filter by element"><option value="">All elements</option></select>
       <select id="dexWork" aria-label="Filter by work suitability"><option value="">Any work suitability</option></select>
       <button type="button" class="toggle" id="dexOwned" role="switch" aria-checked="false" title="Only show starred pals"><span class="kn"></span>Owned only</button>
@@ -150,7 +151,7 @@
     </div>
     <div id="dexCombosBlock" hidden>
       <div class="dex-controls">
-        <input class="search-inp" id="comboSearch" placeholder="Search combos…" aria-label="Search unique combos">
+        <input type="search" class="search-inp" id="comboSearch" placeholder="Search combos…" aria-label="Search unique combos">
         <span class="rstats" id="comboCount" aria-live="polite"></span>
       </div>
       <div class="pairs" id="comboList"></div>
@@ -238,7 +239,7 @@
     </div>
   </section>
 </main>
-<footer>Palarium · a personal fan project — pal data &amp; icons extracted from palpedia.net (game v1.0.0) · Palworld © Pocketpair · works fully offline · star pals in the Paldex to build your owned list</footer>
+<footer>Palarium · a personal fan project — pal data &amp; icons extracted from palpedia.net (game v1.0.0) · Palworld © Pocketpair · works fully offline · star pals in the Paldex to build your owned list · press <code>/</code> to search</footer>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 

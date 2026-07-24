@@ -365,3 +365,4 @@ select#genderSel{padding:10px 12px}
 .plan .rstep.done{opacity:.45}
 .plan .rstep .chk{width:19px;height:19px;accent-color:var(--accent2);cursor:pointer;flex-shrink:0}
 footer{max-width:1200px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-size:12.5px;text-align:center}
+footer code{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:0 5px;font-family:Consolas,monospace}

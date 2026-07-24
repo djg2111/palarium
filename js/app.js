@@ -397,9 +397,16 @@ syncHeaderHeight();
 // ---------- state ----------
 const state = JSON.parse(localStorage.getItem('palbreed') || '{}');
 function save() {
-  localStorage.setItem('palbreed', JSON.stringify({
+  const s = {
     tab: currentTab, a: pickA.get()?.k, b: pickB.get()?.k, t: pickT.get()?.k, l: pickL.get()?.k,
-    ownedOnly, dexOwnedOnly, rgroup: typeof groupBySpecies !== 'undefined' && groupBySpecies }));
+    ownedOnly, dexOwnedOnly, rgroup: typeof groupBySpecies !== 'undefined' && groupBySpecies,
+    pt: pickPT.get()?.k, po: partnerOwnedOnly, sp: slotPassives, sg: slotGenders,
+    ro: !!currentRoute, chain: breedChain,
+    hn: typeof hatchNewOnly !== 'undefined' && hatchNewOnly,
+    dt: dexType.value, dw: dexWork.value, dsort: dexSort,
+  };
+  for (const n of SLOTS) s['s' + n] = pickS[n].get()?.k;
+  localStorage.setItem('palbreed', JSON.stringify(s));
   updateHash();
 }
 
@@ -417,7 +424,10 @@ function showTab(v) {
   save();
 }
 // ---------- shareable URLs ----------
+let booting = true;                    // suppress hash writes until init has applied the incoming hash
+const initialHash = location.hash;
 function updateHash() {
+  if (booting) return;
   let h = '#/' + currentTab;
   if (currentTab === 'breed') {
     const a = pickA.get(), b = pickB.get();
@@ -428,8 +438,8 @@ function updateHash() {
   }
   if (location.hash !== h) history.replaceState(null, '', h);
 }
-function applyHash() {
-  const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+function applyHash(hash) {
+  const parts = (hash ?? location.hash).replace(/^#\/?/, '').split('/').filter(Boolean);
   if (!parts.length) return false;
   const [tab, x, y] = parts;
   if (tab === 'pal' && x && byKey.has(x)) { showTab('dex'); openModal(byKey.get(x)); return true; }
@@ -569,7 +579,14 @@ function renderBreed() {
   b1.addEventListener('click', () => openModal(ch));
   const b2 = document.createElement('button'); b2.className = 'alink'; b2.textContent = `Find all parents of ${ch.n}`;
   b2.addEventListener('click', () => { pickT.set(ch, true); reverseShown = 120; renderReverse(); showTab('reverse'); });
-  lr.append(b1, b2);
+  const b3 = document.createElement('button'); b3.className = 'alink'; b3.textContent = `Continue: breed ${ch.n} with…`;
+  b3.title = 'Use this child as Parent 1 and pick its partner';
+  b3.addEventListener('click', () => {
+    breedChain = null;
+    pickA.set(ch, true); pickB.set(null, true); renderBreed();
+    setTimeout(() => pickB.openPop(), 0);
+  });
+  lr.append(b1, b2, b3);
   zone.appendChild(lr);
   appendChainCard(zone, a, b);
 }
@@ -1007,15 +1024,23 @@ const pickS = {};
 for (const n of SLOTS) {
   pickS[n] = makePicker(document.getElementById('pickS' + n), {
     placeholder: n === 1 ? 'Pick species or use roster' : 'None',
-    allowClear: true, ownedToggle: true, onChange: () => { slotPassives[n] = []; slotGenders[n] = null; renderSlotChips(); }});
+    allowClear: true, ownedToggle: true, onChange: () => { slotPassives[n] = []; slotGenders[n] = null; renderSlotChips(); save(); }});
 }
-const pickPT = makePicker(document.getElementById('pickPT'), {placeholder:'Target species', allowClear:true, ownedToggle:true, onChange:()=>{}});
+const pickPT = makePicker(document.getElementById('pickPT'), {placeholder:'Target species', allowClear:true, ownedToggle:true, onChange:save});
+document.getElementById('clearSlots').addEventListener('click', () => {
+  for (const n of SLOTS) { pickS[n].set(null, true); slotPassives[n] = []; slotGenders[n] = null; }
+  pickPT.set(null, true);
+  currentRoute = null; renderSlotChips();
+  document.getElementById('routeOut').innerHTML = '<div class="hint">Choose starting pal(s) and a target, then hit Compute.</div>';
+  save();
+});
 function setSlotAuto(rosterEntry) {
   let n = SLOTS.find(i => !pickS[i].get()) ?? 4;
   pickS[n].set(byKey.get(rosterEntry.k), true);
   slotPassives[n] = [...rosterEntry.ps];
   slotGenders[n] = rosterEntry.g || null;
   renderSlotChips();
+  save();
   showTab('plan');
   document.getElementById('pickS1').scrollIntoView({block:'center', behavior:'smooth'});
 }
@@ -1028,7 +1053,7 @@ function renderSlotChips() {
 }
 let partnerOwnedOnly = false;
 const partnerToggle = document.getElementById('partnerToggle');
-partnerToggle.addEventListener('click', () => { partnerOwnedOnly = !partnerOwnedOnly; setSwitch(partnerToggle, partnerOwnedOnly); });
+partnerToggle.addEventListener('click', () => { partnerOwnedOnly = !partnerOwnedOnly; setSwitch(partnerToggle, partnerOwnedOnly); save(); });
 
 function ownedSpeciesSet() {
   const s = new Set(owned);
@@ -1092,7 +1117,15 @@ function pairOutcomes(aK, bK, prefixSteps) {
   const r = breed(byKey.get(aK), byKey.get(bK));
   return r.children.map(c => ({steps: [...prefixSteps, stepOf(aK, bK, c, r.kind)], k: c.pal.k}));
 }
-document.getElementById('computeBtn').addEventListener('click', () => {
+const computeBtn = document.getElementById('computeBtn');
+computeBtn.addEventListener('click', () => {
+  computeBtn.disabled = true; computeBtn.textContent = 'Computing…';
+  setTimeout(() => {
+    computeRoute();
+    computeBtn.disabled = false; computeBtn.textContent = 'Compute route ➜';
+  }, 20);
+});
+function computeRoute() {
   const out = document.getElementById('routeOut');
   const t = pickPT.get();
   const starters = [];
@@ -1159,7 +1192,8 @@ document.getElementById('computeBtn').addEventListener('click', () => {
     }
   }
   out.scrollIntoView({block: 'nearest', behavior: 'smooth'});
-});
+  save();
+}
 
 function stepEl(s, opts = {}) {
   const row = document.createElement('div'); row.className = 'rstep';
@@ -1403,7 +1437,7 @@ const hatchSearch = document.getElementById('hatchSearch');
 const hatchNewBtn = document.getElementById('hatchNewOnly');
 let hatchNewOnly = false;
 hatchSearch.addEventListener('input', renderHatch);
-hatchNewBtn.addEventListener('click', () => { hatchNewOnly = !hatchNewOnly; setSwitch(hatchNewBtn, hatchNewOnly); renderHatch(); });
+hatchNewBtn.addEventListener('click', () => { hatchNewOnly = !hatchNewOnly; setSwitch(hatchNewBtn, hatchNewOnly); save(); renderHatch(); });
 function renderHatch() {
   const list = document.getElementById('hatchList');
   const stats = document.getElementById('hatchStats');
@@ -1431,6 +1465,7 @@ function renderHatch() {
     const card = document.createElement('button'); card.className = 'hcard'; card.type = 'button';
     card.appendChild(icon(r.p, 40, true));
     const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.p.n; card.appendChild(nm);
+    if (r.p.rar >= 5) card.appendChild(tierBadge(r.p));
     if (r.isNew) { const nb = document.createElement('span'); nb.className = 'newb'; nb.textContent = 'NEW'; card.appendChild(nb); }
     const ways = document.createElement('span'); ways.className = 'ways';
     ways.textContent = r.ways + (r.ways === 1 ? ' pair' : ' pairs'); card.appendChild(ways);
@@ -1503,17 +1538,17 @@ for (const [k, label] of Object.entries(WORKS)) {
   const o = document.createElement('option'); o.value = k; o.textContent = label; dexWork.appendChild(o);
 }
 dexSearch.addEventListener('input', renderDex);
-dexType.addEventListener('change', renderDex);
+dexType.addEventListener('change', () => { save(); renderDex(); });
 dexWork.addEventListener('change', () => {
   if (dexWork.value) dexSort = {key: 'w', dir: -1};
-  renderDex();
+  save(); renderDex();
 });
 dexOwnedBtn.addEventListener('click', () => { dexOwnedOnly = !dexOwnedOnly; setSwitch(dexOwnedBtn, dexOwnedOnly); save(); renderDex(); });
 document.querySelectorAll('th[data-s]').forEach(th => {
   th.addEventListener('click', () => {
     const k = th.dataset.s;
     dexSort = {key: k, dir: dexSort.key === k ? -dexSort.dir : (k === 'w' || k === 'own' ? -1 : 1)};
-    renderDex();
+    save(); renderDex();
   });
 });
 function renderDex() {
@@ -1583,8 +1618,40 @@ if (state.l && byKey.get(state.l)) pickL.set(byKey.get(state.l), true);
 if (state.ownedOnly) { ownedOnly = true; setSwitch(ownedToggle, true); }
 if (state.dexOwnedOnly) { dexOwnedOnly = true; setSwitch(dexOwnedBtn, true); }
 if (state.rgroup) { groupBySpecies = true; setSwitch(groupToggle, true); }
+// planner, chain, and filter state
+for (const n of SLOTS) {
+  const k = state['s' + n];
+  if (k && byKey.has(k)) {
+    pickS[n].set(byKey.get(k), true);
+    slotPassives[n] = (state.sp && state.sp[n]) || [];
+    slotGenders[n] = (state.sg && state.sg[n]) || null;
+  }
+}
+if (state.pt && byKey.has(state.pt)) pickPT.set(byKey.get(state.pt), true);
+if (state.po) { partnerOwnedOnly = true; setSwitch(partnerToggle, true); }
+if (state.hn) { hatchNewOnly = true; setSwitch(hatchNewBtn, true); }
+if (state.dt) dexType.value = state.dt;
+if (state.dw) dexWork.value = state.dw;
+if (state.dsort && state.dsort.key) dexSort = state.dsort;
+if (state.chain && Array.isArray(state.chain.steps)
+    && state.chain.steps.every(s => byKey.has(s.aK) && byKey.has(s.bK) && byKey.has(s.cK))
+    && state.chain.idx >= 0 && state.chain.idx < state.chain.steps.length) {
+  breedChain = state.chain;
+}
 renderBreed(); renderReverse(); renderDex(); renderRoster(); renderPlans(); renderSlotChips();
-if (!applyHash() && state.tab) showTab(state.tab);
+booting = false;
+if (!applyHash(initialHash) && state.tab) showTab(state.tab);
+if (state.ro && pickS[1].get() && pickPT.get()) computeRoute();
+// "/" focuses the active view's search box
+document.addEventListener('keydown', e => {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName)) return;
+  if (overlay.classList.contains('open') || roverlay.classList.contains('open') || openPicker) return;
+  let target = {dex: '#dexSearch', hatch: '#hatchSearch', roster: '#rosterSearch', reverse: '#pairFilter'}[currentTab];
+  if (currentTab === 'dex' && document.getElementById('dexPalsBlock').hidden) target = '#comboSearch';
+  const inp = target && document.querySelector(target);
+  if (inp) { e.preventDefault(); inp.focus(); inp.select(); }
+});
 // PWA: offline capability + installability (http(s) only — no-op when opened as a local file)
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
