@@ -340,6 +340,7 @@ tbody tr:hover{background:var(--surface)}
 .spal .g{font-size:var(--fs-md)}
 .gm,.gf{font-weight:700}
 .gm{color:var(--male)}.gf{color:var(--female)}
+.g svg{width:.95em;height:.95em;display:inline-block;vertical-align:-.08em}
 .rstats{color:var(--muted);font-size:var(--fs-sm);white-space:nowrap}
 .rospal .nick{color:var(--muted);font-weight:400;font-size:var(--fs-sm);margin-left:6px}
 select#genderSel{padding:10px 12px}
@@ -359,7 +360,7 @@ select#genderSel{padding:10px 12px}
 .fld .search-inp{width:100%}
 .fld .ivrow .iv{flex:1;min-width:0}
 .segrow{display:flex;gap:6px}
-.segrow button{flex:1;padding:9px 10px;border-radius:var(--r-md);background:var(--raised);border:1px solid var(--border);font-size:var(--fs-md);font-weight:600;color:var(--muted)}
+.segrow button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 10px;border-radius:var(--r-md);background:var(--raised);border:1px solid var(--border);font-size:var(--fs-md);font-weight:600;color:var(--muted)}
 .segrow button:hover:not(.on){color:var(--text);border-color:var(--border-strong)}
 .segrow button.on{color:var(--text);border-color:var(--accent);background:var(--accent-tint)}
 .moredet{border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg)}

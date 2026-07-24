@@ -81,6 +81,7 @@
 
   <section class="view" id="view-roster">
     <div class="pcard">
+      <div class="sub">Your roster tracks <b>individual pals</b> — passives, gender, IVs. Adding one automatically stars ★ its species as owned; the Planner and the Breedable now tab use both.</div>
       <div class="collhead">
         <span class="rstats" id="rosterStats" aria-live="polite"></span>
         <div class="collacts">
@@ -90,7 +91,6 @@
           <input type="file" id="importFile" accept="application/json" style="display:none">
         </div>
       </div>
-      <div class="sub">Your roster tracks <b>individual pals</b> — passives, gender, IVs. Adding one automatically stars ★ its species as owned; the Planner and the Breedable now tab use both.</div>
       <div class="dex-controls">
         <input type="search" class="search-inp" id="rosterSearch" placeholder="Search name, nickname or passive…" aria-label="Search roster">
         <select id="rosterPassiveFilter" aria-label="Filter by passive"><option value="">Any passive</option></select>
@@ -294,8 +294,8 @@
     <div class="fld"><label id="genderLbl">Gender <span class="opt">· optional</span></label>
       <div class="segrow" id="genderSeg" role="group" aria-labelledby="genderLbl">
         <button type="button" data-g="" class="on" aria-pressed="true">Unknown</button>
-        <button type="button" data-g="M" aria-pressed="false">♂ Male</button>
-        <button type="button" data-g="F" aria-pressed="false">♀ Female</button>
+        <button type="button" data-g="M" aria-pressed="false"><span class="g gm" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.2" cy="9.8" r="4.4"/><path d="M9.4 6.6 14 2M9.8 2H14v4.2"/></svg></span>Male</button>
+        <button type="button" data-g="F" aria-pressed="false"><span class="g gf" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.8" r="4.3"/><path d="M8 10.1v4.4M5.6 12.4h4.8"/></svg></span>Female</button>
       </div>
     </div>
     <div class="fld"><label>Passives <span class="opt">· optional, up to 4</span></label><div class="ptag" id="passivePick"></div></div>

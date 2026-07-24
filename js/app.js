@@ -164,11 +164,20 @@ function worksEl(p, highlightKey) {
   if (!w.children.length) { const s = document.createElement('span'); s.textContent = 'No base work'; w.appendChild(s); }
   return w;
 }
-// gender glyphs carry their color everywhere: ♂ = --male, ♀ = --female
+// gender markers carry their color everywhere: ♂ = --male, ♀ = --female.
+// Inline SVG instead of the ♂/♀ text glyphs — font coverage for those code
+// points is small and inconsistent across platforms.
+const GENDER_SVG = {
+  '♂': '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6.2" cy="9.8" r="4.4"/><path d="M9.4 6.6 14 2M9.8 2H14v4.2"/></svg>',
+  '♀': '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="5.8" r="4.3"/><path d="M8 10.1v4.4M5.6 12.4h4.8"/></svg>',
+};
 function gEl(sym) {
   const s = document.createElement('span');
   s.className = 'g ' + (sym === '♂' ? 'gm' : 'gf');
-  s.textContent = sym;
+  s.setAttribute('role', 'img');
+  s.setAttribute('aria-label', sym === '♂' ? 'male' : 'female');
+  s.title = sym === '♂' ? 'Male' : 'Female';
+  s.innerHTML = GENDER_SVG[sym];
   return s;
 }
 // wrap any ♂/♀ inside a plain string in colored spans (warnings, tags)
@@ -1276,7 +1285,7 @@ function renderRoster() {
   };
   const identity = r => {
     const nm = document.createElement('div'); nm.className = 'nm';
-    if (r.g) { const g = document.createElement('span'); g.className = 'g ' + (r.g === 'M' ? 'gm' : 'gf'); g.textContent = gsymR(r.g) + ' '; nm.appendChild(g); }
+    if (r.g) { nm.appendChild(gEl(gsymR(r.g))); nm.append(' '); }
     if (r.nick) { const nk = document.createElement('span'); nk.textContent = '“' + r.nick + '” '; nm.appendChild(nk); }
     if (r.iv) {
       const ivc = document.createElement('span'); ivc.className = 'ivchip';
@@ -1359,7 +1368,7 @@ function renderRosterStrip() {
     const chip = document.createElement('button'); chip.className = 'spal'; chip.type = 'button';
     chip.appendChild(icon(p, 30));
     const nm = document.createElement('span'); nm.textContent = r.nick || p.n; chip.appendChild(nm);
-    if (r.g) { const g = document.createElement('span'); g.className = 'g ' + (r.g === 'M' ? 'gm' : 'gf'); g.textContent = gsymR(r.g); chip.appendChild(g); }
+    if (r.g) chip.appendChild(gEl(gsymR(r.g)));
     if (r.ps.length) { const c = document.createElement('span'); c.className = 'zk'; c.textContent = r.ps.length + '◆'; c.title = r.ps.join(', '); chip.appendChild(c); }
     chip.title = p.n + (r.ps.length ? ' — ' + r.ps.join(', ') : '');
     chip.addEventListener('click', () => setSlotAuto(r));
