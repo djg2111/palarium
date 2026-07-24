@@ -549,6 +549,18 @@ function updateTabsFade() {
 tabsFadeEl.addEventListener('scroll', updateTabsFade, {passive: true});
 new ResizeObserver(updateTabsFade).observe(tabsFadeEl);
 updateTabsFade();
+// the paldex table only becomes its own scroll container when it can't fit —
+// see .tablewrap.panning in the stylesheet for why that matters to the header
+const tableWrapEl = document.querySelector('.tablewrap');
+const dexTableEl = tableWrapEl.querySelector('table');
+function syncTablePan() {
+  tableWrapEl.classList.toggle('panning', dexTableEl.scrollWidth > tableWrapEl.clientWidth + 1);
+  tableWrapEl.classList.toggle('atend',
+    tableWrapEl.scrollLeft + tableWrapEl.clientWidth >= tableWrapEl.scrollWidth - 4);
+}
+tableWrapEl.addEventListener('scroll', syncTablePan, {passive: true});
+new ResizeObserver(syncTablePan).observe(tableWrapEl);
+new ResizeObserver(syncTablePan).observe(dexTableEl);
 
 // ---------- state ----------
 const state = JSON.parse(localStorage.getItem('palbreed') || '{}');
@@ -1797,8 +1809,10 @@ function treeViewport(treeEl) {
   const inner = document.createElement('div'); inner.className = 'tvp-inner';
   inner.appendChild(treeEl);
   vp.appendChild(inner);
-  let scale = 1, tx = 0, ty = 0;
+  let scale = 1, tx = 0, ty = 0, fitScale = 1;
   const apply = () => { inner.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`; };
+  // centre the scaled tree in the viewport, or pin it left when it still overflows
+  const fitX = () => Math.max(0, (vp.clientWidth - inner.offsetWidth * scale) / 2);
   const zoomAt = (cx, cy, factor) => {
     const ns = Math.min(3, Math.max(0.35, scale * factor));
     tx = cx - (cx - tx) * (ns / scale);
@@ -1857,7 +1871,7 @@ function treeViewport(treeEl) {
   for (const [txt, label, fn] of [
     ['+', 'Zoom in', () => zoomAt(...mid(), 1.25)],
     ['−', 'Zoom out', () => zoomAt(...mid(), 1 / 1.25)],
-    ['⤾', 'Reset view', () => { scale = 1; tx = ty = 0; apply(); }],
+    ['⤾', 'Reset view', () => { scale = fitScale; tx = fitX(); ty = 0; apply(); }],
   ]) {
     const b = document.createElement('button'); b.type = 'button'; b.textContent = txt;
     b.title = label; b.setAttribute('aria-label', label);
@@ -1869,11 +1883,15 @@ function treeViewport(treeEl) {
   hint.textContent = matchMedia('(pointer: coarse)').matches ? 'drag to pan · pinch to zoom' : 'drag to pan · scroll to zoom';
   vp.appendChild(hint);
   requestAnimationFrame(() => {
-    const h = Math.min(Math.max(inner.offsetHeight, 140), 420);
-    vp.style.height = h + 'px';
-    // start centered horizontally if the tree is narrower than the viewport
+    // a 700px-wide chain in a 312px phone viewport used to open clipped, with no
+    // sign the rest existed — open zoomed to fit instead, then let the user zoom in
     const w = vp.clientWidth;
-    if (inner.offsetWidth < w) { tx = (w - inner.offsetWidth) / 2; apply(); }
+    if (inner.offsetWidth > w) fitScale = Math.max(0.45, w / inner.offsetWidth);
+    scale = fitScale;
+    // +46px keeps the zoom controls and the drag hint in a clear strip below a
+    // fitted tree instead of sitting on top of its right-hand chips
+    vp.style.height = Math.min(Math.max(inner.offsetHeight * scale + 46, 160), 420) + 'px';
+    tx = fitX(); apply();
   });
   return vp;
 }
@@ -2385,7 +2403,13 @@ function renderDex() {
     const s = document.createElement('span'); s.textContent = p.n; nm.appendChild(s);
     nm.appendChild(tierBadge(p)); td2.appendChild(nm);
     const td3 = document.createElement('td'); td3.className = 'hn'; td3.appendChild(typeChips(p));
-    const td4 = document.createElement('td'); td4.textContent = p.ic || uniqueChildren.has(p.k) ? p.r + ' (unique only)' : p.r;
+    const td4 = document.createElement('td'); td4.textContent = p.r;
+    if (p.ic || uniqueChildren.has(p.k)) {
+      // a caption rather than inline prose — inline, it wrapped to three lines
+      // in the narrow mobile column and made row heights lurch
+      const u = document.createElement('span'); u.className = 'uq'; u.textContent = 'unique only';
+      td4.appendChild(u);
+    }
     const td5 = document.createElement('td'); td5.className = 'hn'; td5.textContent = p.m + '%';
     const td6 = document.createElement('td'); td6.className = 'tworks';
     const parts = Object.entries(p.w || {}).sort((a,b) => b[1]-a[1]).map(([k,v]) => k === wk ? `<b>${workIcon(k)}${v}</b>` : workIcon(k)+v);
