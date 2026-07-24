@@ -65,9 +65,14 @@
       <div class="collhead">
         <span class="rstats" id="hatchStats" aria-live="polite"></span>
       </div>
-      <div class="sub">Every species you can breed <b>right now</b>, in one step, from pals you own (★ starred or in your roster). Click a result to see which of your pairs produce it.</div>
+      <div class="sub">Every species you can breed from pals you own (★ starred or in your roster) — <b>right now</b> in one step, or through longer chains. Click a result to see how.</div>
       <div class="dex-controls">
         <input type="search" class="search-inp" id="hatchSearch" placeholder="Search results…" aria-label="Search breedable species">
+        <div class="segrow" id="hatchDepth" role="group" aria-label="Breeding chain depth">
+          <button type="button" data-d="1" class="on" aria-pressed="true">1 step</button>
+          <button type="button" data-d="2" aria-pressed="false">2 steps</button>
+          <button type="button" data-d="0" aria-pressed="false">Any chain</button>
+        </div>
         <button type="button" class="toggle" id="hatchNewOnly" role="switch" aria-checked="false" title="Hide species you already own"><span class="kn"></span>New species only</button>
       </div>
       <div class="hatchgrid" id="hatchList"></div>
@@ -103,6 +108,11 @@
   </section>
 
   <section class="view" id="view-plan">
+    <nav class="tabs subtabs" id="planMode" role="tablist" aria-label="Planner mode" hidden>
+      <button data-m="new" class="active" role="tab" aria-selected="true">New route</button>
+      <button data-m="saved" role="tab" aria-selected="false">Saved plans</button>
+    </nav>
+    <div id="planNewBlock">
     <div class="pcard">
       <h2>Plan a breeding route</h2>
       <div class="sub">Pick starting pal(s) and a target species — the planner finds the shortest breeding chain and tracks the passives you want to carry along it.</div>
@@ -131,11 +141,13 @@
       <div class="plansec">3 · Route</div>
       <div class="routewrap" id="routeOut"><div class="hint">Pick at least Start pal 1 and a target species — the route appears here automatically.</div></div>
     </div>
+    </div>
 
+    <div id="planSavedBlock" hidden>
     <div class="pcard">
-      <h2>Saved plans</h2>
       <div class="sub">Your breeding to-do lists. Tick off steps as you hatch them.</div>
       <div id="plansList"><div class="hint">No saved plans yet — compute a route and save it.</div></div>
+    </div>
     </div>
   </section>
 

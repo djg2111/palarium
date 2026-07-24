@@ -387,6 +387,10 @@ select#genderSel{padding:10px 12px}
 .subtabs{margin-bottom:18px;width:fit-content}
 .subtabs button{padding:6px 15px;font-size:var(--fs-md)}
 @media(max-width:640px){.subtabs{display:flex}}
+.subtabs[hidden]{display:none}
+.hatchpanel .rstep{background:var(--surface)}
+#hatchDepth{flex-shrink:0}
+#hatchDepth button{white-space:nowrap;flex:0 0 auto;padding:9px 12px}
 .hatchgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
 .hcard{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 14px;text-align:left}
 .hcard:hover{border-color:var(--border-strong)}

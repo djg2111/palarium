@@ -270,7 +270,7 @@ function openModal(p) {
   btns.appendChild(mkBtn('Find parents', true, () => { closeModal(true); pickT.set(p, true); reverseShown = 120; renderReverse(); navTab('reverse'); }));
   btns.appendChild(mkBtn('Set as Parent 1', false, () => { closeModal(true); pickA.set(p, true); renderBreed(); navTab('breed'); }));
   btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(true); pickB.set(p, true); renderBreed(); navTab('breed'); }));
-  btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(true); pickPT.set(p, true); navTab('plan'); scheduleAuto(); }));
+  btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(true); pickPT.set(p, true); setPlanMode('new'); navTab('plan'); scheduleAuto(); }));
   btns.appendChild(mkBtn('+ Add to roster', false, () => { leaveModal(); openRosterEditor(null, p); }));
   btns.appendChild(mkBtn('Copy link', false, async () => {
     try {
@@ -509,6 +509,8 @@ function save() {
     dp: desiredPick.get(),
     ro: !!currentRoute, chain: breedChain,
     hn: typeof hatchNewOnly !== 'undefined' && hatchNewOnly,
+    hd: typeof hatchDepth !== 'undefined' ? hatchDepth : 1,
+    pm: typeof planMode !== 'undefined' ? planMode : 'new',
     dt: dexType.value, dw: dexWork.value, dsort: dexSort,
   };
   for (const n of SLOTS) s['s' + n] = pickS[n].get()?.k;
@@ -647,6 +649,7 @@ function applyHash(hash) {
     }
     const tp = resolvePal(y);
     if (tp) pickPT.set(tp, true);
+    setPlanMode('new'); // a shared route link always shows the route, not saved plans
     showTab('plan');
     if (ks.length && tp) computeRoute();
     return true;
@@ -1417,6 +1420,7 @@ function setSlotAuto(rosterEntry) {
   slotGenders[n] = rosterEntry.g || null;
   renderSlotChips();
   save();
+  setPlanMode('new');
   navTab('plan');
   scheduleAuto();
   document.getElementById('pickS1').scrollIntoView({block:'center', behavior: SMOOTH});
@@ -1425,6 +1429,25 @@ function renderSlotChips() {
   for (const n of SLOTS) slotPass[n].set(slotPassives[n]);
   updateSlotUI();
 }
+// ---------- planner sub-tabs: new route vs saved plans ----------
+// the bar stays hidden until a plan exists; last-used mode persists so a
+// player who was tracking a plan lands straight back on their to-do list
+let planMode = 'new';
+const planModeEl = document.getElementById('planMode');
+function setPlanMode(m) {
+  planMode = m;
+  planModeEl.querySelectorAll('button').forEach(b => {
+    const on = b.dataset.m === m;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', String(on));
+    b.tabIndex = on ? 0 : -1;
+  });
+  document.getElementById('planNewBlock').hidden = m !== 'new';
+  document.getElementById('planSavedBlock').hidden = m !== 'saved';
+  save();
+}
+planModeEl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setPlanMode(b.dataset.m); });
+tablistKeys(planModeEl);
 let partnerOwnedOnly = false;
 const partnerToggle = document.getElementById('partnerToggle');
 partnerToggle.addEventListener('click', () => { partnerOwnedOnly = !partnerOwnedOnly; setSwitch(partnerToggle, partnerOwnedOnly); save(); scheduleAuto(); });
@@ -1886,7 +1909,7 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
     plans.push({id: Date.now() + '', name, tK: currentRoute.tK,
       passives: currentRoute.passives, steps: currentRoute.steps, done: currentRoute.steps.map(() => false)});
     savePlans(); renderPlans();
-    toast('Plan “' + name + '” saved');
+    toast('Plan “' + name + '” saved', null, {label: 'View', fn: () => setPlanMode('saved')});
     saveBtn.textContent = 'Saved ✓'; setTimeout(() => saveBtn.textContent = 'Save plan', 1500);
   });
   const linkBtn = document.createElement('button'); linkBtn.className = 'alink'; linkBtn.textContent = 'Copy route link';
@@ -1908,8 +1931,14 @@ let plans = JSON.parse(localStorage.getItem('palbreed_plans') || '[]').filter(p 
 function savePlans() { localStorage.setItem('palbreed_plans', JSON.stringify(plans)); updateChecklist(); }
 function renderPlans() {
   const list = document.getElementById('plansList');
+  planModeEl.hidden = !plans.length;
+  planModeEl.querySelector('[data-m="saved"]').textContent = `Saved plans (${plans.length})`;
   list.innerHTML = '';
-  if (!plans.length) { list.innerHTML = '<div class="hint">No saved plans yet — compute a route and save it.</div>'; return; }
+  if (!plans.length) {
+    if (planMode === 'saved') setPlanMode('new');
+    list.innerHTML = '<div class="hint">No saved plans yet — compute a route and save it.</div>';
+    return;
+  }
   for (const plan of plans) {
     const card = document.createElement('div'); card.className = 'plan';
     const head = document.createElement('div'); head.className = 'planhead';
@@ -1967,6 +1996,19 @@ const hatchNewBtn = document.getElementById('hatchNewOnly');
 let hatchNewOnly = false;
 hatchSearch.addEventListener('input', renderHatch);
 hatchNewBtn.addEventListener('click', () => { hatchNewOnly = !hatchNewOnly; setSwitch(hatchNewBtn, hatchNewOnly); save(); renderHatch(); });
+// chain depth: 1 = one step (default), 2 = up to two steps, 0 = any chain
+let hatchDepth = 1;
+const hatchDepthEl = document.getElementById('hatchDepth');
+function setHatchDepth(d, silent) {
+  hatchDepth = d;
+  hatchDepthEl.querySelectorAll('button').forEach(b => {
+    const on = +b.dataset.d === d;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+  if (!silent) { save(); renderHatch(); }
+}
+hatchDepthEl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setHatchDepth(+b.dataset.d); });
 let hatchOpen = null; // childK of the expanded card
 function renderHatch() {
   const list = document.getElementById('hatchList');
@@ -1985,21 +2027,43 @@ function renderHatch() {
     list.appendChild(h);
     return;
   }
-  const kids = new Map(); // childK -> {ways, pairs:[[aK,bK],…]}
+  const ownSet = new Set(own);
+  // generation 1: every owned pair, keeping the full pair list per child
+  const kids = new Map(); // childK -> {gen:1, ways, pairs} | {gen>=2, wa, wb (witness pair)}
   for (let i = 0; i < own.length; i++) for (let j = i; j < own.length; j++) {
     const res = breed(byKey.get(own[i]), byKey.get(own[j]));
     for (const c of res.children) {
-      const e = kids.get(c.pal.k) || kids.set(c.pal.k, {ways: 0, pairs: []}).get(c.pal.k);
+      const e = kids.get(c.pal.k) || kids.set(c.pal.k, {gen: 1, ways: 0, pairs: []}).get(c.pal.k);
       e.ways++; e.pairs.push([own[i], own[j]]);
     }
   }
-  const ownSet = new Set(own);
+  // deeper generations: bred children join the parent pool. Only species you
+  // own (or have already bred in the chain) ever act as parents, so the set
+  // stays honest — one witness pair per species is enough to rebuild a chain.
+  const maxGen = hatchDepth === 0 ? 6 : hatchDepth;
+  let pool = [...own];
+  let added = [...kids.keys()].filter(k => !ownSet.has(k));
+  for (let gen = 2; gen <= maxGen && added.length; gen++) {
+    pool = pool.concat(added);
+    const next = [];
+    for (const a of added) for (const b of pool) {
+      const res = breed(byKey.get(a), byKey.get(b));
+      for (const c of res.children) {
+        const k = c.pal.k;
+        if (kids.has(k) || ownSet.has(k)) continue;
+        kids.set(k, {gen, wa: a, wb: b});
+        next.push(k);
+      }
+    }
+    added = next;
+  }
   const q = hatchSearch.value.trim().toLowerCase();
-  let rows = [...kids.entries()].map(([k, e]) => ({p: byKey.get(k), ways: e.ways, pairs: e.pairs, isNew: !ownSet.has(k)}))
+  let rows = [...kids.entries()].map(([k, e]) => ({p: byKey.get(k), gen: e.gen, ways: e.ways, pairs: e.pairs, isNew: !ownSet.has(k)}))
     .filter(r => (!hatchNewOnly || r.isNew) && (!q || r.p.n.toLowerCase().includes(q)));
-  rows.sort((a, b) => (b.isNew - a.isNew) || a.p.z - b.p.z);
+  rows.sort((a, b) => (b.isNew - a.isNew) || (a.gen - b.gen) || a.p.z - b.p.z);
   const newCount = rows.filter(r => r.isNew).length;
-  stats.textContent = `${rows.length} species from ${own.length} owned · ${newCount} new`;
+  const depthLbl = hatchDepth === 1 ? 'one step' : hatchDepth === 2 ? '≤2 steps' : 'any chain';
+  stats.textContent = `${rows.length} species from ${own.length} owned · ${depthLbl} · ${newCount} new`;
   if (!rows.length) {
     const h = document.createElement('div'); h.className = 'hint'; h.style.gridColumn = '1/-1';
     h.append('Nothing matches these filters. ');
@@ -2021,12 +2085,65 @@ function renderHatch() {
     if (r.p.rar >= 5) card.appendChild(tierBadge(r.p));
     if (r.isNew) { const nb = document.createElement('span'); nb.className = 'newb'; nb.textContent = 'NEW'; card.appendChild(nb); }
     const ways = document.createElement('span'); ways.className = 'ways';
-    ways.textContent = r.ways + (r.ways === 1 ? ' pair' : ' pairs'); card.appendChild(ways);
-    card.title = (expanded ? 'Hide' : 'Show') + ` the pairs that produce ${r.p.n}`;
+    ways.textContent = r.gen === 1 ? r.ways + (r.ways === 1 ? ' pair' : ' pairs') : r.gen + ' steps';
+    card.appendChild(ways);
+    card.title = (expanded ? 'Hide' : 'Show') + (r.gen === 1 ? ` the pairs that produce ${r.p.n}` : ` a breeding chain to ${r.p.n}`);
     card.addEventListener('click', () => { hatchOpen = expanded ? null : r.p.k; renderHatch(); });
     list.appendChild(card);
-    if (expanded) list.appendChild(hatchPanel(r));
+    if (expanded) list.appendChild(r.gen === 1 ? hatchPanel(r) : hatchChainPanel(r, kids, ownSet));
   }
+}
+// rebuild one concrete chain to a multi-step species from its witness pairs;
+// owned species terminate the recursion, so steps come out hatch-order
+function chainStepsFor(k, kids, ownSet) {
+  const steps = [], seen = new Set();
+  const mkStep = (aK, bK, cK) => {
+    const res = breed(byKey.get(aK), byKey.get(bK));
+    const c = res.children.find(x => x.pal.k === cK) || res.children[0];
+    return {aK, bK, cK, kind: res.kind, ga: c.ga, gb: c.gb, pa: c.pa, pb: c.pb};
+  };
+  const build = key => {
+    if (ownSet.has(key) || seen.has(key) || !kids.has(key)) return;
+    seen.add(key);
+    const e = kids.get(key);
+    const [a, b] = e.gen === 1 ? e.pairs[0] : [e.wa, e.wb];
+    build(a); build(b);
+    steps.push(mkStep(a, b, key));
+  };
+  build(k);
+  return steps;
+}
+function hatchChainPanel(r, kids, ownSet) {
+  const panel = document.createElement('div'); panel.className = 'hatchpanel';
+  const steps = chainStepsFor(r.p.k, kids, ownSet);
+  const ttl = document.createElement('div'); ttl.className = 'hpttl';
+  ttl.textContent = `One way to reach ${r.p.n} from your pals — ${steps.length} step${steps.length === 1 ? '' : 's'}:`;
+  panel.appendChild(ttl);
+  steps.forEach((s, i) => panel.appendChild(stepEl(s, {stepNo: i + 1, onOpen: () => openChainStep(steps, i)})));
+  const lr = document.createElement('div'); lr.className = 'linkrow'; lr.style.justifyContent = 'flex-start';
+  const planBtn = document.createElement('button'); planBtn.className = 'alink';
+  planBtn.textContent = 'Plan this route ↗';
+  planBtn.title = 'Open the Planner with this target, these starters, and owned-only partners — replaces current planner inputs';
+  planBtn.addEventListener('click', () => {
+    const bred = new Set(steps.map(s => s.cK));
+    const leaves = [];
+    for (const s of steps) for (const k of [s.aK, s.bK])
+      if (!bred.has(k) && !leaves.includes(k)) leaves.push(k);
+    const use = leaves.slice(0, 4);
+    for (const n of SLOTS) {
+      pickS[n].set(use[n - 1] ? byKey.get(use[n - 1]) : null, true);
+      slotPassives[n] = []; slotGenders[n] = null;
+    }
+    renderSlotChips();
+    pickPT.set(r.p, true);
+    if (!partnerOwnedOnly) { partnerOwnedOnly = true; setSwitch(partnerToggle, true); }
+    setPlanMode('new');
+    navTab('plan');
+    save(); scheduleAuto();
+  });
+  lr.appendChild(planBtn);
+  panel.appendChild(lr);
+  return panel;
 }
 function hatchPanel(r) {
   const panel = document.createElement('div'); panel.className = 'hatchpanel';
@@ -2240,6 +2357,7 @@ if (Array.isArray(state.dp) && state.dp.length) desiredPick.set(state.dp);
 if (state.po) { partnerOwnedOnly = true; setSwitch(partnerToggle, true); }
 if (state.ac) { avoidCollab = true; setSwitch(collabToggle, true); }
 if (state.hn) { hatchNewOnly = true; setSwitch(hatchNewBtn, true); }
+if (state.hd === 0 || state.hd === 2) setHatchDepth(state.hd, true);
 if (state.dt) dexType.value = state.dt;
 if (state.dw) dexWork.value = state.dw;
 if (state.dsort && state.dsort.key) dexSort = state.dsort;
@@ -2249,6 +2367,7 @@ if (state.chain && Array.isArray(state.chain.steps)
   breedChain = state.chain;
 }
 renderBreed(); renderReverse(); renderDex(); renderRoster(); renderPlans(); renderSlotChips();
+if (state.pm === 'saved' && plans.length) setPlanMode('saved');
 // first-visit setup checklist (dismissible; auto-hides once all steps are done)
 {
   const bar = document.getElementById('setupbar');
@@ -2267,6 +2386,7 @@ renderBreed(); renderReverse(); renderDex(); renderRoster(); renderPlans(); rend
       navTab('breed');
     });
     bar.querySelector('[data-su="plan"]').addEventListener('click', () => {
+      setPlanMode('new');
       navTab('plan');
       toast('Pick Start pal 1 and a target species — the route computes by itself.');
     });
@@ -2294,6 +2414,7 @@ document.addEventListener('keydown', e => {
   }
   if (currentTab === 'plan') {
     e.preventDefault();
+    if (planMode !== 'new') setPlanMode('new');
     const n = SLOTS.find(i => !pickS[i].get());
     const pk = n ? pickS[n] : (pickPT.get() ? pickS[1] : pickPT);
     pk.root.scrollIntoView({block: 'center'});
