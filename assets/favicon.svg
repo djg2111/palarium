@@ -1,15 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="egg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#4cc2ff"/>
-      <stop offset="1" stop-color="#7ee0a3"/>
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="14" fill="#0d1117"/>
-  <path d="M32 8C22 8 13 24 13 37c0 11 8.5 19 19 19s19-8 19-19C51 24 42 8 32 8z" fill="url(#egg)"/>
-  <path d="M32 8C22 8 13 24 13 37c0 11 8.5 19 19 19" fill="none" stroke="#0d1117" stroke-opacity=".15" stroke-width="2"/>
-  <circle cx="25" cy="26" r="4.5" fill="#0d1117" opacity=".85"/>
-  <circle cx="39" cy="26" r="4.5" fill="#0d1117" opacity=".85"/>
-  <circle cx="26.5" cy="24.5" r="1.6" fill="#e6edf3"/>
-  <circle cx="40.5" cy="24.5" r="1.6" fill="#e6edf3"/>
+<!-- Favicon: the Egg Incubator, reduced to what 16px can carry — glass vessel,
+     one band at the waterline, capped collar, stepped plinth. The emblem is
+     unreadable at favicon size, which is why this exists as a separate mark. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Palarium">
+  <defs><clipPath id="v"><path d="M32 15c-8 0-14.5 8.5-14.5 18.5 0 8.6 6.3 13.5 14.5 13.5s14.5-4.9 14.5-13.5C46.5 23.5 40 15 32 15z"/></clipPath></defs>
+  <path d="M32 15c-8 0-14.5 8.5-14.5 18.5 0 8.6 6.3 13.5 14.5 13.5s14.5-4.9 14.5-13.5C46.5 23.5 40 15 32 15z" fill="#58b6ea"/>
+  <g clip-path="url(#v)">
+    <path d="M17 36c6-2.5 10 1.5 15-.5s10 2 15-1.5V48H17z" fill="#8fd0f2" opacity=".5"/>
+    <path d="M17 38.5h30v4.5H17z" fill="#d9b25c"/>
+  </g>
+  <path d="M20.5 12h23l-1.8 6.5H22.3z" fill="#d9b25c"/>
+  <path d="M20.5 12h23v2.2h-23z" fill="#a8863f"/>
+  <path d="M32 1.5 35.8 8.5h-7.6z" fill="#d9b25c"/>
+  <rect x="29.5" y="8.5" width="5" height="3" fill="#a8863f"/>
+  <path d="M23 47h18l-1.5 4.5h-15z" fill="#a8863f"/>
+  <rect x="18.5" y="51.5" width="27" height="4" rx="1" fill="#d9b25c"/>
+  <rect x="15" y="55.5" width="34" height="5" rx="1.5" fill="#d9b25c"/>
 </svg>

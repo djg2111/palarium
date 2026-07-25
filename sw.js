@@ -1,9 +1,11 @@
 // Palarium service worker: network-first for the app shell (so deploys land
 // immediately when online), cache-first for pal icons (immutable-ish, 299 files).
-// v9: icons moved from PNG to lossless WebP and map tiles were added, so every
-// icon URL changed — the bump evicts ~9.6 MB of now-unreachable PNG entries.
-const VERSION = 'palarium-v9';
-const SHELL = ['.', 'index.html', 'css/style.css', 'js/app.js', 'js/data.js', 'assets/favicon.svg', 'manifest.webmanifest'];
+// v10: new brand assets. The header logo is now artwork rather than styled
+// text, so it's precached with the shell — otherwise the header renders empty
+// on a cold offline load.
+const VERSION = 'palarium-v10';
+const SHELL = ['.', 'index.html', 'css/style.css', 'js/app.js', 'js/data.js',
+  'assets/favicon.svg', 'assets/lockup.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
