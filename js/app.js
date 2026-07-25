@@ -2789,6 +2789,7 @@ const mapResultsEl = document.getElementById('mapResults');
 const mapSearchEl = document.getElementById('mapSearch');
 const mapLayerSeg = document.getElementById('mapLayer');
 const mapFilterSeg = document.getElementById('mapFilters');
+const mapLabelSeg = document.getElementById('mapLabels');
 
 const MAP_PREFS_V = 2;   // bump when a filter chip ships, so saved sets don't hide it
 const mapPrefs = JSON.parse(localStorage.getItem('palarium_map') || '{}');
@@ -2809,7 +2810,7 @@ let mapDragged = false;
 // section has initialised, and reading these from there would be a TDZ crash
 function mapSavePrefs() {
   localStorage.setItem('palarium_map',
-    JSON.stringify({v: MAP_PREFS_V, l: mapLayer, t: [...mapTypes]}));
+    JSON.stringify({v: MAP_PREFS_V, l: mapLayer, t: [...mapTypes], lb: mapLabelMode}));
 }
 
 const mapKey = m => m.layer + '|' + m.id;
@@ -2834,7 +2835,7 @@ function mapApply() {
   mapStageEl.style.transform = `translate3d(${mapTX}px,${mapTY}px,0) scale(${mapK})`;
   mapStageEl.style.setProperty('--iz', 1 / mapK);
   mapStageEl.classList.toggle('lab', mapK >= 0.2);
-  const rt = 'r' + (mapK < 0.12 ? 0 : mapK < 0.25 ? 1 : mapK < 0.45 ? 2 : 3);
+  const rt = 'r' + stageTier(mapK);
   if (!mapStageEl.classList.contains(rt)) {
     mapStageEl.classList.remove('r0', 'r1', 'r2', 'r3');
     mapStageEl.classList.add(rt);
@@ -2845,6 +2846,7 @@ function mapApply() {
   // the zone edge is baked into the canvas, so it only needs repainting when
   // the zoom bucket changes — a few times per session, not per frame
   if (mapSpawnKey && zoneDrawnAt !== mapTileZoom(mapK)) mapDrawZones();
+  mapQueueLabels();
 }
 // Both textures are square, but the playable area inside them isn't: the
 // surface is a diamond and the World Tree fills barely two thirds. Fitting and
@@ -3018,6 +3020,7 @@ function mapSyncMarkers() {
     el.classList.toggle('dim', on && !!q && !hit);
     if (on) { counts[m.type]++; if (hit) matches++; }
   }
+  mapQueueLabels();
   if (q) {
     // a query can match a species (spawn areas) as well as places, and saying
     // "0 matches" next to a species result on screen is just wrong
@@ -3358,8 +3361,27 @@ const spawnLayersFor = k => Object.keys(MAP.layers).filter(l => spawnPoints(k, l
 // a band following the union's outline. Fill the outer union opaque, then knock
 // the inner union back with a partially transparent destination-out — one
 // canvas, two passes, no per-circle strokes showing through the interior.
-const ZONE_INK = '#ffb347';
-const ZONE_BODY_ALPHA = 0.3;
+// How likely this species is in a given spawner group: its weight over the
+// group's total. A pal that's 30% of one biome's table and 3% of another's is
+// worth telling apart, and the numbers were already sitting in the data unused.
+function spawnShares(palKey) {
+  const out = new Map();
+  if (!SPAWN) return out;
+  for (const {gi, w} of spawnEntries(palKey)) {
+    const total = SPAWN.groups[gi].reduce((a, e) => a + e[3], 0) || 1;
+    out.set(gi, w / total);
+  }
+  return out;
+}
+
+// ARK's spawn maps colour each area by how common the creature is there, which
+// is the thing a flat wash can't say. The ramp stays warm end-to-end (amber ->
+// hot orange) so it reads over green forest, blue sea and white snow alike, and
+// it's normalised to this species' own best area — the question being answered
+// is "where is it most common", not "how does it compare to other pals".
+const ZONE_INK = '#ffc061';
+const zoneFill = t => `rgba(255,${Math.round(186 - 96 * t)},${Math.round(90 - 62 * t)},` +
+  `${(0.17 + 0.33 * t).toFixed(3)})`;
 let zoneDrawnAt = -1;
 function mapDrawZones() {
   const ctx = mapZonesEl.getContext('2d');
@@ -3376,31 +3398,49 @@ function mapDrawZones() {
   // when zoomed out to keep it roughly constant on screen
   const ring = Math.max(1.5, Math.min(14, 3.2 / Math.max(mapK, 0.04)));
 
+  const shares = spawnShares(mapSpawnKey);
+  const peak = Math.max(...shares.values(), 0.0001);
   const outer = new Path2D(), inner = new Path2D();
+  const bodies = [];
   let n = 0;
   for (const {gi} of spawnEntries(mapSpawnKey)) {
     const run = runs.get(gi);
     if (!run) continue;
     const r = Math.max(2, radii[gi] * s);
     const ri = Math.max(0.5, r - ring);
+    const body = new Path2D();
     for (let i = 1; i < run.length; i += 2) {
       const cx = run[i] * s, cy = run[i + 1] * s;
       outer.moveTo(cx + r, cy);        // without this each arc joins the last
       outer.arc(cx, cy, r, 0, Math.PI * 2);
       inner.moveTo(cx + ri, cy);
       inner.arc(cx, cy, ri, 0, Math.PI * 2);
+      body.moveTo(cx + ri, cy);
+      body.arc(cx, cy, ri, 0, Math.PI * 2);
       n++;
     }
+    bodies.push({body, t: Math.min(1, (shares.get(gi) || 0) / peak)});
   }
   if (!n) { mapZonesEl.hidden = true; return 0; }
+
+  // Edge first, as a band: every spot in a group shares a radius, so
+  // union(r) minus union(r - w) is exactly the union's outline.
   ctx.fillStyle = ZONE_INK;
   ctx.fill(outer);
-  // partial destination-out leaves the interior at ZONE_BODY_ALPHA instead of
-  // clearing it, which is what turns the silhouette into edge + tint
   ctx.globalCompositeOperation = 'destination-out';
-  ctx.fillStyle = `rgba(0,0,0,${1 - ZONE_BODY_ALPHA})`;
+  ctx.fillStyle = '#000';
   ctx.fill(inner);
   ctx.globalCompositeOperation = 'source-over';
+
+  // Then the graded interior, clipped inside the ring so it can't paint over
+  // it. One fill per group: overlapping circles within a group are the same
+  // probability and shouldn't darken, but two different spawner groups
+  // overlapping genuinely means a better chance, and those do stack.
+  ctx.save();
+  ctx.clip(inner);
+  for (const b of bodies) { ctx.fillStyle = zoneFill(b.t); ctx.fill(b.body); }
+  ctx.restore();
+
   mapZonesEl.hidden = false;
   return n;
 }
@@ -3472,6 +3512,9 @@ function mapSpawnSummary(palKey) {
   const es = spawnEntries(palKey);
   if (!es.length) return null;
   let lo = Infinity, hi = 0, spots = 0, night = true, dungeonOnly = true;
+  const shares = spawnShares(palKey);
+  let sLo = Infinity, sHi = 0;
+  for (const v of shares.values()) { sLo = Math.min(sLo, v); sHi = Math.max(sHi, v); }
   for (const e of es) {
     lo = Math.min(lo, e.lo); hi = Math.max(hi, e.hi);
     if (!(e.f & SPAWN_NIGHT)) night = false;
@@ -3481,7 +3524,8 @@ function mapSpawnSummary(palKey) {
       if (run) spots += (run.length - 1) / 2;
     }
   }
-  return {lo, hi, spots, night, dungeonOnly, groups: es.length};
+  return {lo, hi, spots, night, dungeonOnly, groups: es.length,
+          shareLo: isFinite(sLo) ? sLo : 0, shareHi: sHi};
 }
 
 function mapRenderSpawnBar(p) {
@@ -3505,8 +3549,19 @@ function mapRenderSpawnBar(p) {
     const n = document.createElement('span'); n.className = 'sbadge'; n.textContent = 'Dungeons only';
     spawnBarEl.appendChild(n);
   }
+  // the shading now carries information, so it needs a key
+  if (sum && sum.groups > 1) {
+    const lg = document.createElement('div'); lg.className = 'sb-legend';
+    const a = document.createElement('span'); a.textContent = 'less common';
+    const ramp = document.createElement('span'); ramp.className = 'sb-ramp';
+    ramp.title = 'Shading shows how much of each area’s spawn table this pal is';
+    const b = document.createElement('span'); b.textContent = 'more';
+    lg.append(a, ramp, b);
+    spawnBarEl.appendChild(lg);
+  }
   const x = document.createElement('button');
   x.type = 'button'; x.className = 'alink sb-clear'; x.textContent = '✕ Clear';
+  if (!sum || sum.groups <= 1) x.style.marginLeft = 'auto';
   x.addEventListener('click', () => mapSetSpawn(null));
   spawnBarEl.appendChild(x);
 }
@@ -3560,6 +3615,16 @@ function mapRenderSpawnInfo(p) {
     return;
   }
 
+  // the number that actually predicts how long you'll be standing there
+  const pct = v => (v * 100 < 1 ? '<1' : Math.round(v * 100)) + '%';
+  const rate = document.createElement('div'); rate.className = 'isub inote';
+  rate.textContent = sum.shareHi
+    ? `Makes up ${sum.shareLo === sum.shareHi ? pct(sum.shareHi)
+        : pct(sum.shareLo) + '\u2013' + pct(sum.shareHi)} of the spawns in its areas` +
+      (sum.groups > 1 ? ' \u2014 brighter shading is where it\u2019s most common.' : '.')
+    : '';
+  if (rate.textContent) mapInfoEl.appendChild(rate);
+
   const other = spawnLayersFor(p.k).filter(l => l !== mapLayer);
   if (other.length) {
     const e = document.createElement('div'); e.className = 'isub inote';
@@ -3610,20 +3675,208 @@ function mapRenderSpawnInfo(p) {
   mapInfoEl.appendChild(acts);
 }
 
+// ---------- label placement ----------
+// 152 waypoints, 90 alphas and 123 regions all shouting at once is unreadable,
+// and a plain on/off toggle trades one bad state for another. This is the
+// approach map renderers use: rank the labels, try several anchor positions for
+// each, and drop the ones that still collide.
+//
+// Boxes are computed analytically from measured text rather than read back from
+// the DOM — 230 getBoundingClientRect calls per pan would force a layout each
+// time, and the labels counter-scale so their screen size is already known.
+const LABEL_MODES = ['auto', 'all', 'off'];
+let mapLabelMode = LABEL_MODES.includes(mapPrefs.lb) ? mapPrefs.lb : 'auto';
+const labelMeasure = document.createElement('canvas').getContext('2d');
+const labelWidths = new Map();
+function labelWidth(text, region) {
+  const key = (region ? 'r|' : 'm|') + text;
+  let w = labelWidths.get(key);
+  if (w === undefined) {
+    // Region labels render uppercase at 12-13px depending on zoom tier, and
+    // uppercase is materially wider than the mixed-case string in the DOM.
+    // Measuring what's actually drawn, at the larger size, keeps the box on the
+    // conservative side — an over-wide box costs a label, an under-wide one
+    // silently lets a name sit on top of a marker.
+    labelMeasure.font = region
+      ? '700 13px "Segoe UI", system-ui, sans-serif'
+      : '700 10.5px "Segoe UI", system-ui, sans-serif';
+    const t = region ? text.toUpperCase() : text;
+    w = labelMeasure.measureText(t).width + (region ? t.length * 1.17 : 0);  // letter-spacing
+    labelWidths.set(key, w);
+  }
+  return w;
+}
+// half the marker glyph, so a label placed beside one clears the art. Alphas
+// carry a level badge above the icon, so their obstacle reaches higher than it
+// is wide — without that, a label anchored above lands on the badge.
+const MK_HALF = {tower: 15, middleBoss: 12, alpha: 15, fastTravel: 11};
+const MK_TOP = {alpha: 28};
+const halfOf = m => MK_HALF[m.type] || 12;
+const topOf = m => MK_TOP[m.type] || MK_HALF[m.type] || 12;
+// anchors in the order they're tried, matching the CSS classes below
+const ANCHORS = ['', 'lb-t', 'lb-r', 'lb-l'];
+const LABEL_PRIORITY = {tower: 0, middleBoss: 1, fastTravel: 2, alpha: 3};
+const LABEL_PAD = 2;
+// One margin for everything just outside the viewport. Obstacles and labels
+// have to use the same number: a wider margin for labels than for markers lets
+// a label at the very edge be placed against an obstacle that was skipped.
+const LABEL_EDGE = 160;
+
+let labelTimer = 0;
+function mapQueueLabels() {
+  clearTimeout(labelTimer);
+  labelTimer = setTimeout(mapPlaceLabels, 90);
+}
+function mapPlaceLabels() {
+  if (!MAP || !mapBuilt) return;
+  const off = mapLabelMode === 'off';
+  const all = mapLabelMode === 'all';
+  const cw = mapViewEl.clientWidth, ch = mapViewEl.clientHeight;
+  const placed = [];
+  const clear = b => {
+    for (const q of placed) {
+      if (b.x0 < q.x1 && b.x1 > q.x0 && b.y0 < q.y1 && b.y1 > q.y0) return false;
+    }
+    return true;
+  };
+  const boxFor = (anchor, sx, sy, w, h, half, top) => {
+    if (anchor === 'lb-t') return {x0: sx - w / 2, x1: sx + w / 2, y0: sy - top - 3 - h, y1: sy - top - 3};
+    if (anchor === 'lb-r') return {x0: sx + half + 5, x1: sx + half + 5 + w, y0: sy - h / 2, y1: sy + h / 2};
+    if (anchor === 'lb-l') return {x0: sx - half - 5 - w, x1: sx - half - 5, y0: sy - h / 2, y1: sy + h / 2};
+    return {x0: sx - w / 2, x1: sx + w / 2, y0: sy + half + 3, y1: sy + half + 3 + h};
+  };
+
+  // Every marker glyph is an obstacle before any label is placed — the
+  // equivalent of Mapbox's icon-allow-overlap:false. Without this the placer
+  // happily drops a waypoint name straight across a tower.
+  const markers = MAP.markers.filter(m => m.layer === mapLayer && mapTypeOn(m.type));
+  if (!off) {
+    for (const m of markers) {
+      const half = halfOf(m);
+      const sx = m.map.x * mapK + mapTX, sy = m.map.y * mapK + mapTY;
+      if (sx < -LABEL_EDGE || sy < -LABEL_EDGE || sx > cw + LABEL_EDGE || sy > ch + LABEL_EDGE) continue;
+      placed.push({x0: sx - half, x1: sx + half, y0: sy - topOf(m), y1: sy + half});
+    }
+  }
+
+  const placedText = new Set();
+  markers.sort((a, b) => (a === mapSel ? -1 : b === mapSel ? 1 : 0)
+    || LABEL_PRIORITY[a.type] - LABEL_PRIORITY[b.type]
+    || (b.level || 0) - (a.level || 0));
+
+  for (const m of markers) {
+    const el = mapEls.get(mapKey(m));
+    if (!el) continue;
+    el.classList.remove('lb-t', 'lb-r', 'lb-l');
+    if (off && m !== mapSel) { el.classList.add('nolb'); continue; }
+    const sx = m.map.x * mapK + mapTX, sy = m.map.y * mapK + mapTY;
+    // off-screen labels are hidden and, importantly, reserve no space
+    if (sx < -LABEL_EDGE || sy < -LABEL_EDGE || sx > cw + LABEL_EDGE || sy > ch + LABEL_EDGE) {
+      el.classList.add('nolb'); continue;
+    }
+    if (all) { el.classList.remove('nolb'); continue; }
+    const w = labelWidth(mapTitle(m)) + LABEL_PAD * 2, h = 15;
+    const half = halfOf(m), top = topOf(m);
+    let put = null;
+    for (const a of ANCHORS) {
+      const b = boxFor(a, sx, sy, w, h, half, top);
+      if (clear(b)) { put = {a, b}; break; }
+    }
+    if (!put && m === mapSel) put = {a: '', b: boxFor('', sx, sy, w, h, half, top)};
+    if (put) {
+      el.classList.remove('nolb');
+      if (put.a) el.classList.add(put.a);
+      placed.push(put.b);
+      placedText.add(mapTitle(m).toLowerCase());
+    } else {
+      el.classList.add('nolb');
+    }
+  }
+
+  // regions last: they're background context, so they yield to anything
+  // actionable, and they're already gated by the zoom tier in CSS
+  for (const el of mapRegionsEl.children) {
+    if (off) { el.classList.add('nolb'); continue; }
+    const sx = +el.dataset.x * mapK + mapTX, sy = +el.dataset.y * mapK + mapTY;
+    if (sx < -LABEL_EDGE || sy < -LABEL_EDGE || sx > cw + LABEL_EDGE || sy > ch + LABEL_EDGE) {
+      el.classList.add('nolb'); continue;
+    }
+    // Read the zoom tier from the data, not from computed style: .nolb itself
+    // sets display:none, so asking the DOM whether a region is "hidden by zoom"
+    // returns true for anything this function suppressed last pass — which
+    // silently let those through untested.
+    if (+el.dataset.t > stageTier(mapK)) { el.classList.remove('nolb'); continue; }
+    if (all) { el.classList.remove('nolb'); continue; }
+    // ~40 regions share a name with the waypoint inside them; printing both is
+    // just noise, and the waypoint is the one you can actually travel to
+    if (placedText.has(el.textContent.toLowerCase())) { el.classList.add('nolb'); continue; }
+    const w = labelWidth(el.textContent, true) + LABEL_PAD * 2, h = 18;
+    const b = {x0: sx - w / 2, x1: sx + w / 2, y0: sy - h / 2, y1: sy + h / 2};
+    if (clear(b)) { el.classList.remove('nolb'); placed.push(b); }
+    else el.classList.add('nolb');
+  }
+
+  // "All" means all, overlaps included — that's the point of the mode
+  if (!all && !off) mapVerifyLabels();
+}
+
+// The pass above models label boxes from measured text, which is fast but is
+// still a model — it can't know about a margin someone changes in the
+// stylesheet later, and it was quietly 2-3px out per anchor. This second pass
+// reads the geometry the browser actually produced and drops any label still
+// sitting on a marker it doesn't own. One batched layout read on a 90ms
+// debounce, and it means the model drifting can only cost a label, never
+// produce the overlap the whole exercise is about.
+function mapVerifyLabels() {
+  const glyphs = [];
+  for (const el of mapMarksEl.children) {
+    if (el.hidden) continue;
+    // NOT firstElementChild: an alpha's level badge is appended before its
+    // glyph, so that would measure the badge and miss the icon entirely
+    const g = el.querySelector('.g');
+    if (g) glyphs.push({owner: el, r: g.getBoundingClientRect()});
+  }
+  const labels = [];
+  for (const el of mapMarksEl.children) {
+    if (el.hidden || el.classList.contains('nolb') || el === mapEls.get(mapSel && mapKey(mapSel))) continue;
+    const lb = el.querySelector('.lb');
+    if (lb) labels.push({el, owner: el, r: lb.getBoundingClientRect()});
+  }
+  for (const el of mapRegionsEl.children) {
+    if (el.classList.contains('nolb')) continue;
+    labels.push({el, owner: null, r: el.getBoundingClientRect()});
+  }
+  for (const l of labels) {
+    if (!l.r.width) continue;
+    for (const g of glyphs) {
+      if (g.owner === l.owner) continue;
+      if (l.r.left < g.r.right - 1 && l.r.right > g.r.left + 1 &&
+          l.r.top < g.r.bottom - 1 && l.r.bottom > g.r.top + 1) {
+        l.el.classList.add('nolb');
+        break;
+      }
+    }
+  }
+}
+
 // ---------- region labels ----------
 // 123 named areas from the game's own region volumes. They're bucketed by
 // physical size so a zoomed-out map shows only the handful of big biomes and
 // the small named landmarks appear as you go in — one class write per frame
 // instead of 123 visibility checks.
 const regionTier = r => r >= 400 ? 0 : r >= 200 ? 1 : r >= 90 ? 2 : 3;
+// same thresholds mapApply uses to set the stage's r0..r3 class
+const stageTier = k => k < 0.12 ? 0 : k < 0.25 ? 1 : k < 0.45 ? 2 : 3;
 function mapBuildRegions() {
   mapRegionsEl.textContent = '';
   for (const r of MAP.regions || []) {
     if (r.layer !== mapLayer) continue;
     const d = document.createElement('div');
     d.className = 'rg t' + regionTier(r.r);
+    d.dataset.t = regionTier(r.r);
     d.style.left = r.map.x + 'px';
     d.style.top = r.map.y + 'px';
+    d.dataset.x = r.map.x; d.dataset.y = r.map.y;
     d.textContent = r.name;
     mapRegionsEl.appendChild(d);
   }
@@ -3655,6 +3908,22 @@ if (MAP) {
       // hiding the type the open card describes leaves a card with no marker
       if (mapSel && !mapTypeOn(mapSel.type)) mapSelect(null);
       mapSyncMarkers(); mapRenderResults();
+    });
+  });
+  mapLabelSeg.querySelectorAll('button').forEach(b => {
+    const paint = () => {
+      const on = b.dataset.lb === mapLabelMode;
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+    };
+    paint();
+    b.addEventListener('click', () => {
+      mapLabelMode = b.dataset.lb;
+      mapLabelSeg.querySelectorAll('button').forEach(x => {
+        const on = x.dataset.lb === mapLabelMode;
+        x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on));
+      });
+      mapSavePrefs();
+      mapPlaceLabels();
     });
   });
   mapSearchEl.addEventListener('input', () => {

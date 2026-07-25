@@ -209,6 +209,12 @@
         <button type="button" data-t="tower" class="on" aria-pressed="true" title="Syndicate tower bosses"><span class="mdot tower" aria-hidden="true"></span>Towers</button>
         <button type="button" data-t="region" class="on" aria-pressed="true" title="Named regions, revealed as you zoom in"><span class="mdot region" aria-hidden="true"></span>Regions</button>
       </div>
+      <div class="segrow mlabels" id="mapLabels" role="group" aria-label="Place name labels">
+        <span class="mlb-cap">Labels</span>
+        <button type="button" data-lb="auto" class="on" aria-pressed="true" title="Show as many names as fit without overlapping">Auto</button>
+        <button type="button" data-lb="all" aria-pressed="false" title="Show every name, even where they overlap">All</button>
+        <button type="button" data-lb="off" aria-pressed="false" title="Hide names — hover or tap a marker to read one">Off</button>
+      </div>
       <span class="rstats" id="mapCount" aria-live="polite"></span>
     </div>
     <div class="mapresults" id="mapResults" hidden></div>

@@ -209,6 +209,11 @@ in per-cell `.umap` packages. Hence `palex scan`. An actor's `AreaName.Key` join
 to `DT_WorldMapAreaData`, whose `MsgID` joins to `REGION_*` in
 `DT_WorldMap_Common_Text_Common`.
 
+**`Weight` is per row, and the useful number is its share of the group.** A pal
+with weight 20 in a group totalling 60 is a third of what spawns there; the same
+weight in a group totalling 600 is filler. The map shades spawn areas by that
+share, so don't drop `Weight` from `spawndata.js` thinking it's unused.
+
 **Spawners are two tables joined on `SpawnerName`.** `DT_PalSpawnerPlacement` is
 where they sit (8,253 instances, 372 distinct groups); `DT_PalWildSpawner` is
 what comes out (1,691 weighted rows, up to 3 pals each, with a night-only flag).
