@@ -14,6 +14,9 @@ const path = require('path');
 
 const SRC = 'extract/ui';
 const ITEMSRC = 'extract/items';
+const COMPASSSRC = 'extract/compass';
+const PASSIVESRC = 'extract/passive';
+const EGGSRC = 'extract/egg';
 const OUT = '../assets/ui';
 const ITEMOUT = '../assets/items';
 
@@ -21,15 +24,93 @@ const ELEMENTS = ['normal', 'fire', 'water', 'electric', 'grass', 'dark', 'drago
 const WORKS = ['kindling', 'watering', 'planting', 'generatingElectricity', 'handiwork',
   'gathering', 'lumbering', 'mining', 'medicineProduction', 'oilExtraction',
   'cooling', 'transporting', 'farming', 'any'];
+// Map markers. FTtower is the fast-travel statue — the winged emblem the game
+// shows for an activated travel point, and the actor these markers come from is
+// literally BP_LevelObject_TowerFastTravelPoint_C. `Teleport` is the blue portal
+// vortex (the one on top of Feybreak Tower), which is a different thing; it's
+// kept under its own name rather than mislabelled as the waypoint.
 const MARKERS = {
-  T_icon_compass_Teleport: 'waypoint',
+  T_icon_compass_FTtower: 'waypoint',
+  T_icon_compass_FTUnlockMap: 'statue',
+  T_icon_compass_Teleport: 'portal',
   T_icon_compass_tower: 'tower',
   T_icon_compass_boss: 'alpha',
   T_icon_compass_dungeon: 'dungeon',
-  T_icon_compass_FTtower: 'ftTower',
   T_icon_compass_camp: 'camp',
   T_icon_compass_Boss_Unknown: 'unknown',
 };
+
+// Egg icons, one per element plus the plain and mutated variants. The game's
+// internal element names again (Leaf/Electricity/Earth), mapped to the app's.
+const EGGS = {
+  normal: 'T_itemicon_Material_PalEgg',
+  fire: 'T_itemicon_Material_PalEgg_Fire_01',
+  water: 'T_itemicon_Material_PalEgg_Water_01',
+  electric: 'T_itemicon_Material_PalEgg_Electricity_01',
+  grass: 'T_itemicon_Material_PalEgg_Leaf_01',
+  dark: 'T_itemicon_Material_PalEgg_Dark_01',
+  dragon: 'T_itemicon_Material_PalEgg_Dragon_01',
+  ground: 'T_itemicon_Material_PalEgg_Earth_01',
+  ice: 'T_itemicon_Material_PalEgg_Ice_01',
+  mutation: 'T_itemicon_Material_PalEgg_MutationPal',
+  worldtree: 'T_itemicon_Material_PalEgg_WorldTree_01',
+};
+
+// Passive-skill icons, keyed by the effect type the app already stores as the
+// first token of each passive's `e` string — so no data.js change is needed.
+//
+// CAVEAT, because it matters: there is no effect-type -> icon table in the game
+// files (DT_partnerSkillIconDataTable exists for partner skills but indexes a UI
+// sprite atlas by number, unresolvable from data). This mapping was read off the
+// rendered textures. Wrong entries are a cosmetic bug, not a data one, and the
+// fallback below means nothing renders broken. The element rows are the safe
+// ones: 009_NN and 012_NN are unambiguously the boost/resist diamonds, in the
+// same display order as the element icon sheet.
+const ELEM_ORDER = ['normal', 'fire', 'water', 'electricity', 'leaf', 'dark', 'dragon', 'earth', 'ice'];
+const PASSIVE_FALLBACK = 'T_icon_skill_pal_00';
+const PASSIVES = {
+  maxhp: 'T_icon_skill_pal_004',
+  defense: 'T_icon_skill_pal_005',
+  shotattack: 'T_icon_skill_pal_006',
+  craftspeed: 'T_icon_skill_pal_016',
+  movespeed: 'T_icon_skill_pal_017',
+  swimspeed: 'T_icon_skill_pal_019',
+  ridejumpcount_increase: 'T_icon_skill_pal_FrogJump',
+  // work
+  logging: 'T_icon_skill_pal_WorkRank_Deforest',
+  mining: 'T_icon_skill_pal_WorkRank_Mining',
+  worksuitabilityaddrank_monsterfarm: 'T_icon_skill_pal_WorkRank_MonsterFarm',
+  // survival / upkeep
+  fullstomatch_decrease: 'T_icon_skill_pal_PartyFeeding',
+  sanity_decrease: 'T_icon_skill_pal_011',
+  autohpregenerate: 'T_icon_skill_pal_HPRecovery',
+  palsp_increase: 'T_icon_skill_pal_StaminaEndurance',
+  playersp_decreaserate: 'T_icon_skill_pal_StaminaEndurance',
+  lifesteal: 'T_icon_skill_pal_LifeSteel',            // sic — the texture is misspelled
+  nonkilling: 'T_icon_skill_pal_000',
+  selfdeathadditemdrop: 'T_icon_skill_pal_SacrificeBuff',
+  // combat modifiers
+  activeskillcooltime_decrease: 'T_icon_skill_pal_AttackSpeed_Combat',
+  reloadspeedup: 'T_icon_skill_pal_ReloadSpeed_FullAuto',
+  explosionresist: 'T_icon_skill_pal_ResistExplosion',
+  resistadditionaleffect_burn: 'T_icon_skill_pal_AddStatusEffect_Burn',
+  resistadditionaleffect_poison: 'T_icon_skill_pal_PoisonImmunity',
+  knockbackinvalid_forpassiveskill: 'T_icon_skill_pal_005',
+  leanbackinvalid_forpassiveskill: 'T_icon_skill_pal_005',
+  // breeding / world
+  breedspeed: 'T_icon_skill_pal_SpawnEggSpeed',
+  breedspeed_inbasecamp: 'T_icon_skill_pal_SpawnEggSpeed',
+  palegghatchingspeed: 'T_icon_skill_pal_GetEgg',
+  nocturnal: 'T_icon_skill_pal_NightVision',
+  nightowl: 'T_icon_skill_pal_NightVision',
+  worldtreedecayimmunity: 'T_icon_skill_pal_Revive',
+  shopsellprice_money_increase: 'T_icon_skill_pal_014',
+  shopbuyprice_money_increase: 'T_icon_skill_pal_014',
+};
+for (let i = 0; i < ELEM_ORDER.length; i++) {
+  PASSIVES['elementboost_' + ELEM_ORDER[i]] = `T_icon_skill_pal_009_0${i}`;
+  PASSIVES['elementresist_' + ELEM_ORDER[i]] = `T_icon_skill_pal_012_0${i}`;
+}
 
 // Items ship at 256px and are drawn at ~28px. Kept at 128 — a lossless encode
 // of a 256px source costs 4x for detail no one can see at that size, and the
@@ -98,12 +179,43 @@ async function convert(src, dst, resize) {
   }
   console.log(`works: ${WORKS.length}`);
 
+  let markers = 0;
   for (const [tex, name] of Object.entries(MARKERS)) {
-    const src = `${SRC}/${tex}.png`;
-    if (!fs.existsSync(src)) { console.log(`  !! missing ${src}`); continue; }
+    const src = [`${COMPASSSRC}/${tex}.png`, `${SRC}/${tex}.png`].find(fs.existsSync);
+    if (!src) { console.log(`  !! missing ${tex}`); continue; }
     await convert(src, `${OUT}/map/${name}.webp`);
+    markers++;
   }
-  console.log(`markers: ${Object.keys(MARKERS).length}`);
+  console.log(`markers: ${markers}`);
+
+  let eggs = 0;
+  for (const [name, tex] of Object.entries(EGGS)) {
+    const src = `${EGGSRC}/${tex}.png`;
+    if (!fs.existsSync(src)) { console.log(`  !! missing ${src}`); continue; }
+    await convert(src, `${OUT}/egg/${name}.webp`, 96);
+    eggs++;
+  }
+  console.log(`eggs: ${eggs}`);
+
+  // one file per effect type the app can actually produce, so a missing entry
+  // shows up here as a fallback count rather than as a broken image in the UI
+  const app2 = {};
+  new Function('window', fs.readFileSync('../js/data.js', 'utf8'))(app2);
+  const effects = new Set();
+  for (const p of app2.PALDATA.passives) {
+    for (const part of p.e.split(', ')) effects.add(part.split(' ')[0]);
+  }
+  let mapped = 0, fellBack = [];
+  for (const eff of effects) {
+    const tex = PASSIVES[eff] || PASSIVE_FALLBACK;
+    if (!PASSIVES[eff]) fellBack.push(eff);
+    const src = `${PASSIVESRC}/${tex}.png`;
+    if (!fs.existsSync(src)) { console.log(`  !! missing ${src} (for ${eff})`); continue; }
+    await convert(src, `${OUT}/passive/${eff}.webp`);
+    mapped++;
+  }
+  console.log(`passives: ${mapped} effect types` +
+    (fellBack.length ? ` (${fellBack.length} on the generic fallback: ${fellBack.join(', ')})` : ''));
 
   // Items are written under their *item id*, not their texture name, so the app
   // can address assets/items/<id>.webp directly. A few ids share one texture;

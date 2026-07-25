@@ -8,7 +8,10 @@
 // v12: spawn zones, region names, and the game's own element/work/item icons.
 // spawndata.js is deliberately NOT precached — it's 120 KB that only the map
 // tab reads, and it caches itself on first use through the fetch handler.
-const VERSION = 'palarium-v12';
+// v13: corrected fast-travel marker art, passive/egg icon sets, icon dropdowns,
+// and re-tiled map (unsharp mask) — every tile filename is unchanged, so the
+// cache-first rule below would happily serve the old soft ones forever.
+const VERSION = 'palarium-v13';
 const SHELL = ['.', 'index.html', 'css/style.css', 'js/app.js', 'js/data.js',
   'js/mapdata.js', 'assets/favicon.svg', 'assets/lockup.svg', 'manifest.webmanifest'];
 

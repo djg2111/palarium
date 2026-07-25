@@ -2,20 +2,25 @@
  "tileSize": 512,
  "mode": "lossless",
  "maxZoom": 3,
+ "sharpen": {
+  "sigma": 0.6,
+  "m1": 0.4,
+  "m2": 0.6
+ },
  "maps": {
   "main": {
    "size": 8192,
    "maxZoom": 3,
    "nativeZoom": 4,
    "tiles": 85,
-   "bytes": 9759778
+   "bytes": 10171786
   },
   "tree": {
    "size": 8192,
    "maxZoom": 3,
    "nativeZoom": 4,
    "tiles": 85,
-   "bytes": 13193650
+   "bytes": 13707264
   }
  }
 }

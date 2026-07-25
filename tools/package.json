@@ -12,6 +12,7 @@
     "bench": "node format-bench.js"
   },
   "dependencies": {
+    "potrace": "^2.1.8",
     "sharp": "^0.34.0"
   },
   "devDependencies": {

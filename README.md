@@ -12,6 +12,7 @@
 - **Paldex** — all 299 pals (including Terraria collab), sortable and filterable by element and work suitability, with full pal cards (stats, partner skill ranks, drops, egg type) — plus a browsable list of all 250 unique combos, filterable by whether a recipe needs two species or two of the same.
 - **Map** — the game's own world map, tiled from the shipped textures, across both layers (Palpagos Islands and the World Tree interior). Pan/pinch/scroll, filter, and search.
   - **Markers**: 152 fast-travel statues, 90 field alphas (icon, species, level), every syndicate tower, and 123 named regions that reveal themselves as you zoom. Waypoint and tower markers are the game's own compass icons.
+  - Tiles carry a light unsharp mask, because the pyramid stops at half the source resolution and the browser's upscale at maximum zoom eats more acutance than the downscale left behind. Settings picked by looking at `tools/sharpen-bench.js` output, not at its numbers.
   - **Spawn zones**: pick any of **272 species** and its wild spawn areas are drawn as blobs — 7,847 spawner placements from `DT_PalSpawnerPlacement`, with level band and night-only flag. Search a pal by name, or hit **Find in the wild** on any pal card.
   - **Where to warp**: selecting an alpha or tower lists the three closest fast-travel points with distances and draws a line to the nearest. Selecting a *species* instead ranks statues by how many of its spawn areas are within 1.2 km — the answer to "where do I actually go to catch one".
   - The 18 species with no spawner anywhere (raid bosses, sub-species, collab pals) say so plainly and link to Find Parents.
@@ -21,6 +22,7 @@
 - **Shareable URLs** — calcs, pal cards and planner routes are linkable (`#/breed/Lamball/PinkCat`, `#/pal/Anubis`, `#/plan/SheepBall+ElecCat/Anubis`); browser back/forward navigates tabs, including in-app jumps.
 - **PWA** — installable on phone/desktop and fully offline once loaded (service worker; network-first shell, cached icons). Map tiles are cached as you view them rather than precached — 22 MB up front would be a poor trade for a tab you may never open. Mobile keeps a single-row, horizontally scrollable tab bar and an icon-grid pal picker.
 - **Accessible** — WCAG 2.0/2.1 A+AA clean under axe-core in every UI state; fully keyboard-operable with managed focus, including arrow-key tablists.
+- **Game icons throughout** — elements, work suitability, passive skills, eggs, inventory items and map markers are all the game's own art, including inside the filter dropdowns (a native `<option>` can't hold an image, so those are an ARIA 1.2 combobox over the original `<select>`, which stays as the state).
 - **Ownership model** — ★ stars mark species you own; the Roster tracks individual pals. Every "Owned" filter reads both (stars ∪ roster). Pal pickers show ★ and a Recent section; a dismissible first-visit tip bar teaches the basics.
 
 ## Running it
@@ -51,7 +53,7 @@ js/spawndata.js generated wild spawn zones (loaded on demand) — window.SPAWNDA
 js/app.js       all app logic (vanilla JS, no dependencies)
 assets/pals/    pal icons (299, lossless WebP)
 assets/map/     map tile pyramid (170 lossless WebP tiles, z0–z3)
-assets/ui/      element, work-suitability and map-marker icons (lossless WebP)
+assets/ui/      element, work, map-marker, passive-skill and egg icons (lossless WebP)
 assets/items/   inventory item icons for drops and recipes (lossless WebP)
 tools/          extraction + generation pipeline (not part of the site)
 docs/           notes on the extracted data

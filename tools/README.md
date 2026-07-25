@@ -75,8 +75,14 @@ dotnet run -- json "Maps/MainWorld_5/PL_MainWorld5\.umap$" ../extract/level
 dotnet run -- png "Texture/UI/Map/(T_WorldMap|T_TreeMap)\.uasset$" ../extract/maps
 dotnet run -- png "Texture/PalIcon/Normal/.*\.uasset$" ../extract/icons
 
-# UI icon sets: elements, work suitability, map/compass markers
-dotnet run -- png "Texture/UI/(Main_Menu/T_Icon_element_0[0-8]|InGame/T_icon_palwork_(0[0-9]|1[0-3])|InGame/T_icon_compass_(Teleport|tower|FTtower|boss|dungeon|camp|BossGate|Oilrig|KeyBoss)|Map/T_icon_compass_Boss_Unknown)\.uasset$" ../extract/ui
+# UI icon sets: elements and work suitability
+dotnet run -- png "Texture/UI/(Main_Menu/T_Icon_element_0[0-8]|InGame/T_icon_palwork_(0[0-9]|1[0-3]))\.uasset$" ../extract/ui
+
+# map markers, passive-skill icons, egg icons (separate dirs; gen-ui-icons.js
+# picks the ones it needs out of each)
+dotnet run -- png "Texture/UI/(InGame|Map)/T_icon_compass_[^/]*\.uasset$" ../extract/compass
+dotnet run -- png "SkillIcon/T_icon_skill_pal_[^/]*\.uasset$" ../extract/passive
+dotnet run -- png "InventoryItemIcon/Texture/T_itemicon_Material_PalEgg[^/]*\.uasset$" ../extract/egg
 
 # region volumes: only 13 of ~124 are in the persistent level (see traps)
 dotnet run -- scan "MainWorld_5/PL_MainWorld5/_Generated_/.*\.umap$" "PalRegionTrigger" "../extract/out/regionCells.json"
@@ -112,7 +118,13 @@ node datadiff.js <old data.js> <new data.js>   # what changed, engine fields cal
 node breeding-diff.js                          # app vs game: CombiRank / combos
 node calibrate.js                              # re-derive the map coordinate transform
 node format-bench.js                           # size/quality per encode option
+node sharpen-bench.js                          # unsharp settings for the tiler
+node vector-test.js                            # raster vs traced SVG for the icon sets
 ```
+
+`sharpen-bench.js` and `vector-test.js` answer questions rather than producing
+assets. Both write a contact sheet — look at it, the numbers alone will happily
+recommend something that has visible halos or misregistered colour seams.
 
 `datadiff.js` separates **breeding-engine fields** (`r`, `pr`, `ic`, and the
 combo table) from cosmetic ones, because a silent change to those changes every
@@ -165,6 +177,22 @@ world X *inverted*. Established empirically by `calibrate.js`, which scores all
 8 axis-swap/flip combinations by how many markers land on non-ocean pixels —
 75% for MainMap and 89% for Tree, against 44% for the runner-up. Re-run it if
 markers ever look offset.
+
+**The fast-travel marker is `FTtower`, not `Teleport`.** `T_icon_compass_Teleport`
+is the blue portal vortex (the one on top of Feybreak Tower); the winged emblem
+the game shows for a travel point is `T_icon_compass_FTtower`, which also matches
+the actor these markers come from (`BP_LevelObject_TowerFastTravelPoint_C`).
+`FTUnlockMap` is the third winged variant, the map-unlocking statue.
+
+**Passive-skill icons have no mapping table.** `T_icon_skill_pal_*` is the
+passive set, keyed by effect type, but nothing in the data tables links effect
+type to texture. `DT_partnerSkillIconDataTable` exists and covers all 299 pals,
+but its `TextureID` (0-209) indexes a UI sprite atlas defined in a widget, not
+any exported asset, so partner-skill icons are *not* shipped. The passive map in
+`gen-ui-icons.js` was read off the rendered textures. The element rows are safe
+(`009_NN` boost / `012_NN` resist, in the icon sheet's display order); the rest
+are judgement calls, and a wrong one is cosmetic. There is no separate *active*
+skill icon set — the game draws attack skills with the element icons.
 
 **Numbered icon sets are indexed by UI display order, not by the enum.** This is
 the one that will silently mislabel your whole Paldex. `EPalWorkSuitability` runs

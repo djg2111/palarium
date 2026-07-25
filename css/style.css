@@ -162,6 +162,7 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .pico.click{cursor:pointer;transition:border-color var(--t-fast)}
 .pico.click:hover{border-color:var(--border-strong)}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
+.types{display:inline-flex;align-items:center;gap:3px}
 .chip{font-size:var(--fs-xs);font-weight:700;padding:2px 9px 2px 6px;border-radius:var(--r-full);color:var(--ink);text-transform:capitalize;
   display:inline-flex;align-items:center;gap:3px}
 /* Game UI icons, extracted from the paks. .uii is the shared base: never let
@@ -277,9 +278,34 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
   mask-image:linear-gradient(90deg,#000,#000 calc(100% - 24px),transparent)}
 .tablewrap.panning.atend{-webkit-mask-image:none;mask-image:none}
 .dex-controls .search-inp{width:auto;flex:1;min-width:160px;max-width:300px}
-@media(max-width:640px){.dex-controls select{flex:1;min-width:140px}}
+.dex-controls .isel{flex:0 1 auto}
+@media(max-width:640px){.dex-controls select,.dex-controls .isel{flex:1;min-width:140px}}
 select{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);color:var(--text);padding:10px 14px;outline:none;cursor:pointer}
 select:focus{border-color:var(--accent)}
+
+/* Dropdowns that show an icon. A native <option> can't hold an image, so the
+   <select> stays as the state (and the thing every listener talks to) while
+   this draws over it. Sized to sit flush next to the plain selects it doesn't
+   replace. */
+.nativehide{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.isel{position:relative;display:inline-flex}
+.isel-btn{display:inline-flex;align-items:center;gap:8px;width:100%;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  color:var(--text);padding:10px 32px 10px 14px;font-size:var(--fs-base);text-align:left;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 17px) calc(50% + 2px),calc(100% - 12px) calc(50% + 2px);
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.isel-btn:hover{border-color:var(--border-strong)}
+.isel.open .isel-btn{border-color:var(--accent)}
+.isel-pop{position:absolute;top:calc(100% + 4px);left:0;min-width:100%;max-height:320px;overflow-y:auto;
+  z-index:60;display:none;flex-direction:column;background:var(--overlay);
+  border:1px solid var(--border-strong);border-radius:var(--r-md);
+  box-shadow:0 14px 40px rgba(0,0,0,.55);padding:4px}
+.isel.open .isel-pop{display:flex}
+.isel-row{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:var(--r-sm);
+  font-size:var(--fs-md);color:var(--text-2);cursor:pointer;white-space:nowrap}
+.isel-row:hover{background:var(--raised);color:var(--text)}
+.isel-row.on{background:var(--accent-tint);color:var(--text);font-weight:600}
 table{width:100%;border-collapse:collapse}
 th{position:sticky;top:var(--hh,64px);background:var(--bg);text-align:left;font-size:var(--fs-sm);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border-strong);cursor:pointer;user-select:none;white-space:nowrap;z-index:5}
 th:hover{color:var(--text)}
@@ -377,6 +403,8 @@ tbody tr:hover{background:var(--surface)}
 .ptag .trow:hover{background:var(--raised)}
 .ptag .trow .tr-r{margin-left:auto;font-size:var(--fs-xs);color:var(--muted)}
 .pchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.pchip .uii,.trow-n .uii{margin-right:1px}
+.trow-n{display:inline-flex;align-items:center;gap:7px}
 .pchip{display:inline-flex;align-items:center;gap:6px;background:var(--success-tint);border:1px solid var(--success-line);color:var(--success);border-radius:var(--r-full);padding:2px 11px;font-size:var(--fs-sm);font-weight:600;cursor:pointer}
 .pchip:hover{border-color:var(--danger);color:var(--danger)}
 .pchip.neg{background:var(--danger-tint);border-color:var(--danger-line);color:var(--danger)}
@@ -662,7 +690,7 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
 .mk-fastTravel,.mk-tower,.mk-middleBoss{z-index:1}
 .mk-fastTravel .g,.mk-tower .g,.mk-middleBoss .g{background:center/contain no-repeat;
   filter:drop-shadow(0 1px 2px rgba(0,0,0,.9))}
-.mk-fastTravel .g{width:17px;height:17px;background-image:url(../assets/ui/map/waypoint.webp)}
+.mk-fastTravel .g{width:19px;height:19px;background-image:url(../assets/ui/map/waypoint.webp)}
 .mk-tower,.mk-middleBoss{z-index:3}
 .mk-tower .g{width:26px;height:26px;background-image:url(../assets/ui/map/tower.webp)}
 .mk-middleBoss .g{width:21px;height:21px;background-image:url(../assets/ui/map/alpha.webp)}
@@ -750,10 +778,10 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
   /* --- filter/search rows: one full-width control per line --- */
   .controls,.dex-controls{gap:10px}
   .controls>.ctl,
-  .dex-controls>.search-inp,.dex-controls>select,
+  .dex-controls>.search-inp,.dex-controls>select,.dex-controls>.isel,
   .dex-controls>.toggle,.dex-controls>.segrow{flex:1 1 100%;width:100%;min-width:0;max-width:none}
   .search-inp{width:100%}
-  .dex-controls .search-inp,.dex-controls select{max-width:none}
+  .dex-controls .search-inp,.dex-controls select,.dex-controls .isel{max-width:none}
   .ctl .picker,.ctl select,.ctl .search-inp,.ctl .toggle{width:100%;max-width:none;min-width:0}
   /* an &nbsp; label exists only to bottom-align the desktop row — on a stack
      it renders as a phantom gap above the toggle */

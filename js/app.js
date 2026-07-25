@@ -11,14 +11,14 @@ function resolvePal(x) {
   return byName.get(x.toLowerCase()) || null;
 }
 const TYPE_COLORS = {normal:'var(--neutral)',fire:'var(--fire)',water:'var(--water)',electric:'var(--electric)',grass:'var(--grass)',dark:'var(--dark)',dragon:'var(--dragon)',ground:'var(--ground)',ice:'var(--ice)'};
-const WORKS = {kindling:'🔥 Kindling',watering:'💧 Watering',planting:'🌱 Planting',generatingElectricity:'⚡ Electricity',handiwork:'🛠️ Handiwork',gathering:'🧺 Gathering',lumbering:'🪓 Lumbering',mining:'⛏️ Mining',medicineProduction:'💊 Medicine',cooling:'❄️ Cooling',transporting:'📦 Transporting',farming:'🐄 Farming'};
+const WORKS = {kindling:'Kindling',watering:'Watering',planting:'Planting',generatingElectricity:'Electricity',handiwork:'Handiwork',gathering:'Gathering',lumbering:'Lumbering',mining:'Mining',medicineProduction:'Medicine',cooling:'Cooling',transporting:'Transporting',farming:'Farming'};
 // The element and work icons are the game's own textures. Their file names had
 // to be read off the rendered art rather than taken from the EPalElementType /
 // EPalWorkSuitability enums, which disagree with the icon sheet's order — see
 // tools/gen-ui-icons.js. The emoji in WORKS survive because a <select> option
 // can't hold an image.
 const UI = 'assets/ui/';
-const WORK_LABEL = k => (WORKS[k] || k).replace(/^\S+\s+/, '');
+const WORK_LABEL = k => WORKS[k] || pretty(k);
 function uiIcon(dir, key, size, cls) {
   const i = new Image(size, size);
   i.className = 'uii' + (cls ? ' ' + cls : '');
@@ -29,6 +29,13 @@ function uiIcon(dir, key, size, cls) {
 }
 const workImgTag = k =>
   `<img class="uii" src="${UI}work/${k}.webp" alt="" width="15" height="15" loading="lazy" decoding="async">`;
+// A passive's icon is keyed by its primary effect type, which is already the
+// first token of the effect string the dataset carries — no extra data needed.
+const passiveIconKey = meta => (meta && meta.e ? meta.e.split(' ')[0] : null);
+function passiveIcon(meta, size = 15) {
+  const k = passiveIconKey(meta);
+  return k ? uiIcon('passive', k, size) : null;
+}
 // honor prefers-reduced-motion in JS-driven scrolls (CSS handles animations)
 const SMOOTH = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
 
@@ -153,16 +160,25 @@ function tierBadge(p) {
   return s;
 }
 const EGG_NAMES = {normal:'Common', fire:'Scorching', water:'Damp', grass:'Verdant', electric:'Electric', ice:'Frozen', ground:'Rocky', dark:'Dark', dragon:'Dragon'};
+// egg icon files are named for the app's element keys; anything unmapped falls
+// back to the plain egg rather than a broken image
+const EGG_ELEM = {normal:'normal', fire:'fire', water:'water', grass:'grass', electric:'electric',
+  ice:'ice', ground:'ground', dark:'dark', dragon:'dragon'};
 const eggOf = p => (p.rar >= 8 ? 'Huge ' : p.rar >= 5 ? 'Large ' : '') + (EGG_NAMES[p.t[0]] || 'Common') + ' Egg';
 function eggChip(p) {
-  const c = document.createElement('span'); c.className = 'mchip';
-  c.textContent = '🥚 ' + eggOf(p);
+  const c = document.createElement('span'); c.className = 'mchip drop';
+  // the egg art is per element; size lives in the label
+  c.append(uiIcon('egg', EGG_ELEM[p.t[0]] || 'normal', 18), eggOf(p));
   c.title = 'Egg this pal hatches from (bigger and rarer eggs incubate longer — match its temperature preference to speed up)';
   return c;
 }
 function typeDots(p) {
   const w = document.createElement('span'); w.className = 'types';
-  for (const t of p.t) { const d = document.createElement('i'); d.className = 'dot'; d.style.background = TYPE_COLORS[t] || 'var(--muted)'; d.title = t; w.appendChild(d); }
+  for (const t of p.t) {
+    const i = uiIcon('element', t, 14);
+    i.title = t;
+    w.appendChild(i);
+  }
   return w;
 }
 function typeChips(p) {
@@ -615,6 +631,103 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
   });
   renderBtn();
   return api;
+}
+
+// ---------- dropdowns that can show an icon ----------
+// A native <option> can't hold an image, which left the Paldex's element and
+// work filters showing emoji next to columns that show the game's own icons.
+// The <select> stays in the DOM as the single source of truth — every existing
+// .value read and change listener keeps working — and this draws over it.
+function makeIconSelect(sel, dir, keyOf) {
+  sel.classList.add('nativehide');
+  sel.tabIndex = -1;
+  sel.setAttribute('aria-hidden', 'true');
+  const wrap = document.createElement('div');
+  wrap.className = 'isel';
+  // ARIA 1.2 select-only combobox: role=combobox on the trigger (a plain button
+  // may not carry aria-activedescendant), aria-controls pointing at the listbox.
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'isel-btn';
+  btn.setAttribute('role', 'combobox');
+  btn.setAttribute('aria-haspopup', 'listbox');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.setAttribute('aria-controls', 'iselpop-' + sel.id);
+  if (sel.getAttribute('aria-label')) btn.setAttribute('aria-label', sel.getAttribute('aria-label'));
+  const pop = document.createElement('div');
+  pop.className = 'isel-pop'; pop.setAttribute('role', 'listbox');
+  pop.id = 'iselpop-' + sel.id;
+  // the list scrolls, and a scrollable region has to be reachable; the rows are
+  // options driven by aria-activedescendant rather than tab stops of their own
+  pop.tabIndex = -1;
+  if (sel.getAttribute('aria-label')) pop.setAttribute('aria-label', sel.getAttribute('aria-label'));
+  sel.replaceWith(wrap);
+  wrap.append(sel, btn, pop);
+
+  const rowFor = o => {
+    const r = document.createElement('div');
+    r.className = 'isel-row'; r.setAttribute('role', 'option');
+    r.id = 'iselopt-' + sel.id + '-' + (o.value || 'any');
+    r.dataset.v = o.value;
+    const k = o.value && keyOf(o.value);
+    if (k) r.appendChild(uiIcon(dir, k, 16));
+    r.append(o.textContent);
+    return r;
+  };
+  function paint() {
+    btn.textContent = '';
+    const o = sel.selectedOptions[0];
+    const k = o && o.value && keyOf(o.value);
+    if (k) btn.appendChild(uiIcon(dir, k, 16));
+    btn.append(o ? o.textContent : '');
+    pop.querySelectorAll('.isel-row').forEach(r => {
+      const on = r.dataset.v === sel.value;
+      r.classList.toggle('on', on);
+      r.setAttribute('aria-selected', String(on));
+    });
+    btn.setAttribute('aria-activedescendant',
+      pop.querySelector('.isel-row.on')?.id || '');
+  }
+  function build() {
+    pop.textContent = '';
+    for (const o of sel.options) pop.appendChild(rowFor(o));
+    paint();
+  }
+  const close = () => { wrap.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); };
+  const open = () => {
+    wrap.classList.add('open'); btn.setAttribute('aria-expanded', 'true');
+    pop.querySelector('.isel-row.on')?.scrollIntoView({block: 'nearest'});
+  };
+  const pick = v => {
+    if (sel.value !== v) { sel.value = v; sel.dispatchEvent(new Event('change', {bubbles: true})); }
+    paint(); close(); btn.focus();
+  };
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    wrap.classList.contains('open') ? close() : open();
+  });
+  pop.addEventListener('click', e => {
+    const r = e.target.closest('.isel-row');
+    if (r) pick(r.dataset.v);
+  });
+  btn.addEventListener('keydown', e => {
+    const rows = [...pop.querySelectorAll('.isel-row')];
+    const i = rows.findIndex(r => r.dataset.v === sel.value);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!wrap.classList.contains('open')) { open(); return; }
+      const ni = Math.max(0, Math.min(rows.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)));
+      pick(rows[ni].dataset.v); open();
+    } else if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault(); pick(rows[e.key === 'Home' ? 0 : rows.length - 1].dataset.v); open();
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault(); wrap.classList.contains('open') ? close() : open();
+    } else if (e.key === 'Escape' && wrap.classList.contains('open')) {
+      e.preventDefault(); close();
+    }
+  });
+  document.addEventListener('click', e => { if (!wrap.contains(e.target)) close(); });
+  // options are populated after this runs for some selects, so expose a rebuild
+  return {refresh: build, sync: paint};
 }
 
 // ---------- layout: keep sticky offsets in sync with real header height ----------
@@ -1129,7 +1242,9 @@ function makePassivePicker(mount, max = 4, onChange) {
       const meta = PASSIVES.find(p => p.n === n);
       const c = document.createElement('button'); c.type = 'button';
       c.className = 'pchip' + (meta && meta.r < 0 ? ' neg' : '');
-      c.textContent = n + ' ✕'; c.title = (meta && meta.e) || 'Remove';
+      const ic = passiveIcon(meta, 14);
+      if (ic) c.appendChild(ic);
+      c.append(n + ' ✕'); c.title = (meta && meta.e) || 'Remove';
       c.addEventListener('click', () => { selected = selected.filter(x => x !== n); renderChips(); onChange && onChange(); });
       chips.appendChild(c);
     }
@@ -1141,7 +1256,10 @@ function makePassivePicker(mount, max = 4, onChange) {
     if (!matches.length) { mount.classList.remove('open'); return; }
     for (const p of matches) {
       const r = document.createElement('button'); r.className = 'trow'; r.type = 'button';
-      const nm = document.createElement('span'); nm.textContent = (p.mt ? '🧬 ' : '') + p.n;
+      const nm = document.createElement('span'); nm.className = 'trow-n';
+      const ic = passiveIcon(p, 15);
+      if (ic) nm.appendChild(ic);
+      nm.append((p.mt ? '🧬 ' : '') + p.n);
       const tier = document.createElement('span'); tier.className = 'tr-r';
       tier.textContent = (p.r > 0 ? '+'.repeat(Math.min(p.r, 4)) : p.r < 0 ? '−'.repeat(Math.min(-p.r, 4)) : '·') + (p.e ? '  ' + p.e : '') + (p.mt ? '  (mutation-only)' : '');
       r.append(nm, tier);
@@ -1171,7 +1289,10 @@ function passiveChips(names, readonly = true) {
     const meta = PASSIVES.find(p => p.n === n);
     const c = document.createElement('span');
     c.className = 'pchip ro' + (meta && meta.r < 0 ? ' neg' : '');
-    c.textContent = n; c.title = (meta && meta.e) || '';
+    const ic = passiveIcon(meta, 14);
+    if (ic) c.appendChild(ic);
+    c.append(n);
+    c.title = (meta && meta.e) || '';
     w.appendChild(c);
   }
   return w;
@@ -2475,6 +2596,13 @@ for (const t of Object.keys(TYPE_COLORS)) {
 for (const [k, label] of Object.entries(WORKS)) {
   const o = document.createElement('option'); o.value = k; o.textContent = label; dexWork.appendChild(o);
 }
+// upgrade the two Paldex filters and the roster's passive filter in place, so
+// their rows match the icons the table and the chips already use
+makeIconSelect(dexType, 'element', v => v).refresh();
+makeIconSelect(dexWork, 'work', v => v).refresh();
+const rosterPassiveSel = makeIconSelect(rosterPassiveFilter, 'passive',
+  v => passiveIconKey(PASSIVES.find(p => p.n === v)));
+rosterPassiveSel.refresh();
 dexSearch.addEventListener('input', renderDex);
 dexType.addEventListener('change', () => { save(); renderDex(); });
 dexWork.addEventListener('change', () => {

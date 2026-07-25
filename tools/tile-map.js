@@ -21,12 +21,14 @@ const MODE = process.argv[3] ?? 'lossless';
 // Cap the pyramid below native. z3 = 4096px across the whole map, still ~2x a
 // typical screen; the native z4 level alone costs 40 MB of the 62 MB full set.
 const MAX_ZOOM = process.argv[4] != null ? Number(process.argv[4]) : 3;
+// unsharp mask applied to every level after the downscale; see sharpen-bench.js
+const SHARPEN = { sigma: 0.6, m1: 0.4, m2: 0.6 };
 const webpOpts = MODE === 'lossless'
   ? { lossless: true, effort: 4 }
   : { quality: Number(MODE), effort: 4 };
 
 (async () => {
-  const manifest = { tileSize: TILE, mode: MODE, maxZoom: MAX_ZOOM, maps: {} };
+  const manifest = { tileSize: TILE, mode: MODE, maxZoom: MAX_ZOOM, sharpen: SHARPEN, maps: {} };
 
   for (const m of MAPS) {
     const srcPath = path.join(SRC, m.file);
@@ -44,9 +46,17 @@ const webpOpts = MODE === 'lossless'
       const dir = path.join(OUT, m.key, String(z));
       fs.mkdirSync(dir, { recursive: true });
 
-      // resize once per level, then slice — far cheaper than re-resizing per tile
+      // resize once per level, then slice — far cheaper than re-resizing per tile.
+      //
+      // The unsharp mask is the fix for "sharp zoomed out, mushy zoomed in":
+      // the pyramid stops at z3 = 4096px across an 8192px source, so at maximum
+      // zoom the browser is bilinear-upscaling a downscale, and that eats more
+      // acutance than lanczos put back. Settings picked with sharpen-bench.js —
+      // one notch stronger starts showing dark halos on the coastline. Costs
+      // ~3.6% file size.
       const level = await sharp(srcPath, { limitInputPixels: false })
         .resize(dim, dim, { kernel: 'lanczos3' })
+        .sharpen(SHARPEN)
         .png({ compressionLevel: 0 })
         .toBuffer();
 
