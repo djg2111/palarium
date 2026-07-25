@@ -18,11 +18,11 @@ const MAPS = [
 ];
 // quality mode: 'lossless' or a webp quality number
 const MODE = process.argv[3] ?? 'lossless';
-// Cap the pyramid below native. z3 = 4096px across the whole map, still ~2x a
-// typical screen; the native z4 level alone costs 40 MB of the 62 MB full set.
-const MAX_ZOOM = process.argv[4] != null ? Number(process.argv[4]) : 3;
-// unsharp mask applied to every level after the downscale; see sharpen-bench.js
-const SHARPEN = { sigma: 0.6, m1: 0.4, m2: 0.6 };
+const MAX_ZOOM = process.argv[4] != null ? Number(process.argv[4]) : 4;
+// Unsharp mask, applied only to levels that are actually downscales. Once the
+// pyramid reaches native (z4 = 8192px) there is no resample to compensate for,
+// and sharpening 1:1 pixels just looks processed. See sharpen-bench.js.
+const SHARPEN = { sigma: 0.7, m1: 0.5, m2: 0.75 };
 const webpOpts = MODE === 'lossless'
   ? { lossless: true, effort: 4 }
   : { quality: Number(MODE), effort: 4 };
@@ -54,11 +54,9 @@ const webpOpts = MODE === 'lossless'
       // acutance than lanczos put back. Settings picked with sharpen-bench.js —
       // one notch stronger starts showing dark halos on the coastline. Costs
       // ~3.6% file size.
-      const level = await sharp(srcPath, { limitInputPixels: false })
-        .resize(dim, dim, { kernel: 'lanczos3' })
-        .sharpen(SHARPEN)
-        .png({ compressionLevel: 0 })
-        .toBuffer();
+      let pipe = sharp(srcPath, { limitInputPixels: false });
+      if (dim !== size) pipe = pipe.resize(dim, dim, { kernel: 'lanczos3' }).sharpen(SHARPEN);
+      const level = await pipe.png({ compressionLevel: 0 }).toBuffer();
 
       for (let y = 0; y < n; y++) {
         for (let x = 0; x < n; x++) {

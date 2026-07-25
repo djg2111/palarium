@@ -2768,7 +2768,7 @@ if (state.pm === 'saved' && plans.length) setPlanMode('saved');
 // (--iz = 1/scale), which the markers read to counter-scale themselves. That
 // keeps a 255-marker layer at one style write per frame instead of 255.
 const MAP = window.MAPDATA || null;
-const MAP_SIZE = 8192, MAP_TILE = 512, MAP_MAXZ = 3;
+const MAP_SIZE = 8192, MAP_TILE = 512, MAP_MAXZ = 4;
 const LAYER_DIR = {MainMap: 'main', Tree: 'tree'};
 const LAYER_NAME = {MainMap: 'Palpagos Islands', Tree: 'World Tree'};
 const MTYPE_NAME = {fastTravel: 'Fast travel point', tower: 'Syndicate tower',
@@ -2842,6 +2842,9 @@ function mapApply() {
   mapLinkLine.style.strokeWidth = 2.5 / mapK + 'px';
   mapLinkLine.style.strokeDasharray = `${14 / mapK} ${18 / mapK}`;
   mapRenderTiles();
+  // the zone edge is baked into the canvas, so it only needs repainting when
+  // the zoom bucket changes — a few times per session, not per frame
+  if (mapSpawnKey && zoneDrawnAt !== mapTileZoom(mapK)) mapDrawZones();
 }
 // Both textures are square, but the playable area inside them isn't: the
 // surface is a diamond and the World Tree fills barely two thirds. Fitting and
@@ -2914,9 +2917,10 @@ function mapFocus(m, zoom) {
 }
 
 // ---- tiles ----
-// Pick the level whose 512px tiles render at ~512 CSS px or better. z3 tops out
-// at 4096px across the map, so scale 1 shows it at 2x — deliberate: the tiler
-// caps the pyramid there because the native z4 alone costs 40 MB.
+// Pick the level whose 512px tiles render at ~512 CSS px or better. z4 is the
+// source's native 8192px, so at maximum scale the viewer shows 1:1 pixels and
+// never upscales — the real fix for a soft map. It costs 41 MB of the pyramid's
+// 64, which is why tiles are fetched on demand rather than precached.
 const mapTileZoom = k => Math.max(0, Math.min(MAP_MAXZ, Math.ceil(Math.log2(k * MAP_SIZE / MAP_TILE))));
 function mapRenderTiles() {
   const dir = LAYER_DIR[mapLayer];
@@ -3348,30 +3352,56 @@ const spawnLayersFor = k => Object.keys(MAP.layers).filter(l => spawnPoints(k, l
 // is a fine single canvas path and a terrible DOM. Circles are filled opaque
 // into one path and the *element* carries the opacity, so overlapping areas
 // read as one blob instead of compounding into a dark core.
+// A flat wash at low opacity vanished over open water and pale terrain, so the
+// union gets a hard bright edge instead. The trick that makes that cheap: every
+// spot in a group is the same radius, so union(r) minus union(r - w) is exactly
+// a band following the union's outline. Fill the outer union opaque, then knock
+// the inner union back with a partially transparent destination-out — one
+// canvas, two passes, no per-circle strokes showing through the interior.
+const ZONE_INK = '#ffb347';
+const ZONE_BODY_ALPHA = 0.3;
+let zoneDrawnAt = -1;
 function mapDrawZones() {
   const ctx = mapZonesEl.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
   ctx.clearRect(0, 0, ZONE_RES, ZONE_RES);
+  zoneDrawnAt = mapTileZoom(mapK);
   if (!mapSpawnKey || !SPAWN) { mapZonesEl.hidden = true; return 0; }
   const runs = spawnRuns[mapLayer];
   const radii = SPAWN.radii[mapLayer];
   if (!runs || !radii) { mapZonesEl.hidden = true; return 0; }
   const s = ZONE_RES / MAP_SIZE;
+  // the canvas is fixed at a quarter of map scale, so the edge is drawn thicker
+  // when zoomed out to keep it roughly constant on screen
+  const ring = Math.max(1.5, Math.min(14, 3.2 / Math.max(mapK, 0.04)));
+
+  const outer = new Path2D(), inner = new Path2D();
   let n = 0;
-  ctx.fillStyle = '#58b6ea';
-  ctx.beginPath();
   for (const {gi} of spawnEntries(mapSpawnKey)) {
     const run = runs.get(gi);
     if (!run) continue;
     const r = Math.max(2, radii[gi] * s);
+    const ri = Math.max(0.5, r - ring);
     for (let i = 1; i < run.length; i += 2) {
       const cx = run[i] * s, cy = run[i + 1] * s;
-      ctx.moveTo(cx + r, cy);          // without this each arc joins the last
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      outer.moveTo(cx + r, cy);        // without this each arc joins the last
+      outer.arc(cx, cy, r, 0, Math.PI * 2);
+      inner.moveTo(cx + ri, cy);
+      inner.arc(cx, cy, ri, 0, Math.PI * 2);
       n++;
     }
   }
-  ctx.fill();
-  mapZonesEl.hidden = n === 0;
+  if (!n) { mapZonesEl.hidden = true; return 0; }
+  ctx.fillStyle = ZONE_INK;
+  ctx.fill(outer);
+  // partial destination-out leaves the interior at ZONE_BODY_ALPHA instead of
+  // clearing it, which is what turns the silhouette into edge + tint
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = `rgba(0,0,0,${1 - ZONE_BODY_ALPHA})`;
+  ctx.fill(inner);
+  ctx.globalCompositeOperation = 'source-over';
+  mapZonesEl.hidden = false;
   return n;
 }
 

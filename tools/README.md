@@ -99,7 +99,8 @@ npm install                                  # sharp, for image work
 node gen-data.js ../js/data.js               # rebuild the pal dataset
 node --max-old-space-size=6144 parse-map.js  # markers + regions -> ../js/mapdata.js
 node parse-spawns.js                         # spawn zones    -> ../js/spawndata.js
-node tile-map.js ../assets/map lossless      # slice map textures into WebP tiles
+node tile-map.js ../assets/map lossless      # slice map textures into WebP tiles (z0-z4)
+node z4-requant.js ../assets/map 95 --apply  # optional: halve the pyramid (see below)
 node gen-ui-icons.js                         # UI + item icons -> ../assets/{ui,items}
 ```
 
@@ -218,6 +219,19 @@ assumption after an update rather than assuming it still holds.
 **Boss placement types are excluded from spawn zones on purpose.** `FieldBoss`,
 `DungeonBoss` and `ImprisonmentBoss` are already drawn as alpha and tower
 markers. Including them would double-draw every legendary.
+
+**The pyramid goes to native (z4) and that is most of its weight.** z0-z3 total
+23 MB; z4 alone is 41 MB of the 64. It's there because stopping at z3 means the
+browser upscales 2x at maximum zoom, which no amount of sharpening fixes — the
+map just looks soft. Individual z4 tiles average 64 KB (main) / 98 KB (tree), so
+on-demand fetching stays cheap even though the set is large. If the repo size
+ever becomes the problem, `z4-requant.js ../assets/map 95 --apply` re-encodes
+that level to q95 in place: 41 MB -> 16 MB, mean error 1.6/255, and it is the
+one level only ever viewed at 1:1. z0-z3 stay lossless either way.
+
+**Sharpening applies only to levels that are downscales.** `tile-map.js` skips
+the unsharp mask when `dim === size`, because z4 is native pixels and sharpening
+those just looks processed.
 
 **An 8192² image costs ~268 MB of RAM decoded**, regardless of file size — it
 will kill mobile Safari. Hence the tile pyramid.

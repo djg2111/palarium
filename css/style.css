@@ -647,7 +647,7 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
    carries the transparency, so overlaps read as one blob rather than
    compounding into a dark core. */
 .mapzones{position:absolute;left:0;top:0;width:8192px;height:8192px;pointer-events:none;
-  opacity:.42;mix-blend-mode:screen}
+  opacity:.88}
 .mapzones[hidden]{display:none}
 .maptiles{position:absolute;inset:0}
 .maptiles img{position:absolute;display:block;pointer-events:none;-webkit-user-drag:none}

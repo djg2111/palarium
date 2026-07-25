@@ -11,7 +11,8 @@
 // v13: corrected fast-travel marker art, passive/egg icon sets, icon dropdowns,
 // and re-tiled map (unsharp mask) — every tile filename is unchanged, so the
 // cache-first rule below would happily serve the old soft ones forever.
-const VERSION = 'palarium-v13';
+// v14: native z4 tiles, and z0-z3 re-sharpened under the same filenames again.
+const VERSION = 'palarium-v14';
 const SHELL = ['.', 'index.html', 'css/style.css', 'js/app.js', 'js/data.js',
   'js/mapdata.js', 'assets/favicon.svg', 'assets/lockup.svg', 'manifest.webmanifest'];
 

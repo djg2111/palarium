@@ -1,26 +1,26 @@
 {
  "tileSize": 512,
  "mode": "lossless",
- "maxZoom": 3,
+ "maxZoom": 4,
  "sharpen": {
-  "sigma": 0.6,
-  "m1": 0.4,
-  "m2": 0.6
+  "sigma": 0.7,
+  "m1": 0.5,
+  "m2": 0.75
  },
  "maps": {
   "main": {
    "size": 8192,
-   "maxZoom": 3,
+   "maxZoom": 4,
    "nativeZoom": 4,
-   "tiles": 85,
-   "bytes": 10171786
+   "tiles": 341,
+   "bytes": 26523214
   },
   "tree": {
    "size": 8192,
-   "maxZoom": 3,
+   "maxZoom": 4,
    "nativeZoom": 4,
-   "tiles": 85,
-   "bytes": 13707264
+   "tiles": 341,
+   "bytes": 39069126
   }
  }
 }
