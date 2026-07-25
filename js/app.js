@@ -119,8 +119,23 @@ function breed(a, b) {
   return {kind:'avg', children:[{pal: nearestByRank(target)}], target};
 }
 
+// ---------- saved state, read defensively ----------
+// localStorage outlives the dataset: js/data.js is regenerated from game files,
+// so a key starred a version ago can stop existing. It's also user-writable.
+// Nothing read back is trusted — bad JSON, the wrong container type and stale
+// pal keys all have to degrade to "empty" instead of throwing during boot,
+// because a throw up here skips the rest of init (hash routing, the "/"
+// shortcut, the service worker) and leaves the app half-built.
+function readStore(key, fallback) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key));
+    if (!v || typeof v !== 'object' || Array.isArray(v) !== Array.isArray(fallback)) return fallback;
+    return v;
+  } catch { return fallback; }
+}
+
 // ---------- owned set ----------
-const owned = new Set(JSON.parse(localStorage.getItem('palbreed_owned') || '[]'));
+const owned = new Set(readStore('palbreed_owned', []).filter(k => byKey.has(k)));
 function toggleOwned(k) {
   owned.has(k) ? owned.delete(k) : owned.add(k);
   localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
@@ -129,7 +144,7 @@ function toggleOwned(k) {
 }
 
 // ---------- recently picked pals (shared across all pickers) ----------
-let recentPicks = JSON.parse(localStorage.getItem('palbreed_recents') || '[]').filter(k => byKey.has(k));
+let recentPicks = readStore('palbreed_recents', []).filter(k => byKey.has(k));
 function pushRecent(k) {
   recentPicks = [k, ...recentPicks.filter(x => x !== k)].slice(0, 8);
   localStorage.setItem('palbreed_recents', JSON.stringify(recentPicks));
@@ -475,7 +490,14 @@ function openModal(p, rentry) {
 // ---------- picker ----------
 let openPicker = null;
 document.addEventListener('click', e => { if (openPicker && !openPicker.root.contains(e.target)) openPicker.close(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && openPicker) openPicker.close(); });
+// Escape dismisses the topmost layer only. The roster editor listens for Escape
+// too, and it can't tell that a picker took this one — close() has already
+// cleared openPicker by the time its handler runs — so stop the event here.
+// Without this, backing out of the species picker inside the editor closed the
+// whole dialog and threw away the nickname, passives and IVs typed into it.
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && openPicker) { e.stopImmediatePropagation(); openPicker.close(); }
+});
 // the popup is anchored to its trigger, so scrolling the page underneath it can
 // walk it back under the nav bar — re-fit it (rAF-throttled) while it's open
 let refitQueued = false;
@@ -765,7 +787,7 @@ new ResizeObserver(syncTablePan).observe(tableWrapEl);
 new ResizeObserver(syncTablePan).observe(dexTableEl);
 
 // ---------- state ----------
-const state = JSON.parse(localStorage.getItem('palbreed') || '{}');
+const state = readStore('palbreed', {});
 function save() {
   const s = {
     tab: currentTab, a: pickA.get()?.k, b: pickB.get()?.k, t: pickT.get()?.k, l: pickL.get()?.k,
@@ -917,10 +939,12 @@ function applyHash(hash) {
   if (!document.getElementById('view-' + tab)) return badLink('Link not recognized');
   if (tab === 'plan' && x) {
     const ks = x.split('+').map(resolvePal).filter(Boolean).map(p => p.k).slice(0, 4);
+    let brought = false; // did this link actually change the planner's inputs?
     if (ks.length) {
       for (const n of SLOTS) {
         const k = ks[n - 1] || null;
         if ((pickS[n].get()?.k || null) !== k) {
+          brought = true;
           pickS[n].set(k ? byKey.get(k) : null, true);
           slotPassives[n] = []; slotGenders[n] = null;
         }
@@ -928,8 +952,12 @@ function applyHash(hash) {
       renderSlotChips();
     }
     const tp = resolvePal(y);
-    if (tp) pickPT.set(tp, true);
-    setPlanMode('new'); // a shared route link always shows the route, not saved plans
+    if (tp) { brought = brought || pickPT.get()?.k !== tp.k; pickPT.set(tp, true); }
+    // A shared route link shows the route, not saved plans. But updateHash
+    // writes this same URL for the planner's own state, so reloading your own
+    // page arrives here too — and forcing "new" there threw away the sub-tab
+    // you were last on, which state.pm had just restored.
+    if (brought) setPlanMode('new');
     showTab('plan');
     if (ks.length && tp) computeRoute();
     return true;
@@ -1304,8 +1332,15 @@ function passiveChips(names, readonly = true) {
 }
 
 // ---------- roster ----------
-let roster = JSON.parse(localStorage.getItem('palbreed_roster') || '[]')
-  .filter(r => byKey.has(r.k)).map(r => ({g: null, nick: '', note: '', iv: null, ...r}));
+// one shape for roster entries however they arrive — storage, or an imported
+// backup written before a field existed. ps is as optional as the rest: an
+// entry without it used to take renderRoster down.
+function normRoster(list) {
+  return list.filter(r => r && byKey.has(r.k)).map(r => ({...r,
+    g: r.g || null, nick: r.nick || '', note: r.note || '',
+    iv: Array.isArray(r.iv) ? r.iv : null, ps: Array.isArray(r.ps) ? r.ps : []}));
+}
+let roster = normRoster(readStore('palbreed_roster', []));
 function saveRoster() {
   localStorage.setItem('palbreed_roster', JSON.stringify(roster));
   scheduleAuto(); // roster changes partner passives/genders the route may use
@@ -1652,9 +1687,10 @@ document.getElementById('importFile').addEventListener('change', e => {
       toast(`Import backup (${nr} pal${nr === 1 ? '' : 's'}, ${np} plan${np === 1 ? '' : 's'})? This replaces your current roster, plans and owned list.`, null, {
         label: 'Import',
         fn: () => {
-          roster = (d.roster || []).filter(r => byKey.has(r.k)).map(r => ({g: null, nick: '', note: '', iv: null, ...r}));
-          plans = (d.plans || []).filter(p => byKey.has(p.tK));
-          owned.clear(); for (const k of d.owned || []) if (byKey.has(k)) owned.add(k);
+          roster = normRoster(Array.isArray(d.roster) ? d.roster : []);
+          plans = normPlans(Array.isArray(d.plans) ? d.plans : []);
+          owned.clear();
+          for (const k of Array.isArray(d.owned) ? d.owned : []) if (byKey.has(k)) owned.add(k);
           saveRoster(); savePlans(); localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
           renderRoster(); renderPlans(); renderDex(); renderReverse();
           toast('Backup imported — ' + roster.length + ' pals, ' + plans.length + ' plans restored');
@@ -2251,7 +2287,16 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
 }
 
 // ---------- planner: saved plans ----------
-let plans = JSON.parse(localStorage.getItem('palbreed_plans') || '[]').filter(p => byKey.has(p.tK));
+// A plan is only renderable if every species it names still exists — checking
+// the target alone let a plan whose steps referenced a since-renamed pal
+// through, and stepEl then threw on byKey.get(...).n during boot.
+function normPlans(list) {
+  return list.filter(p => p && byKey.has(p.tK) && Array.isArray(p.steps)
+      && p.steps.every(s => s && byKey.has(s.aK) && byKey.has(s.bK) && byKey.has(s.cK)))
+    .map(p => ({...p, passives: Array.isArray(p.passives) ? p.passives : [],
+      done: Array.isArray(p.done) ? p.done : p.steps.map(() => false)}));
+}
+let plans = normPlans(readStore('palbreed_plans', []));
 function savePlans() { localStorage.setItem('palbreed_plans', JSON.stringify(plans)); updateChecklist(); }
 function renderPlans() {
   const list = document.getElementById('plansList');
@@ -2799,7 +2844,7 @@ const mapFilterSeg = document.getElementById('mapFilters');
 const mapLabelSeg = document.getElementById('mapLabels');
 
 const MAP_PREFS_V = 2;   // bump when a filter chip ships, so saved sets don't hide it
-const mapPrefs = JSON.parse(localStorage.getItem('palarium_map') || '{}');
+const mapPrefs = readStore('palarium_map', {});
 let mapLayer = LAYER_DIR[mapPrefs.l] ? mapPrefs.l : 'MainMap';
 const mapTypes = new Set(mapPrefs.v === MAP_PREFS_V && Array.isArray(mapPrefs.t)
   ? mapPrefs.t : ['alpha', 'fastTravel', 'tower', 'region']);
@@ -3287,7 +3332,7 @@ function mapOpenRef(ref) {
   const low = String(ref).toLowerCase();
   if (low === 'tree') { mapSetLayer('Tree'); return; }
   if (low === 'main' || low === 'mainmap') { mapSetLayer('MainMap'); return; }
-  const m = MAP.markers.find(k => k.id.toLowerCase() === low);
+  const m = MAP.markers.find(k => k.id && k.id.toLowerCase() === low);
   if (m) mapSelect(m, true);
   else badLink('Link not recognized — no map marker “' + ref + '”');
 }
@@ -3969,6 +4014,14 @@ function mapBuildRegions() {
 }
 
 if (MAP) {
+  // One extracted marker (the Deserted Islet tower) has no id in the world
+  // files. Everything that addresses a marker — #/map/<id>, Copy link, the hash
+  // updateHash writes when you select one — keys off it, so give the id-less
+  // ones a stable one derived from their actor rather than putting "null" in
+  // the address bar and handing out a link that resolves to nothing.
+  for (const m of MAP.markers) {
+    if (!m.id) m.id = (m.actor || m.type + '_' + m.label).replace(/^BP_/, '').replace(/_C$/, '');
+  }
   for (const m of MAP.markers) {
     if (m.type !== 'alpha') continue;
     const p = mapPal(m);
@@ -4146,6 +4199,7 @@ document.addEventListener('keydown', e => {
   if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
   if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName)) return;
   if (overlay.classList.contains('open') || roverlay.classList.contains('open') || openPicker) return;
+  if (document.querySelector('.isel.open')) return;  // an icon dropdown owns the keyboard
   // tabs without a search box open the most useful pal picker instead
   if (currentTab === 'breed') {
     e.preventDefault();
