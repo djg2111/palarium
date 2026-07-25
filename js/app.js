@@ -726,6 +726,11 @@ function makeIconSelect(sel, dir, keyOf) {
     }
   });
   document.addEventListener('click', e => { if (!wrap.contains(e.target)) close(); });
+  // Anything that writes sel.value and fires change repaints itself. Without
+  // this the button is a picture of the state at the moment it was built: a
+  // saved filter restored on boot left the control reading "Any element" while
+  // 255 of 299 rows were hidden.
+  sel.addEventListener('change', paint);
   // options are populated after this runs for some selects, so expose a rebuild
   return {refresh: build, sync: paint};
 }
@@ -2598,8 +2603,9 @@ for (const [k, label] of Object.entries(WORKS)) {
 }
 // upgrade the two Paldex filters and the roster's passive filter in place, so
 // their rows match the icons the table and the chips already use
-makeIconSelect(dexType, 'element', v => v).refresh();
-makeIconSelect(dexWork, 'work', v => v).refresh();
+const dexTypeSel = makeIconSelect(dexType, 'element', v => v);
+const dexWorkSel = makeIconSelect(dexWork, 'work', v => v);
+dexTypeSel.refresh(); dexWorkSel.refresh();
 const rosterPassiveSel = makeIconSelect(rosterPassiveFilter, 'passive',
   v => passiveIconKey(PASSIVES.find(p => p.n === v)));
 rosterPassiveSel.refresh();
@@ -2612,6 +2618,7 @@ dexWork.addEventListener('change', () => {
 dexOwnedBtn.addEventListener('click', () => { dexOwnedOnly = !dexOwnedOnly; setSwitch(dexOwnedBtn, dexOwnedOnly); save(); renderDex(); });
 function clearDexFilters() {
   dexSearch.value = ''; dexType.value = ''; dexWork.value = '';
+  dexTypeSel.sync(); dexWorkSel.sync();      // these two are drawn over, not native
   dexOwnedOnly = false; setSwitch(dexOwnedBtn, false);
   save(); renderDex();
 }
@@ -2725,8 +2732,8 @@ if (state.po) { partnerOwnedOnly = true; setSwitch(partnerToggle, true); }
 if (state.ac) { avoidCollab = true; setSwitch(collabToggle, true); }
 if (state.hn) { hatchNewOnly = true; setSwitch(hatchNewBtn, true); }
 if (state.hd === 0 || state.hd === 2) setHatchDepth(state.hd, true);
-if (state.dt) dexType.value = state.dt;
-if (state.dw) dexWork.value = state.dw;
+if (state.dt) { dexType.value = state.dt; dexTypeSel.sync(); }
+if (state.dw) { dexWork.value = state.dw; dexWorkSel.sync(); }
 if (state.dsort && state.dsort.key) dexSort = state.dsort;
 if (state.ck === 'mix' || state.ck === 'self') setComboKind(state.ck, true);
 if (state.chain && Array.isArray(state.chain.steps)
