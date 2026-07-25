@@ -52,5 +52,11 @@ self.addEventListener('fetch', e => {
     const copy = res.clone();
     caches.open(VERSION).then(c => c.put(e.request, copy));
     return res;
-  }).catch(() => caches.match(e.request).then(hit => hit || caches.match('index.html'))));
+  // index.html is the right offline answer for a *navigation* and a wrong one
+  // for anything else: handing it back for js/spawndata.js loaded a script tag
+  // full of markup, which threw "Unexpected token '<'" and then poisoned the
+  // browser's subresource cache so the retry failed too. Fail the request
+  // instead — every caller of an on-demand script already has an error path.
+  }).catch(() => caches.match(e.request).then(hit => hit
+    || (e.request.mode === 'navigate' ? caches.match('index.html') : Response.error()))));
 });

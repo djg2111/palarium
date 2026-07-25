@@ -1992,6 +1992,7 @@ function computeRoute() {
   save();
 }
 
+let wildSeq = 0;   // ids for aria-controls on the "where do I catch one" panels
 function stepEl(s, opts = {}) {
   const row = document.createElement('div'); row.className = 'rstep';
   if (opts.stepNo != null) { const no = document.createElement('span'); no.className = 'stepno'; no.textContent = opts.stepNo; row.appendChild(no); }
@@ -2036,6 +2037,53 @@ function stepEl(s, opts = {}) {
     });
     row.appendChild(o);
   }
+  // The partner column is the pal you have to go and *get*, and when it has no
+  // ★ the route used to stop at "you don't own one". The map data already knows
+  // where that species lives, so answer it here instead of sending the reader
+  // to the Map tab and losing the route they were reading.
+  //
+  // window.MAPDATA rather than MAP: renderPlans() runs at boot and calls this,
+  // and `const MAP` is declared ~800 lines further down — reading MAP here
+  // would be a TDZ ReferenceError, not a null. Every other map helper is
+  // touched only inside the click handler, which cannot fire before boot ends.
+  if (window.MAPDATA && !own.has(s.bK)) {
+    const pb = byKey.get(s.bK);
+    const boxId = 'wild-' + (++wildSeq);
+    // A merge step, and every step of a hatchery chain, can name a partner an
+    // earlier step already hatches. "Go and catch one" isn't wrong there, but
+    // it isn't the whole truth either — say which step makes one.
+    const at = opts.chain ? opts.chain.indexOf(s) : -1;
+    const bredAt = at > 0 ? opts.chain.findIndex((x, i) => i < at && x.cK === s.bK) : -1;
+    const w = document.createElement('button'); w.type = 'button'; w.className = 'odds wild';
+    w.textContent = '📍 Where?';
+    w.title = 'Where to catch a ' + pb.n;
+    w.setAttribute('aria-label', 'Where to catch a ' + pb.n);
+    w.setAttribute('aria-expanded', 'false');
+    // the panel is appended at the end of the row, after the ↗ button, so name
+    // it explicitly rather than relying on it following the trigger in the DOM
+    w.setAttribute('aria-controls', boxId);
+    w.addEventListener('click', () => {
+      const shown = row.querySelector('.wildinfo');
+      if (shown) { shown.remove(); w.setAttribute('aria-expanded', 'false'); return; }
+      const box = document.createElement('div'); box.className = 'wildinfo';
+      box.id = boxId;
+      // the answer arrives a moment after the click, once the spawn table has
+      // loaded — announce the swap rather than leaving a reader on "Looking up…"
+      box.setAttribute('aria-live', 'polite');
+      box.textContent = 'Looking up where ' + pb.n + ' spawns…';
+      row.appendChild(box);
+      w.setAttribute('aria-expanded', 'true');
+      // 124 KB of spawn areas the planner deliberately doesn't ship with: the
+      // first expand anywhere pays for it, and mapLoadSpawns() is idempotent,
+      // so the Map tab and every other row share that one load.
+      mapLoadSpawns()
+        .then(() => { if (box.isConnected) wildInfo(box, pb, bredAt); })
+        .catch(() => {
+          if (box.isConnected) box.textContent = 'Spawn data didn’t load — check your connection, then try again.';
+        });
+    });
+    row.appendChild(w);
+  }
   if (opts.onOpen) {
     const ob = document.createElement('button'); ob.className = 'stepopen'; ob.type = 'button'; ob.textContent = '↗';
     ob.title = 'Open this pairing in the Breed tab with the full chain';
@@ -2044,6 +2092,77 @@ function stepEl(s, opts = {}) {
     row.appendChild(ob);
   }
   return row;
+}
+
+// Fills the "where do I catch one" panel. Only ever reached from the click
+// handler above, after mapLoadSpawns() has resolved — so the const-bound map
+// helpers it reaches for (MAP_ALPHAS, spawnEntries, mPerPx, mapDist…) are all
+// long past their definitions by the time any of this runs.
+function wildInfo(box, p, bredAt = -1) {
+  box.textContent = '';
+  const line = cls => {
+    const d = document.createElement('div'); d.className = 'wline' + (cls ? ' ' + cls : '');
+    box.appendChild(d); return d;
+  };
+  const mapLink = (label, hash) => {
+    const a = document.createElement('a'); a.className = 'wlink'; a.href = hash; a.textContent = label;
+    box.appendChild(a);
+  };
+  if (bredAt >= 0) line('wnote').textContent = `Step ${bredAt + 1} already hatches one — catching a wild ${p.n} is the shortcut.`;
+  const sum = mapSpawnSummary(p.k);
+  if (!sum) {
+    // the same three honest outcomes the Map tab already distinguishes
+    const alpha = MAP_ALPHAS.get(p.k);
+    if (!alpha) {
+      line().textContent = `${p.n} can’t be caught in the wild — it has no spawner anywhere in the world. ` +
+        'The only ways to get one are to breed it or win it from a raid.';
+      return;
+    }
+    const a = alpha[0];
+    const near = mapNearest(a, 'fastTravel', 1)[0];
+    line().textContent = `No wild spawn areas. The only ${p.n} in the world is the` +
+      (a.level ? ` Lv ${a.level}` : '') + ` alpha on ${LAYER_NAME[a.layer] || 'the map'}` +
+      (near ? `, nearest statue ${mapTitle(near.f)}` : '') +
+      '. Beat it and catch it there.';
+    mapLink('Show the alpha on the map ↗', '#/map/' + encodeURIComponent(a.id));
+    return;
+  }
+  const head = line();
+  const b = document.createElement('b');
+  b.textContent = sum.lo === sum.hi ? 'Lv ' + sum.lo : `Lv ${sum.lo}–${sum.hi}`;
+  const cnt = document.createElement('span');
+  cnt.textContent = `${sum.spots} spawn area${sum.spots === 1 ? '' : 's'}`;
+  head.append(b, cnt);
+  if (sum.night) { const t = document.createElement('span'); t.className = 'wtag'; t.textContent = '🌙 Night only'; head.appendChild(t); }
+  if (sum.dungeonOnly) { const t = document.createElement('span'); t.className = 'wtag'; t.textContent = 'Dungeons only'; head.appendChild(t); }
+
+  // Reuse the Map's statue ranking — areas within 1.2 km, not raw distance —
+  // rather than inventing a second answer to the same question. Layer is
+  // picked from where the species actually lives, preferring the main island,
+  // so the panel reads the same whatever layer the Map tab was left on.
+  const layers = spawnLayersFor(p.k);
+  const layer = layers.includes('MainMap') ? 'MainMap' : layers[0];
+  const hubs = layer ? mapSpawnHubs(p.k, layer, 3) : [];
+  if (hubs.length) {
+    const l = line('whubs');
+    const lb = document.createElement('span'); lb.className = 'wlb'; lb.textContent = 'Best fast travel';
+    l.appendChild(lb);
+    const m = mPerPx(layer);
+    for (const h of hubs) {
+      const c = document.createElement('span'); c.className = 'whub';
+      const n = document.createElement('span'); n.textContent = mapTitle(h.f);
+      const d = document.createElement('i'); d.textContent = h.near ? h.near + ' areas' : fmtDist(h.best * m);
+      c.title = h.near
+        ? `${h.near} spawn areas within 1.2 km of ${mapTitle(h.f)} · nearest ${fmtDist(h.best * m)}`
+        : `Nearest spawn area ${fmtDist(h.best * m)} from ${mapTitle(h.f)}`;
+      c.append(n, d);
+      l.appendChild(c);
+    }
+  }
+  const other = layers.filter(x => x !== layer);
+  if (layer && layer !== 'MainMap') line().textContent = `These areas are on ${LAYER_NAME[layer]}.`;
+  else if (other.length) line().textContent = `Also spawns on ${LAYER_NAME[other[0]]}.`;
+  mapLink('Show these areas on the map ↗', '#/map/spawn/' + p.k);
 }
 // binary-tree diagram of a route: merge branches join into the carrier line.
 // hlIdx highlights that step's child (used by the Breed tab's chain view).
@@ -2250,7 +2369,7 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
   if (need.length) out.appendChild(neededRow(need));
   if (steps.length > 1) out.appendChild(treeViewport(routeTree(steps)));
   // the "passive carrier line" tag only means something when passives are tracked
-  steps.forEach((s, i) => out.appendChild(stepEl(s, {stepNo: i + 1, carrier: carried.length > 0, odds: stepOdds[i], onOpen: () => openChainStep(steps, i)})));
+  steps.forEach((s, i) => out.appendChild(stepEl(s, {stepNo: i + 1, chain: steps, carrier: carried.length > 0, odds: stepOdds[i], onOpen: () => openChainStep(steps, i)})));
   if (carried.length) {
     const n = document.createElement('div'); n.className = 'mathline';
     n.textContent = 'At each step, hatch until a child inherits your passives (and the right gender for the next pairing), then continue with that child.';
@@ -2359,7 +2478,7 @@ function renderPlans() {
     const need = neededSpecies(plan.steps);
     if (need.length) card.appendChild(neededRow(need));
     plan.steps.forEach((s, i) => {
-      const row = stepEl(s, {stepNo: i + 1, onOpen: () => openChainStep(plan.steps, i)});
+      const row = stepEl(s, {stepNo: i + 1, chain: plan.steps, onOpen: () => openChainStep(plan.steps, i)});
       if (plan.done[i]) row.classList.add('done');
       const chk = document.createElement('input'); chk.type = 'checkbox'; chk.className = 'chk'; chk.checked = !!plan.done[i];
       chk.title = 'Mark step done';
@@ -2500,7 +2619,7 @@ function hatchChainPanel(r, kids, ownSet) {
   const ttl = document.createElement('div'); ttl.className = 'hpttl';
   ttl.textContent = `One way to reach ${r.p.n} from your pals — ${steps.length} step${steps.length === 1 ? '' : 's'}:`;
   panel.appendChild(ttl);
-  steps.forEach((s, i) => panel.appendChild(stepEl(s, {stepNo: i + 1, onOpen: () => openChainStep(steps, i)})));
+  steps.forEach((s, i) => panel.appendChild(stepEl(s, {stepNo: i + 1, chain: steps, onOpen: () => openChainStep(steps, i)})));
   const lr = document.createElement('div'); lr.className = 'linkrow'; lr.style.justifyContent = 'flex-start';
   const planBtn = document.createElement('button'); planBtn.className = 'alink';
   planBtn.textContent = 'Plan this route ↗';
@@ -3379,6 +3498,14 @@ function mapLoadSpawns() {
     const s = document.createElement('script');
     s.src = 'js/spawndata.js';
     s.onload = () => {
+      // The service worker answers a failed shell fetch with index.html, so an
+      // offline load resolves this script tag with markup that never defines
+      // SPAWNDATA: onload fires and the data isn't there. Reject instead of
+      // throwing inside the handler and leaving the promise pending forever —
+      // callers all have a rejection path, and none of them has a hang path.
+      if (!window.SPAWNDATA || !window.SPAWNDATA.groups) {
+        spawnLoading = null; rej(new Error('spawn data unavailable')); return;
+      }
       SPAWN = window.SPAWNDATA;
       spawnByPal = new Map();
       SPAWN.groups.forEach((entries, gi) => {

@@ -495,6 +495,25 @@ select#genderSel{padding:10px 12px}
 .odds:hover{color:var(--text);border-color:var(--border-strong)}
 .odds[aria-expanded="true"]{color:var(--text);border-color:var(--accent)}
 .oddsinfo{flex-basis:100%;font-size:var(--fs-sm);color:var(--muted);line-height:1.45}
+/* "where do I catch one" — same expand-in-place shape as .odds/.oddsinfo, but
+   its own class so the two toggles can't remove each other's panel */
+.odds.wild{border-color:var(--accent-line);color:var(--text-2)}
+.odds.wild:hover{border-color:var(--accent)}
+.wildinfo{flex-basis:100%;min-width:0;font-size:var(--fs-sm);color:var(--muted);line-height:1.45;
+  display:flex;flex-direction:column;align-items:flex-start;gap:6px;
+  border-top:1px solid var(--border);margin-top:2px;padding-top:9px}
+.wildinfo .wline{display:flex;align-items:center;flex-wrap:wrap;gap:8px;max-width:100%}
+.wildinfo b{color:var(--text);font-weight:700}
+.wildinfo .wnote{color:var(--text-2)}
+.wildinfo .wtag{font-size:var(--fs-xs);font-weight:700;color:var(--accent);background:var(--accent-tint);
+  border:1px solid var(--accent-line);border-radius:var(--r-full);padding:1px 8px}
+.wildinfo .wlb{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--muted)}
+.wildinfo .whub{display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;color:var(--text-2);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:2px 9px}
+.wildinfo .whub>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wildinfo .whub i{font-style:normal;font-size:var(--fs-xs);color:var(--muted);flex-shrink:0}
+.wildinfo .wlink{color:var(--accent);font-weight:600;text-decoration:none;border-bottom:1px solid var(--accent-line)}
+.wildinfo .wlink:hover{border-bottom-color:var(--accent)}
 .needrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;font-size:var(--fs-sm);color:var(--muted)}
 .needrow .tchip{cursor:pointer}
 .needrow .tchip:hover{border-color:var(--border-strong)}
