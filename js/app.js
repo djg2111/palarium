@@ -1670,13 +1670,17 @@ function renderRosterStrip() {
   }
 }
 
-// ---------- backup export / import ----------
+// ---------- data export / import ----------
+// This carries the three things you typed in — roster, saved plans, owned list
+// — and deliberately not the settings (filters, toggles, map prefs, recents),
+// which belong to the device you're on. The wording says so everywhere it's
+// shown, because "backup" reads as "everything" and this isn't that.
 document.getElementById('exportBtn').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify({app: 'palarium', savedAt: new Date().toISOString(),
     roster, plans, owned: [...owned]}, null, 1)], {type: 'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'palarium-backup.json';
+  a.download = 'palarium-data.json';
   a.click(); URL.revokeObjectURL(a.href);
 });
 document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
@@ -1686,9 +1690,9 @@ document.getElementById('importFile').addEventListener('change', e => {
   rd.onload = () => {
     try {
       const d = JSON.parse(rd.result);
-      if (d.app !== 'palarium' && d.app !== 'palbreed') throw new Error('not a Palarium backup');
+      if (d.app !== 'palarium' && d.app !== 'palbreed') throw new Error('not a Palarium export');
       const nr = (d.roster || []).length, np = (d.plans || []).length;
-      toast(`Import backup (${nr} pal${nr === 1 ? '' : 's'}, ${np} plan${np === 1 ? '' : 's'})? This replaces your current roster, plans and owned list.`, null, {
+      toast(`Import ${nr} pal${nr === 1 ? '' : 's'} and ${np} plan${np === 1 ? '' : 's'}? This replaces your current roster, plans and owned list. Your settings aren’t touched.`, null, {
         label: 'Import',
         fn: () => {
           roster = normRoster(Array.isArray(d.roster) ? d.roster : []);
@@ -1697,7 +1701,7 @@ document.getElementById('importFile').addEventListener('change', e => {
           for (const k of Array.isArray(d.owned) ? d.owned : []) if (byKey.has(k)) owned.add(k);
           saveRoster(); savePlans(); localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
           renderRoster(); renderPlans(); renderDex(); renderReverse();
-          toast('Backup imported — ' + roster.length + ' pals, ' + plans.length + ' plans restored');
+          toast('Imported ' + roster.length + ' pals and ' + plans.length + ' plans');
         },
       });
     } catch (err) { toast('Import failed: ' + err.message); }
@@ -2339,10 +2343,14 @@ function renderPlans() {
       const idx = plans.findIndex(x => x.id === plan.id);
       if (idx < 0) return;
       const removed = plans[idx];
+      // deleting the last plan drops the sub-tab bar and bounces you to "new";
+      // undo has to put that back too, or restoring your only plan leaves you
+      // on the route form looking at no evidence the undo did anything
+      const mode = planMode;
       plans.splice(idx, 1); savePlans(); renderPlans();
       toast('Deleted plan “' + removed.name + '”', () => {
         plans.splice(Math.min(idx, plans.length), 0, removed);
-        savePlans(); renderPlans();
+        savePlans(); renderPlans(); setPlanMode(mode);
       });
     });
     head.appendChild(del);
@@ -2847,11 +2855,20 @@ const mapLayerSeg = document.getElementById('mapLayer');
 const mapFilterSeg = document.getElementById('mapFilters');
 const mapLabelSeg = document.getElementById('mapLabels');
 
-const MAP_PREFS_V = 2;   // bump when a filter chip ships, so saved sets don't hide it
+// The enabled filter chips are saved as a set, so a chip that ships later isn't
+// in anyone's saved set and would be off for every returning user — invisible
+// in development, where the prefs are always fresh. This used to be handled by
+// bumping a version constant by hand, which only works if you remember.
+// Instead each save records which chips existed at the time; anything the saved
+// set has never been offered is new, and defaults to on. Adding a chip to
+// index.html is now enough — there is nothing to keep in step.
 const mapPrefs = readStore('palarium_map', {});
+const MAP_CHIPS = [...mapFilterSeg.querySelectorAll('button[data-t]')].map(b => b.dataset.t);
 let mapLayer = LAYER_DIR[mapPrefs.l] ? mapPrefs.l : 'MainMap';
-const mapTypes = new Set(mapPrefs.v === MAP_PREFS_V && Array.isArray(mapPrefs.t)
-  ? mapPrefs.t : ['alpha', 'fastTravel', 'tower', 'region']);
+const mapTypes = new Set(Array.isArray(mapPrefs.t)
+  ? [...mapPrefs.t.filter(t => MAP_CHIPS.includes(t)),          // drop chips that were retired
+     ...MAP_CHIPS.filter(t => !(mapPrefs.k || []).includes(t))] // opt into ones never offered
+  : MAP_CHIPS);
 let mapK = 0.1, mapMinK = 0.05, mapTX = 0, mapTY = 0;
 let mapSel = null, mapBuilt = false, mapQuery = '';
 const mapEls = new Map();    // "layer|id" -> marker button
@@ -2865,8 +2882,9 @@ let mapDragged = false;
 // map prefs live in their own key: save() runs during boot, before this
 // section has initialised, and reading these from there would be a TDZ crash
 function mapSavePrefs() {
+  // k = the chips that existed when this was written; see MAP_CHIPS above
   localStorage.setItem('palarium_map',
-    JSON.stringify({v: MAP_PREFS_V, l: mapLayer, t: [...mapTypes], lb: mapLabelMode}));
+    JSON.stringify({l: mapLayer, t: [...mapTypes], k: MAP_CHIPS, lb: mapLabelMode}));
 }
 
 const mapKey = m => m.layer + '|' + m.id;
