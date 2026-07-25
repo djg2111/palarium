@@ -868,8 +868,14 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
   .slotgrid{grid-template-columns:1fr}
   .targetrow .slot,.targetrow .slot.opts{flex:1 1 100%;min-width:0;max-width:none}
   /* margin-left:auto on a wrapping row gave the ↗ button a whole empty line */
-  .rstep{position:relative;padding-right:50px}
+  .rstep{position:relative;--gutter:50px;padding-right:var(--gutter)}
   .rstep .stepopen{position:absolute;top:11px;right:12px;margin-left:0}
+  /* the gutter only clears the ↗ on the first line; the panel underneath isn't
+     beneath anything, so give it the width back rather than ellipsizing statue
+     names 34px early. flex-basis as well as the margin — the base rule pins the
+     basis at 100%, so a negative margin alone moves the box without widening
+     it. Same custom property throughout so the two can't drift apart. */
+  .rstep .wildinfo{flex-basis:calc(100% + var(--gutter) - 16px);margin-right:calc(16px - var(--gutter))}
   .saverow>.search-inp{flex:1 1 100%}
   .planhead .pushr{margin-left:0}
 

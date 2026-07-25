@@ -1992,6 +1992,36 @@ function computeRoute() {
   save();
 }
 
+// A merge step, and every step of a hatchery chain, can name a partner that an
+// earlier step already hatches — so catching one wild may make that step, and
+// whatever fed it, unnecessary. Work out which: a step is needed only while its
+// child still feeds, directly or transitively, the pal the chain is for, so drop
+// the one edge the catch replaces and keep whatever the last step can still
+// reach. Anything the rest of the chain still consumes stays live, which is what
+// stops this claiming a skip that isn't there.
+function chainSkips(chain, s) {
+  const n = chain ? chain.length : 0;
+  const at = n ? chain.indexOf(s) : -1;
+  if (at < 1) return {bredAt: -1, skips: []};
+  const producer = (k, before) => {
+    for (let i = before - 1; i >= 0; i--) if (chain[i].cK === k) return i;
+    return -1;
+  };
+  const bredAt = producer(s.bK, at);
+  if (bredAt < 0) return {bredAt: -1, skips: []};
+  const parents = chain.map((x, j) => [producer(x.aK, j), producer(x.bK, j)]);
+  parents[at][1] = -1;
+  const live = new Set();
+  const walk = j => {
+    if (live.has(j)) return;
+    live.add(j);
+    for (const p of parents[j]) if (p >= 0) walk(p);
+  };
+  walk(n - 1);
+  const skips = [];
+  for (let i = 0; i < n; i++) if (!live.has(i)) skips.push(i);
+  return {bredAt, skips};
+}
 let wildSeq = 0;   // ids for aria-controls on the "where do I catch one" panels
 function stepEl(s, opts = {}) {
   const row = document.createElement('div'); row.className = 'rstep';
@@ -2049,11 +2079,7 @@ function stepEl(s, opts = {}) {
   if (window.MAPDATA && !own.has(s.bK)) {
     const pb = byKey.get(s.bK);
     const boxId = 'wild-' + (++wildSeq);
-    // A merge step, and every step of a hatchery chain, can name a partner an
-    // earlier step already hatches. "Go and catch one" isn't wrong there, but
-    // it isn't the whole truth either — say which step makes one.
-    const at = opts.chain ? opts.chain.indexOf(s) : -1;
-    const bredAt = at > 0 ? opts.chain.findIndex((x, i) => i < at && x.cK === s.bK) : -1;
+    const {bredAt, skips} = chainSkips(opts.chain, s);
     const w = document.createElement('button'); w.type = 'button'; w.className = 'odds wild';
     w.textContent = '📍 Where?';
     w.title = 'Where to catch a ' + pb.n;
@@ -2077,7 +2103,7 @@ function stepEl(s, opts = {}) {
       // first expand anywhere pays for it, and mapLoadSpawns() is idempotent,
       // so the Map tab and every other row share that one load.
       mapLoadSpawns()
-        .then(() => { if (box.isConnected) wildInfo(box, pb, bredAt); })
+        .then(() => { if (box.isConnected) wildInfo(box, pb, bredAt, skips); })
         .catch(() => {
           if (box.isConnected) box.textContent = 'Spawn data didn’t load — check your connection, then try again.';
         });
@@ -2098,7 +2124,7 @@ function stepEl(s, opts = {}) {
 // handler above, after mapLoadSpawns() has resolved — so the const-bound map
 // helpers it reaches for (MAP_ALPHAS, spawnEntries, mPerPx, mapDist…) are all
 // long past their definitions by the time any of this runs.
-function wildInfo(box, p, bredAt = -1) {
+function wildInfo(box, p, bredAt = -1, skips = []) {
   box.textContent = '';
   const line = cls => {
     const d = document.createElement('div'); d.className = 'wline' + (cls ? ' ' + cls : '');
@@ -2108,7 +2134,17 @@ function wildInfo(box, p, bredAt = -1) {
     const a = document.createElement('a'); a.className = 'wlink'; a.href = hash; a.textContent = label;
     box.appendChild(a);
   };
-  if (bredAt >= 0) line('wnote').textContent = `Step ${bredAt + 1} already hatches one — catching a wild ${p.n} is the shortcut.`;
+  if (bredAt >= 0) {
+    // Only name the steps a catch actually removes. Where the hatched one is
+    // consumed elsewhere in the chain too, nothing drops out and the honest
+    // claim is the weaker one.
+    const ns = skips.map(i => i + 1);
+    const list = ns.length === 1 ? 'step ' + ns[0]
+      : 'steps ' + ns.slice(0, -1).join(', ') + ' and ' + ns[ns.length - 1];
+    line('wnote').textContent = ns.length
+      ? `Step ${bredAt + 1} hatches one — catching a wild ${p.n} instead skips ${list}.`
+      : `Step ${bredAt + 1} already hatches one, and the rest of the chain still needs it — a wild ${p.n} saves the hatch, not the step.`;
+  }
   const sum = mapSpawnSummary(p.k);
   if (!sum) {
     // the same three honest outcomes the Map tab already distinguishes
@@ -2148,16 +2184,14 @@ function wildInfo(box, p, bredAt = -1) {
     const lb = document.createElement('span'); lb.className = 'wlb'; lb.textContent = 'Best fast travel';
     l.appendChild(lb);
     const m = mPerPx(layer);
-    for (const h of hubs) {
+    hubs.forEach((h, i) => {
       const c = document.createElement('span'); c.className = 'whub';
       const n = document.createElement('span'); n.textContent = mapTitle(h.f);
-      const d = document.createElement('i'); d.textContent = h.near ? h.near + ' areas' : fmtDist(h.best * m);
-      c.title = h.near
-        ? `${h.near} spawn areas within 1.2 km of ${mapTitle(h.f)} · nearest ${fmtDist(h.best * m)}`
-        : `Nearest spawn area ${fmtDist(h.best * m)} from ${mapTitle(h.f)}`;
+      const d = document.createElement('i'); d.textContent = hubLabel(h, i, m);
+      c.title = hubTitle(h, i, m);
       c.append(n, d);
       l.appendChild(c);
-    }
+    });
   }
   const other = layers.filter(x => x !== layer);
   if (layer && layer !== 'MainMap') line().textContent = `These areas are on ${LAYER_NAME[layer]}.`;
@@ -3712,24 +3746,62 @@ function mapDrawZones() {
 // Ranked by how many spawn points sit within reach of each fast-travel point,
 // not by raw distance: the nearest statue to one stray spawner is less useful
 // than the one sitting in the middle of the herd.
+const POP8 = Uint8Array.from({length: 256}, (_, i) => {
+  let c = 0; for (let v = i; v; v >>= 1) c += v & 1; return c;
+});
 function mapSpawnHubs(palKey, layer, n = 3) {
   const pts = spawnPoints(palKey, layer);
   if (!pts.length) return [];
   const reach = 1200 / mPerPx(layer);          // 1.2 km, in map pixels
+  const np = pts.length / 2, words = (np + 7) >> 3;
   const hubs = [];
   for (const f of MAP.markers) {
     if (f.type !== 'fastTravel' || f.layer !== layer) continue;
     let near = 0, best = Infinity;
-    for (let i = 0; i < pts.length; i += 2) {
+    // which spots this statue covers, as a bitset — 150 statues over the
+    // densest species is ~100 KB, where a list of indices would be megabytes
+    const cov = new Uint8Array(words);
+    for (let i = 0, p = 0; i < pts.length; i += 2, p++) {
       const d = Math.hypot(pts[i] - f.map.x, pts[i + 1] - f.map.y);
-      if (d < reach) near++;
+      if (d < reach) { near++; cov[p >> 3] |= 1 << (p & 7); }
       if (d < best) best = d;
     }
-    hubs.push({f, near, best});
+    hubs.push({f, near, best, cov});
   }
   hubs.sort((a, b) => b.near - a.near || a.best - b.best);
-  return hubs.slice(0, n);
+  // nothing within reach of anywhere: the only honest answer left is distance
+  if (!hubs.length || !hubs[0].near) {
+    return hubs.slice(0, n).map(h => ({f: h.f, near: h.near, best: h.best, gain: 0}));
+  }
+  // Scoring each statue on its own gave three names for one place: on a common
+  // species the runners-up sit on the same herd as the winner, so they scored
+  // nearly the same while adding nowhere new. Pick the leader on raw coverage,
+  // then rank the rest by what they *add* — greedy set cover. Falling to a
+  // small `gain` is itself the answer for a species that's everywhere: one
+  // statue already had it.
+  const out = [], taken = new Uint8Array(words);
+  for (let r = 0; r < n && hubs.length; r++) {
+    let bi = -1, bg = -1, bd = Infinity;
+    for (let i = 0; i < hubs.length; i++) {
+      let g = 0;
+      for (let w = 0; w < words; w++) g += POP8[hubs[i].cov[w] & ~taken[w] & 255];
+      if (g > bg || (g === bg && hubs[i].best < bd)) { bi = i; bg = g; bd = hubs[i].best; }
+    }
+    if (bi < 0 || (r && bg <= 0)) break;      // nothing new left worth a row
+    const h = hubs.splice(bi, 1)[0];
+    for (let w = 0; w < words; w++) taken[w] |= h.cov[w];
+    out.push({f: h.f, near: h.near, best: h.best, gain: bg});
+  }
+  return out;
 }
+// One phrasing for both readers of the list. The leader is worth its whole
+// catchment; a runner-up is worth only the part of it nobody above already
+// covers, which is the number that tells you whether it's worth a second trip.
+const hubLabel = (h, i, m) => !h.near ? fmtDist(h.best * m)
+  : i ? '+' + h.gain + ' more' : h.near + ' areas';
+const hubTitle = (h, i, m) => !h.near ? `Nearest spawn area ${fmtDist(h.best * m)} away`
+  : i ? `${h.gain} spawn areas within 1.2 km that the statues above it don’t already cover · nearest ${fmtDist(h.best * m)}`
+      : `${h.near} spawn areas within 1.2 km · nearest ${fmtDist(h.best * m)}`;
 
 // ---- selection ----
 function mapSetSpawn(palKey, focus) {
@@ -3918,11 +3990,9 @@ function mapRenderSpawnInfo(p) {
       const b = document.createElement('button'); b.type = 'button';
       const n = document.createElement('span'); n.textContent = mapTitle(h.f);
       const d = document.createElement('span'); d.className = 'd';
-      d.textContent = h.near ? h.near + ' areas' : fmtDist(h.best * m);
+      d.textContent = hubLabel(h, i, m);
       b.append(n, d);
-      b.title = h.near
-        ? `${h.near} spawn areas within 1.2 km · nearest ${fmtDist(h.best * m)}`
-        : `Nearest spawn area ${fmtDist(h.best * m)} away`;
+      b.title = hubTitle(h, i, m);
       b.addEventListener('click', () => mapSelect(h.f, true));
       wrap.appendChild(b);
       if (i === 0) mapEls.get(mapKey(h.f))?.classList.add('near');
