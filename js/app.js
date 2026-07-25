@@ -1334,9 +1334,13 @@ function passiveChips(names, readonly = true) {
 // ---------- roster ----------
 // one shape for roster entries however they arrive — storage, or an imported
 // backup written before a field existed. ps is as optional as the rest: an
-// entry without it used to take renderRoster down.
+// entry without it used to take renderRoster down. id isn't optional — Edit,
+// Remove and the "Newest" sort all address entries by it — so an entry that
+// arrives without one is issued the same kind of id the editor mints.
+const newEntryId = () => Date.now() + '' + Math.floor(Math.random() * 1e4);
 function normRoster(list) {
   return list.filter(r => r && byKey.has(r.k)).map(r => ({...r,
+    id: r.id ? String(r.id) : newEntryId(),
     g: r.g || null, nick: r.nick || '', note: r.note || '',
     iv: Array.isArray(r.iv) ? r.iv : null, ps: Array.isArray(r.ps) ? r.ps : []}));
 }
@@ -1461,7 +1465,7 @@ function commitRosterEntry() {
     const r = roster.find(x => x.id === editingId);
     if (r) Object.assign(r, entry);
   } else {
-    roster.push({id: Date.now() + '' + Math.floor(Math.random() * 1e4), ...entry});
+    roster.push({id: newEntryId(), ...entry});
   }
   if (!owned.has(p.k)) toggleOwned(p.k);
   saveRoster(); renderDex(); renderReverse();

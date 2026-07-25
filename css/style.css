@@ -630,7 +630,13 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
 .mapresults .more{color:var(--muted);font-size:var(--fs-sm);align-self:center}
 
 /* the persistent "you are looking at X's range" bar above the viewport */
-.spawnbar{display:flex;align-items:center;gap:11px;margin:0 0 12px;padding:8px 12px 8px 8px;
+/* The legend is 182px of nowrap and .sb-clear can't shrink, so on a phone the
+   row had nothing left to give and took it out of .sb-txt (min-width:0) — the
+   pal's name and level range were squeezed to 0px at 320 and 15px at 360, and
+   the Clear button still hung 2px off the right edge of a 320px viewport. Let
+   the row wrap instead: Clear (with the legend) drops to a second line and the
+   name gets its width back. Inert at any width the row already fits. */
+.spawnbar{display:flex;flex-wrap:wrap;align-items:center;gap:11px;margin:0 0 12px;padding:8px 12px 8px 8px;
   background:var(--accent-tint);border:1px solid var(--accent-line);border-radius:var(--r-lg)}
 .spawnbar[hidden]{display:none}
 .spawnbar .pico{flex-shrink:0}
