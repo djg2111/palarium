@@ -323,6 +323,11 @@ function openModal(p, rentry) {
   btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(true); pickB.set(p, true); renderBreed(); navTab('breed'); }));
   btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(true); pickPT.set(p, true); setPlanMode('new'); navTab('plan'); scheduleAuto(); }));
   btns.appendChild(mkBtn('+ Add to roster', false, () => { leaveModal(); openRosterEditor(null, p); }));
+  if (MAP_ALPHAS.has(p.k)) {
+    const spots = MAP_ALPHAS.get(p.k);
+    btns.appendChild(mkBtn(spots.length > 1 ? `Show on map (${spots.length} spots)` : 'Show on map', false,
+      () => { closeModal(true); navTab('map'); mapSelect(spots[0], true); }));
+  }
   btns.appendChild(mkBtn('Copy link', false, async () => {
     try {
       await navigator.clipboard.writeText(location.href.split('#')[0] + '#/pal/' + p.k);
@@ -636,6 +641,7 @@ function showTab(v) {
   syncBottomNav(v);
   closeMoreSheet();
   if (v === 'hatch') renderHatch();
+  if (v === 'map') mapActivate();
   save();
 }
 // in-app jumps push a history entry so Back returns to where you came from
@@ -663,7 +669,7 @@ tablistKeys(tabsEl);
 const bottomNavEl = document.getElementById('bottomnav');
 const moreSheetEl = document.getElementById('moresheet');
 const moreBtnEl = document.getElementById('moreBtn');
-const MORE_TABS = ['hatch', 'roster', 'dex', 'guide'];
+const MORE_TABS = ['hatch', 'roster', 'dex', 'map', 'guide'];
 function closeMoreSheet() {
   moreSheetEl.classList.remove('open');
   moreBtnEl.setAttribute('aria-expanded', 'false');
@@ -724,6 +730,9 @@ function updateHash() {
     if (t) h += '/' + t.k;
   } else if (currentTab === 'plan') {
     h = planHash() || h;
+  } else if (currentTab === 'map') {
+    if (mapSel) h += '/' + mapSel.id;
+    else if (mapLayer === 'Tree') h += '/tree';
   }
   if (location.hash !== h) history.replaceState(null, '', h);
 }
@@ -763,6 +772,11 @@ function applyHash(hash) {
     setPlanMode('new'); // a shared route link always shows the route, not saved plans
     showTab('plan');
     if (ks.length && tp) computeRoute();
+    return true;
+  }
+  if (tab === 'map') {
+    showTab('map');           // the viewport has no size until its tab is shown
+    if (x) mapOpenRef(x); else mapSelect(null);
     return true;
   }
   if (tab === 'breed') {
@@ -2574,6 +2588,597 @@ if (state.pm === 'saved' && plans.length) setPlanMode('saved');
     updateChecklist();
   }
 }
+// ---------- map view ----------
+// One fixed 8192x8192 "map pixel" stage under a single transform. Tiles,
+// markers and the link line are all positioned in map pixels and never move —
+// panning and zooming rewrite exactly one transform plus one CSS variable
+// (--iz = 1/scale), which the markers read to counter-scale themselves. That
+// keeps a 255-marker layer at one style write per frame instead of 255.
+const MAP = window.MAPDATA || null;
+const MAP_SIZE = 8192, MAP_TILE = 512, MAP_MAXZ = 3;
+const LAYER_DIR = {MainMap: 'main', Tree: 'tree'};
+const LAYER_NAME = {MainMap: 'Palpagos Islands', Tree: 'World Tree'};
+const MTYPE_NAME = {fastTravel: 'Fast travel point', tower: 'Syndicate tower',
+  middleBoss: 'World Tree boss', alpha: 'Field alpha'};
+// which species have a fixed alpha spawn — read by the pal card's "Show on map"
+const MAP_ALPHAS = new Map();
+
+const mapViewEl = document.getElementById('mapView');
+const mapStageEl = document.getElementById('mapStage');
+const mapTilesEl = document.getElementById('mapTiles');
+const mapMarksEl = document.getElementById('mapMarks');
+const mapLinkEl = document.getElementById('mapLink');
+const mapLinkLine = document.getElementById('mapLinkLine');
+const mapInfoEl = document.getElementById('mapInfo');
+const mapHelpEl = document.getElementById('mapHelp');
+const mapCountEl = document.getElementById('mapCount');
+const mapResultsEl = document.getElementById('mapResults');
+const mapSearchEl = document.getElementById('mapSearch');
+const mapLayerSeg = document.getElementById('mapLayer');
+const mapFilterSeg = document.getElementById('mapFilters');
+
+const mapPrefs = JSON.parse(localStorage.getItem('palarium_map') || '{}');
+let mapLayer = LAYER_DIR[mapPrefs.l] ? mapPrefs.l : 'MainMap';
+const mapTypes = new Set(Array.isArray(mapPrefs.t) ? mapPrefs.t : ['alpha', 'fastTravel', 'tower']);
+let mapK = 0.1, mapMinK = 0.05, mapTX = 0, mapTY = 0;
+let mapSel = null, mapBuilt = false, mapQuery = '';
+const mapEls = new Map();    // "layer|id" -> marker button
+const mapTiles = new Map();  // "dir/z/x/y" -> img
+let mapTileSig = '', mapBaseImg = null, mapGlideRAF = 0;
+// A pan drags the marker along under the cursor, so a drag that starts on one
+// also *ends* on it and Chrome fires a click. Without this the map selected a
+// marker every time you grabbed the view near one.
+let mapDragged = false;
+
+// map prefs live in their own key: save() runs during boot, before this
+// section has initialised, and reading these from there would be a TDZ crash
+function mapSavePrefs() {
+  localStorage.setItem('palarium_map', JSON.stringify({l: mapLayer, t: [...mapTypes]}));
+}
+
+const mapKey = m => m.layer + '|' + m.id;
+// BOSS_ rows name the tower variant (Boss_Anubis); the icon is the base pal's
+const mapPal = m => m.pal ? (byKey.get(m.pal) || byKey.get(m.pal.replace(/^Boss_/, '')) || null) : null;
+const mapTitle = m => m.type === 'alpha' ? (mapPal(m)?.n || m.label) : m.label;
+// the tower filter chip covers the three World Tree mid-bosses too
+const mapTypeOn = t => mapTypes.has(t === 'middleBoss' ? 'tower' : t);
+// world units are centimetres
+const fmtDist = d => d >= 1000 ? (d / 1000).toFixed(d < 10000 ? 1 : 0) + ' km' : Math.round(d / 5) * 5 + ' m';
+const mapDist = (a, b) => Math.hypot(a.world.x - b.world.x, a.world.y - b.world.y) / 100;
+
+function mapMatch(m, q) {
+  if (!q) return true;
+  return (m.label || '').toLowerCase().includes(q)
+    || (m.boss || '').toLowerCase().includes(q)
+    || (mapPal(m)?.n || '').toLowerCase().includes(q);
+}
+
+// ---- view transform ----
+function mapApply() {
+  mapStageEl.style.transform = `translate3d(${mapTX}px,${mapTY}px,0) scale(${mapK})`;
+  mapStageEl.style.setProperty('--iz', 1 / mapK);
+  mapStageEl.classList.toggle('lab', mapK >= 0.2);
+  mapLinkLine.style.strokeWidth = 2.5 / mapK + 'px';
+  mapLinkLine.style.strokeDasharray = `${14 / mapK} ${18 / mapK}`;
+  mapRenderTiles();
+}
+// Both textures are square, but the playable area inside them isn't: the
+// surface is a diamond and the World Tree fills barely two thirds. Fitting and
+// clamping to the marker bounding box instead of the raw 8192 square stops the
+// default view from opening on a frame of empty ocean, and stops panning off
+// into the void.
+const mapBoundsCache = new Map();
+function mapBounds() {
+  let b = mapBoundsCache.get(mapLayer);
+  if (b) return b;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const m of MAP.markers) {
+    if (m.layer !== mapLayer) continue;
+    x0 = Math.min(x0, m.map.x); x1 = Math.max(x1, m.map.x);
+    y0 = Math.min(y0, m.map.y); y1 = Math.max(y1, m.map.y);
+  }
+  if (!isFinite(x0)) { x0 = y0 = 0; x1 = y1 = MAP_SIZE; }
+  const pad = MAP_SIZE * 0.025;   // markers stop short of the coastline
+  b = {x0: Math.max(0, x0 - pad), y0: Math.max(0, y0 - pad),
+       x1: Math.min(MAP_SIZE, x1 + pad), y1: Math.min(MAP_SIZE, y1 + pad)};
+  mapBoundsCache.set(mapLayer, b);
+  return b;
+}
+function mapClampTo(k, tx, ty) {
+  const cw = mapViewEl.clientWidth, ch = mapViewEl.clientHeight, b = mapBounds();
+  const w = (b.x1 - b.x0) * k, h = (b.y1 - b.y0) * k;
+  return [
+    w <= cw ? (cw - w) / 2 - b.x0 * k : Math.min(-b.x0 * k, Math.max(cw - b.x1 * k, tx)),
+    h <= ch ? (ch - h) / 2 - b.y0 * k : Math.min(-b.y0 * k, Math.max(ch - b.y1 * k, ty)),
+  ];
+}
+function mapClamp() { [mapTX, mapTY] = mapClampTo(mapK, mapTX, mapTY); }
+function mapZoomTo(k, px, py) {
+  k = Math.max(mapMinK, Math.min(1, k));
+  if (Math.abs(k - mapK) < 1e-6) return;
+  if (px == null) { px = mapViewEl.clientWidth / 2; py = mapViewEl.clientHeight / 2; }
+  mapTX = px - (px - mapTX) * (k / mapK);
+  mapTY = py - (py - mapTY) * (k / mapK);
+  mapK = k;
+  mapClamp(); mapApply();
+}
+function mapStopGlide() { if (mapGlideRAF) { cancelAnimationFrame(mapGlideRAF); mapGlideRAF = 0; } }
+function mapGlide(tx, ty, k) {
+  mapStopGlide();
+  if (SMOOTH === 'auto') { mapK = k; mapTX = tx; mapTY = ty; mapApply(); return; }
+  const t0 = performance.now(), k0 = mapK, x0 = mapTX, y0 = mapTY;
+  const step = now => {
+    const u = Math.min(1, (now - t0) / 340), e = 1 - (1 - u) ** 3;
+    mapK = k0 + (k - k0) * e; mapTX = x0 + (tx - x0) * e; mapTY = y0 + (ty - y0) * e;
+    mapApply();
+    mapGlideRAF = u < 1 ? requestAnimationFrame(step) : 0;
+  };
+  mapGlideRAF = requestAnimationFrame(step);
+}
+function mapFit(animate) {
+  const cw = mapViewEl.clientWidth, ch = mapViewEl.clientHeight;
+  if (!cw || !ch) return;
+  const b = mapBounds();
+  mapMinK = Math.min(1, cw / (b.x1 - b.x0), ch / (b.y1 - b.y0));
+  const [tx, ty] = mapClampTo(mapMinK, 0, 0);
+  if (animate) mapGlide(tx, ty, mapMinK);
+  else { mapK = mapMinK; mapTX = tx; mapTY = ty; mapApply(); }
+}
+function mapFocus(m, zoom) {
+  const cw = mapViewEl.clientWidth, ch = mapViewEl.clientHeight;
+  if (!cw || !ch) return;
+  const k = Math.max(mapMinK, Math.min(1, zoom ?? Math.max(mapK, 0.34)));
+  const [tx, ty] = mapClampTo(k, cw / 2 - m.map.x * k, ch / 2 - m.map.y * k);
+  mapGlide(tx, ty, k);
+}
+
+// ---- tiles ----
+// Pick the level whose 512px tiles render at ~512 CSS px or better. z3 tops out
+// at 4096px across the map, so scale 1 shows it at 2x — deliberate: the tiler
+// caps the pyramid there because the native z4 alone costs 40 MB.
+const mapTileZoom = k => Math.max(0, Math.min(MAP_MAXZ, Math.ceil(Math.log2(k * MAP_SIZE / MAP_TILE))));
+function mapRenderTiles() {
+  const dir = LAYER_DIR[mapLayer];
+  const z = mapTileZoom(mapK), n = 2 ** z, span = MAP_SIZE / n;
+  const cw = mapViewEl.clientWidth, ch = mapViewEl.clientHeight;
+  const l = Math.max(0, Math.floor(-mapTX / mapK / span) - 1);
+  const t = Math.max(0, Math.floor(-mapTY / mapK / span) - 1);
+  const r = Math.min(n - 1, Math.floor((-mapTX + cw) / mapK / span) + 1);
+  const b = Math.min(n - 1, Math.floor((-mapTY + ch) / mapK / span) + 1);
+  const sig = `${dir}/${z}/${l},${t},${r},${b}`;
+  if (sig === mapTileSig) return;
+  mapTileSig = sig;
+
+  const want = new Set();
+  for (let y = t; y <= b; y++) for (let x = l; x <= r; x++) {
+    const key = `${dir}/${z}/${x}/${y}`;
+    want.add(key);
+    if (mapTiles.has(key)) continue;
+    const img = new Image();
+    img.alt = ''; img.decoding = 'async'; img.draggable = false;
+    // +1px overlap kills the hairline seams that fractional scaling leaves
+    // between neighbours; at 1/1024 of a tile the distortion is invisible
+    img.style.cssText = `left:${x * span}px;top:${y * span}px;width:${span + 1}px;height:${span + 1}px`;
+    img.src = `assets/map/${dir}/${z}/${x}_${y}.webp`;
+    mapTiles.set(key, img);
+    mapTilesEl.appendChild(img);
+  }
+  for (const [key, img] of mapTiles) {
+    if (want.has(key)) continue;
+    img.remove(); mapTiles.delete(key);
+  }
+}
+function mapResetTiles() {
+  for (const img of mapTiles.values()) img.remove();
+  mapTiles.clear(); mapTileSig = '';
+  if (!mapBaseImg) {
+    mapBaseImg = new Image();
+    mapBaseImg.className = 'base'; mapBaseImg.alt = ''; mapBaseImg.draggable = false;
+    mapTilesEl.appendChild(mapBaseImg);
+  }
+  // z0 sits under every detail level so changing level never flashes the
+  // background while the replacement tiles decode
+  mapBaseImg.src = `assets/map/${LAYER_DIR[mapLayer]}/0/0_0.webp`;
+  mapTilesEl.insertBefore(mapBaseImg, mapTilesEl.firstChild);
+}
+
+// ---- markers ----
+function mapBuildMarkers() {
+  mapMarksEl.textContent = ''; mapEls.clear();
+  for (const m of MAP.markers) {
+    if (m.layer !== mapLayer) continue;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'mk mk-' + m.type; b.tabIndex = -1;
+    b.style.left = m.map.x + 'px'; b.style.top = m.map.y + 'px';
+    const g = document.createElement('span'); g.className = 'g';
+    if (m.type === 'alpha') {
+      const p = mapPal(m);
+      const im = new Image();
+      im.alt = ''; im.loading = 'lazy'; im.decoding = 'async'; im.draggable = false;
+      im.onerror = () => {
+        const f = document.createElement('span');
+        f.className = 'fb'; f.textContent = (mapTitle(m) || '?')[0];
+        im.replaceWith(f);
+      };
+      if (p) im.src = IMG + p.img; else im.onerror();
+      g.appendChild(im);
+      if (m.level) {
+        const lv = document.createElement('span'); lv.className = 'lvl';
+        lv.textContent = 'Lv ' + m.level; b.appendChild(lv);
+      }
+    } else if (m.type === 'tower' || m.type === 'middleBoss') {
+      g.textContent = m.type === 'tower' ? '▲' : '◆';
+    }
+    b.appendChild(g);
+    const lb = document.createElement('span'); lb.className = 'lb';
+    lb.textContent = mapTitle(m); b.appendChild(lb);
+    const t = mapTitle(m) + ' — ' + MTYPE_NAME[m.type] + (m.level ? ' Lv ' + m.level : '');
+    b.title = t; b.setAttribute('aria-label', t);
+    b.addEventListener('click', e => { e.stopPropagation(); if (!mapDragged) mapSelect(m); });
+    mapEls.set(mapKey(m), b);
+    mapMarksEl.appendChild(b);
+  }
+}
+function mapSyncMarkers() {
+  const q = mapQuery.trim().toLowerCase();
+  const counts = {alpha: 0, fastTravel: 0, tower: 0, middleBoss: 0};
+  let matches = 0;
+  for (const m of MAP.markers) {
+    if (m.layer !== mapLayer) continue;
+    const el = mapEls.get(mapKey(m)); if (!el) continue;
+    const on = mapTypeOn(m.type);
+    el.hidden = !on;
+    const hit = mapMatch(m, q);
+    el.classList.toggle('dim', on && !!q && !hit);
+    if (on) { counts[m.type]++; if (hit) matches++; }
+  }
+  if (q) {
+    mapCountEl.textContent = matches + (matches === 1 ? ' match here' : ' matches here');
+  } else {
+    const parts = [];
+    if (mapTypes.has('alpha')) parts.push(counts.alpha + ' alphas');
+    if (mapTypes.has('fastTravel')) parts.push(counts.fastTravel + ' waypoints');
+    if (mapTypes.has('tower')) parts.push(counts.tower + counts.middleBoss + ' towers');
+    mapCountEl.textContent = parts.join(' · ') || 'No markers shown';
+  }
+}
+
+// ---- search results (cross-layer, so "where is Jetragon" works from anywhere) ----
+function mapRenderResults() {
+  const q = mapQuery.trim().toLowerCase();
+  mapResultsEl.textContent = '';
+  if (!q) { mapResultsEl.hidden = true; return; }
+  const hits = MAP.markers.filter(m => mapTypeOn(m.type) && mapMatch(m, q));
+  hits.sort((a, b) => {
+    const an = mapTitle(a).toLowerCase(), bn = mapTitle(b).toLowerCase();
+    return (bn.startsWith(q) ? 1 : 0) - (an.startsWith(q) ? 1 : 0)
+      || (a.layer === mapLayer ? -1 : 0) - (b.layer === mapLayer ? -1 : 0)
+      || an.localeCompare(bn);
+  });
+  mapResultsEl.hidden = false;
+  for (const m of hits.slice(0, 10)) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'mres';
+    const p = mapPal(m);
+    if (p) {
+      const im = new Image(); im.src = IMG + p.img; im.alt = ''; im.loading = 'lazy'; b.appendChild(im);
+    } else {
+      const s = document.createElement('span'); s.className = 'rt';
+      s.textContent = m.type === 'fastTravel' ? '🔷' : '▲'; b.appendChild(s);
+    }
+    const tx = document.createElement('span');
+    tx.textContent = mapTitle(m) + (m.level ? ' · Lv ' + m.level : '')
+      + (m.layer === mapLayer ? '' : ' · ' + LAYER_NAME[m.layer]);
+    b.appendChild(tx);
+    b.addEventListener('click', () => mapSelect(m, true));
+    mapResultsEl.appendChild(b);
+  }
+  if (!hits.length) {
+    const s = document.createElement('span'); s.className = 'more';
+    s.textContent = 'Nothing matches “' + mapQuery.trim() + '” — try a pal or waypoint name.';
+    mapResultsEl.appendChild(s);
+  } else if (hits.length > 10) {
+    const s = document.createElement('span'); s.className = 'more';
+    s.textContent = '+' + (hits.length - 10) + ' more'; mapResultsEl.appendChild(s);
+  }
+}
+
+// ---- selection + detail panel ----
+function mapNearest(m, type, n) {
+  return MAP.markers
+    .filter(f => f.type === type && f.layer === m.layer && f !== m)
+    .map(f => ({f, d: mapDist(f, m)}))
+    .sort((a, b) => a.d - b.d).slice(0, n);
+}
+function mapSelect(m, focus) {
+  if (!MAP) return;
+  if (m && m.layer !== mapLayer) mapSetLayer(m.layer);
+  for (const el of mapEls.values()) el.classList.remove('sel', 'near');
+  mapSel = m || null;
+  if (!mapSel) {
+    mapInfoEl.hidden = true; mapInfoEl.textContent = '';
+    mapLinkEl.classList.add('off');
+    updateHash();
+    return;
+  }
+  mapEls.get(mapKey(mapSel))?.classList.add('sel');
+  mapRenderInfo(mapSel);
+  if (focus) mapFocus(mapSel);
+  updateHash();
+}
+function mapLinkTo(a, b) {
+  if (!a || !b) { mapLinkEl.classList.add('off'); return; }
+  mapLinkLine.setAttribute('x1', a.map.x); mapLinkLine.setAttribute('y1', a.map.y);
+  mapLinkLine.setAttribute('x2', b.map.x); mapLinkLine.setAttribute('y2', b.map.y);
+  mapLinkEl.classList.remove('off');
+}
+function mapRenderInfo(m) {
+  mapInfoEl.hidden = false;
+  mapInfoEl.textContent = '';
+  const p = mapPal(m);
+
+  const x = document.createElement('button');
+  x.type = 'button'; x.className = 'iclose'; x.textContent = '✕';
+  x.setAttribute('aria-label', 'Close marker details');
+  x.addEventListener('click', () => mapSelect(null));
+  mapInfoEl.appendChild(x);
+
+  const head = document.createElement('div'); head.className = 'ihead';
+  if (p) head.appendChild(icon(p, 44, true));
+  const hb = document.createElement('div');
+  const h3 = document.createElement('h3'); h3.textContent = mapTitle(m); hb.appendChild(h3);
+  const sub = document.createElement('div'); sub.className = 'isub';
+  sub.textContent = MTYPE_NAME[m.type] + (m.level ? ' · Lv ' + m.level : '')
+    + (m.boss ? ' · ' + m.boss : '');
+  hb.appendChild(sub);
+  head.appendChild(hb);
+  mapInfoEl.appendChild(head);
+
+  if (p) {
+    const crow = document.createElement('div'); crow.className = 'crow';
+    crow.appendChild(typeChips(p)); crow.appendChild(tierBadge(p));
+    mapInfoEl.appendChild(crow);
+  }
+
+  // an alpha or a tower wants the nearest statue; a statue wants to know what's
+  // worth walking to from it
+  const wantFT = m.type !== 'fastTravel';
+  const list = wantFT ? mapNearest(m, 'fastTravel', 3) : mapNearest(m, 'alpha', 4);
+  const lb = document.createElement('div'); lb.className = 'nlb';
+  lb.textContent = wantFT ? 'Closest fast travel' : 'Alphas near here';
+  mapInfoEl.appendChild(lb);
+  if (!list.length) {
+    const e = document.createElement('div'); e.className = 'isub';
+    e.textContent = wantFT ? 'No fast travel point on this layer.' : 'No alphas on this layer.';
+    mapInfoEl.appendChild(e);
+  } else {
+    const wrap = document.createElement('div'); wrap.className = 'near';
+    list.forEach(({f, d}, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      const n = document.createElement('span'); n.textContent = mapTitle(f) + (f.level ? ' · Lv ' + f.level : '');
+      const dd = document.createElement('span'); dd.className = 'd'; dd.textContent = fmtDist(d);
+      b.append(n, dd);
+      b.title = 'Show ' + mapTitle(f) + ' on the map';
+      b.addEventListener('click', () => mapSelect(f, true));
+      wrap.appendChild(b);
+      if (i === 0) { mapEls.get(mapKey(f))?.classList.add('near'); mapLinkTo(m, f); }
+    });
+    mapInfoEl.appendChild(wrap);
+  }
+  if (!list.length) mapLinkTo(null, null);
+
+  const acts = document.createElement('div'); acts.className = 'iacts';
+  if (p) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'alink'; b.textContent = 'Pal card';
+    b.addEventListener('click', () => openModal(p));
+    acts.appendChild(b);
+  }
+  const cp = document.createElement('button');
+  cp.type = 'button'; cp.className = 'alink'; cp.textContent = 'Copy link';
+  cp.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(location.href.split('#')[0] + '#/map/' + m.id);
+      toast('Link to ' + mapTitle(m) + ' copied');
+    } catch { toast('Copy failed — clipboard blocked by browser'); }
+  });
+  acts.appendChild(cp);
+  mapInfoEl.appendChild(acts);
+}
+
+// ---- layer ----
+function mapSetLayer(l) {
+  if (!LAYER_DIR[l] || l === mapLayer) return;
+  mapLayer = l;
+  mapSavePrefs();
+  mapLayerSeg.querySelectorAll('button').forEach(b => {
+    const on = b.dataset.l === l;
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+  });
+  mapSel = null;
+  mapInfoEl.hidden = true; mapInfoEl.textContent = '';
+  mapLinkEl.classList.add('off');
+  mapResetTiles();
+  mapBuildMarkers();
+  mapSyncMarkers();
+  mapRenderResults();
+  mapFit();
+  updateHash();
+}
+
+// ---- activation (the container has no size until the tab is shown) ----
+const mapPhone = () => matchMedia('(max-width:640px)').matches;
+const mapHeadH = () => parseInt(getComputedStyle(document.documentElement).getPropertyValue('--hh')) || 0;
+function mapSyncHeight() {
+  if (!MAP) return;
+  // On a phone the control stack above the map runs to half the screen, so a
+  // height derived from 100dvh alone pushed the viewport's bottom edge — and
+  // with it the info sheet anchored to it — under the fold. Measure instead.
+  if (!mapPhone()) { mapViewEl.style.height = ''; return; }
+  const navH = bottomNavEl.offsetHeight || 0;
+  mapViewEl.style.height = Math.max(300, window.innerHeight - mapHeadH() - navH - 22) + 'px';
+}
+function mapActivate() {
+  if (!MAP) return;
+  mapSyncHeight();
+  if (!mapBuilt) {
+    mapBuilt = true;
+    mapResetTiles();
+    mapBuildMarkers();
+    mapSyncMarkers();
+    mapFit();
+  }
+  // the map now owns a screenful; bring it under the header rather than
+  // leaving the user staring at filter chips with the map below the fold
+  if (mapPhone()) requestAnimationFrame(() => {
+    const top = mapViewEl.getBoundingClientRect().top + window.scrollY - mapHeadH() - 8;
+    if (Math.abs(window.scrollY - top) > 10) scrollTo({top: Math.max(0, top), behavior: SMOOTH});
+  });
+}
+// resolves #/map/<marker-id> and #/map/tree
+function mapOpenRef(ref) {
+  if (!MAP || !ref) return;
+  const low = String(ref).toLowerCase();
+  if (low === 'tree') { mapSetLayer('Tree'); return; }
+  if (low === 'main' || low === 'mainmap') { mapSetLayer('MainMap'); return; }
+  const m = MAP.markers.find(k => k.id.toLowerCase() === low);
+  if (m) mapSelect(m, true);
+  else badLink('Link not recognized — no map marker “' + ref + '”');
+}
+
+if (MAP) {
+  for (const m of MAP.markers) {
+    if (m.type !== 'alpha') continue;
+    const p = mapPal(m);
+    if (!p) continue;
+    if (!MAP_ALPHAS.has(p.k)) MAP_ALPHAS.set(p.k, []);
+    MAP_ALPHAS.get(p.k).push(m);
+  }
+  mapLayerSeg.querySelectorAll('button').forEach(b => {
+    const on = b.dataset.l === mapLayer;
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+    b.addEventListener('click', () => mapSetLayer(b.dataset.l));
+  });
+  mapFilterSeg.querySelectorAll('button').forEach(b => {
+    const t = b.dataset.t;
+    const paint = () => {
+      const on = mapTypes.has(t);
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+    };
+    paint();
+    b.addEventListener('click', () => {
+      if (mapTypes.has(t)) mapTypes.delete(t); else mapTypes.add(t);
+      paint(); mapSavePrefs();
+      // hiding the type the open card describes leaves a card with no marker
+      if (mapSel && !mapTypeOn(mapSel.type)) mapSelect(null);
+      mapSyncMarkers(); mapRenderResults();
+    });
+  });
+  mapSearchEl.addEventListener('input', () => {
+    mapQuery = mapSearchEl.value;
+    mapSyncMarkers(); mapRenderResults();
+  });
+  mapSearchEl.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const first = mapResultsEl.querySelector('.mres');
+    if (first) first.click();
+  });
+
+  // ---- gestures. No setPointerCapture: capturing on the viewport retargets
+  // the follow-up click away from the marker button that was pressed. ----
+  const ptrs = new Map();
+  let pinchD = 0, pinchK = 0, dragged = 0;
+  let helpTimer = 0;
+  const hideHelp = () => { clearTimeout(helpTimer); mapHelpEl.classList.add('gone'); };
+  // it's a hint, not a caption — retire it whether or not anyone touches the map
+  helpTimer = setTimeout(hideHelp, 7000);
+  mapViewEl.addEventListener('pointerdown', e => {
+    if (e.target.closest('.mapzoom, .mapinfo')) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
+    dragged = 0; mapDragged = false;
+    mapStopGlide();
+    mapViewEl.classList.add('drag');
+    if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()];
+      pinchD = Math.hypot(a.x - b.x, a.y - b.y); pinchK = mapK;
+    }
+  });
+  const onMove = e => {
+    const p = ptrs.get(e.pointerId); if (!p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    p.x = e.clientX; p.y = e.clientY;
+    if (ptrs.size === 1) {
+      dragged += Math.abs(dx) + Math.abs(dy);
+      if (dragged > 4) hideHelp();
+      mapTX += dx; mapTY += dy; mapClamp(); mapApply();
+    } else if (ptrs.size === 2 && pinchD > 0) {
+      const [a, b] = [...ptrs.values()];
+      const r = mapViewEl.getBoundingClientRect();
+      dragged += 20; hideHelp();
+      mapZoomTo(pinchK * (Math.hypot(a.x - b.x, a.y - b.y) / pinchD),
+        (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top);
+    }
+  };
+  const onUp = e => {
+    if (!ptrs.has(e.pointerId)) return;
+    ptrs.delete(e.pointerId);
+    if (ptrs.size < 2) pinchD = 0;
+    if (ptrs.size) return;
+    mapViewEl.classList.remove('drag');
+    mapDragged = dragged > 4;   // read by the marker click handler, which runs next
+    // a tap on open water clears the selection; a drag that ended there doesn't
+    if (dragged <= 4 && !e.target.closest('.mk, .mapzoom, .mapinfo')) mapSelect(null);
+  };
+  window.addEventListener('pointermove', onMove, {passive: true});
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
+
+  mapViewEl.addEventListener('wheel', e => {
+    e.preventDefault();
+    mapStopGlide(); hideHelp();
+    const r = mapViewEl.getBoundingClientRect();
+    const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+    mapZoomTo(mapK * Math.exp(-d * 0.0016), e.clientX - r.left, e.clientY - r.top);
+  }, {passive: false});
+  mapViewEl.addEventListener('dblclick', e => {
+    if (e.target.closest('.mapzoom, .mapinfo')) return;
+    const r = mapViewEl.getBoundingClientRect();
+    mapZoomTo(mapK * 1.9, e.clientX - r.left, e.clientY - r.top);
+  });
+  mapViewEl.addEventListener('keydown', e => {
+    const step = e.shiftKey ? 240 : 90;
+    const pan = {ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step]}[e.key];
+    if (pan) {
+      e.preventDefault(); mapStopGlide(); hideHelp();
+      mapTX += pan[0]; mapTY += pan[1]; mapClamp(); mapApply();
+    } else if (e.key === '+' || e.key === '=') { e.preventDefault(); mapZoomTo(mapK * 1.5); }
+    else if (e.key === '-' || e.key === '_') { e.preventDefault(); mapZoomTo(mapK / 1.5); }
+    else if (e.key === '0') { e.preventDefault(); mapFit(true); }
+    else if (e.key === 'Escape' && mapSel) { e.preventDefault(); mapSelect(null); }
+  });
+  document.getElementById('mapIn').addEventListener('click', () => { hideHelp(); mapZoomTo(mapK * 1.6); });
+  document.getElementById('mapOut').addEventListener('click', () => { hideHelp(); mapZoomTo(mapK / 1.6); });
+  document.getElementById('mapReset').addEventListener('click', () => { hideHelp(); mapSelect(null); mapFit(true); });
+
+  // the viewport only has a size once its tab is visible, and the phone
+  // breakpoint sizes it off the viewport height, so refit on every resize
+  addEventListener('resize', mapSyncHeight);
+  new ResizeObserver(() => {
+    if (!mapBuilt || !mapViewEl.clientWidth) return;
+    const cw = mapViewEl.clientWidth, ch = mapViewEl.clientHeight, b = mapBounds();
+    mapMinK = Math.min(1, cw / (b.x1 - b.x0), ch / (b.y1 - b.y0));
+    if (mapK < mapMinK) mapK = mapMinK;
+    mapClamp(); mapApply();
+  }).observe(mapViewEl);
+} else {
+  // no mapdata.js — drop the tab rather than route to an empty view
+  document.querySelectorAll('[data-v="map"]').forEach(b => b.remove());
+  document.getElementById('view-map')?.remove();
+}
+
 // guide jump links: hand the reader to the tab being described
 document.querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', () => {
   if (b.dataset.nav === 'combos') { navTab('dex'); setDexMode('combos'); }
@@ -2613,7 +3218,7 @@ document.addEventListener('keydown', e => {
     pickT.openPop(true);
     return;
   }
-  let target = {dex: '#dexSearch', hatch: '#hatchSearch', roster: '#rosterSearch', reverse: '#pairFilter'}[currentTab];
+  let target = {dex: '#dexSearch', hatch: '#hatchSearch', roster: '#rosterSearch', reverse: '#pairFilter', map: '#mapSearch'}[currentTab];
   if (currentTab === 'dex' && document.getElementById('dexPalsBlock').hidden) target = '#comboSearch';
   const inp = target && document.querySelector(target);
   if (inp) { e.preventDefault(); inp.focus(); inp.select(); }

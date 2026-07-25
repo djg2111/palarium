@@ -3,9 +3,11 @@
 // v10: new brand assets. The header logo is now artwork rather than styled
 // text, so it's precached with the shell — otherwise the header renders empty
 // on a cold offline load.
-const VERSION = 'palarium-v10';
+// v11: map view. mapdata.js joins the shell (45 KB, and app.js hides the Map
+// tab entirely without it); the tiles it references stay on-demand below.
+const VERSION = 'palarium-v11';
 const SHELL = ['.', 'index.html', 'css/style.css', 'js/app.js', 'js/data.js',
-  'assets/favicon.svg', 'assets/lockup.svg', 'manifest.webmanifest'];
+  'js/mapdata.js', 'assets/favicon.svg', 'assets/lockup.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

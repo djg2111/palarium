@@ -557,6 +557,121 @@ footer{max-width:1200px;margin:0 auto;padding:0 20px 30px;color:var(--muted);fon
 footer code{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:0 5px;font-family:Consolas,monospace}
 @media(pointer:coarse){.kbdonly{display:none}}
 
+/* ===================== interactive map =====================
+   A tile pyramid (assets/map/<layer>/<z>/<x>_<y>.webp) drawn into a fixed
+   8192x8192 "map pixel" stage that gets one transform. Everything inside —
+   tiles, markers, the link line — is positioned in map pixels, so nothing has
+   to be repositioned when the view moves; only the stage's transform changes.
+   Markers counter-scale off --iz (= 1/scale, written once per frame on the
+   stage) so they stay a constant size on screen without 255 style writes. */
+.mapbar{margin-bottom:12px}
+.mapbar .mfilters{flex-wrap:wrap}
+.mapbar .mfilters button{flex:0 1 auto;gap:7px;padding:9px 13px}
+.mdot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--muted)}
+.mdot.alpha{background:var(--danger)}
+.mdot.ft{background:var(--accent);border-radius:2px;transform:rotate(45deg)}
+.mdot.tower{background:var(--gold);border-radius:2px}
+.mapresults{display:flex;gap:8px;flex-wrap:wrap;margin:-4px 0 12px}
+.mapresults[hidden]{display:none}
+.mapresults .mres{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:4px 12px 4px 5px;font-size:var(--fs-sm);font-weight:600;color:var(--text-2)}
+.mapresults .mres:hover{border-color:var(--accent);color:var(--text)}
+.mapresults .mres img{width:22px;height:22px;border-radius:50%;object-fit:cover;background:var(--raised)}
+.mapresults .mres .rt{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--raised);font-size:12px}
+.mapresults .more{color:var(--muted);font-size:var(--fs-sm);align-self:center}
+
+.mapview{position:relative;overflow:hidden;height:min(72vh,760px);min-height:420px;
+  background:#0a1b2a;border:1px solid var(--border);border-radius:var(--r-xl);
+  touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;contain:layout paint}
+.mapview.drag{cursor:grabbing}
+.mapstage{position:absolute;top:0;left:0;width:8192px;height:8192px;transform-origin:0 0}
+.maptiles{position:absolute;inset:0}
+.maptiles img{position:absolute;display:block;pointer-events:none;-webkit-user-drag:none}
+/* the z0 tile stays underneath every detail level, so switching level never
+   flashes the empty background while the new tiles decode */
+.maptiles img.base{left:0;top:0;width:8192px;height:8192px}
+.maplink{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.maplink line{stroke:var(--accent);stroke-linecap:round;stroke-dasharray:14 18;opacity:.9}
+.maplink.off{display:none}
+.mapmarks{position:absolute;inset:0}
+
+.mk{position:absolute;padding:0;background:none;border:none;line-height:0;
+  transform:translate(-50%,-50%) scale(var(--iz,1));transform-origin:50% 50%;
+  transition:none}
+.mk:not(:disabled):active{transform:translate(-50%,-50%) scale(var(--iz,1))}
+.mk .g{display:block;box-sizing:border-box}
+.mk .lb{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:3px;
+  font-size:10.5px;font-weight:700;line-height:1.25;white-space:nowrap;color:var(--text);
+  text-shadow:0 0 3px #000,0 0 6px #000,0 1px 2px #000;pointer-events:none;opacity:0;transition:opacity var(--t-fast)}
+.lab .mk .lb,.mk:hover .lb,.mk.sel .lb{opacity:1}
+.mk:focus-visible{outline:none}
+.mk:focus-visible .g{outline:2px solid var(--accent);outline-offset:2px}
+
+/* fast travel — a small diamond, the flattest read of "there are 152 of these" */
+.mk-fastTravel{z-index:1}
+.mk-fastTravel .g{width:11px;height:11px;background:var(--accent);border:1.5px solid #06121c;transform:rotate(45deg);border-radius:2px}
+.mk-fastTravel:hover .g,.mk-fastTravel.sel .g{background:var(--accent-hover);box-shadow:0 0 0 3px var(--accent-line)}
+
+/* towers — the syndicate bosses, always labelled */
+.mk-tower,.mk-middleBoss{z-index:3}
+.mk-tower .g,.mk-middleBoss .g{width:20px;height:20px;background:var(--gold);border:2px solid #06121c;border-radius:4px;
+  display:grid;place-items:center;font-size:12px;line-height:1;color:var(--ink);font-weight:900}
+.mk-middleBoss .g{width:16px;height:16px;font-size:10px;border-radius:50%}
+.mk-tower .lb,.mk-middleBoss .lb{color:var(--gold);opacity:1}
+.mk-tower:hover .g,.mk-tower.sel .g,.mk-middleBoss:hover .g,.mk-middleBoss.sel .g{box-shadow:0 0 0 3px var(--gold-line)}
+
+/* alphas — the pal's own icon, which is the only label that scans at a glance */
+.mk-alpha{z-index:2}
+.mk-alpha .g{width:26px;height:26px;border-radius:50%;overflow:hidden;background:var(--raised);
+  border:2px solid var(--danger);box-shadow:0 1px 4px rgba(0,0,0,.7)}
+.mk-alpha img{width:100%;height:100%;display:block;object-fit:cover;pointer-events:none}
+.mk-alpha .fb{width:100%;height:100%;display:grid;place-items:center;font-size:12px;font-weight:800;color:var(--text)}
+.mk-alpha:hover .g,.mk-alpha.sel .g{border-color:var(--text);box-shadow:0 0 0 3px var(--danger-line)}
+.mk-alpha .lvl{position:absolute;left:50%;top:-4px;transform:translate(-50%,-100%);
+  background:var(--danger);color:var(--ink);font-size:9px;font-weight:800;line-height:1;
+  padding:2px 4px;border-radius:var(--r-full);pointer-events:none;opacity:0;transition:opacity var(--t-fast)}
+.lab .mk .lvl,.mk-alpha:hover .lvl,.mk-alpha.sel .lvl{opacity:1}
+/* Search dims the misses rather than hiding them, so you keep the sense of
+   where everything else is. Their labels go, though: 16%-opacity text is a
+   real contrast failure, and it's noise the search was meant to cut. */
+.mk.dim{opacity:.16;pointer-events:none}
+.mk.dim .lb,.mk.dim .lvl{display:none}
+
+/* nearest-waypoint highlight, driven from the info panel */
+.mk.near .g{box-shadow:0 0 0 3px var(--accent),0 0 12px var(--accent)}
+
+.mapzoom{position:absolute;top:12px;right:12px;z-index:6;display:flex;flex-direction:column;gap:6px}
+.mapzoom button{width:36px;height:36px;display:grid;place-items:center;font-size:19px;font-weight:700;
+  background:rgba(22,27,34,.92);border:1px solid var(--border-strong);border-radius:var(--r-md);color:var(--text-2);backdrop-filter:blur(6px)}
+.mapzoom button:hover{color:var(--text);border-color:var(--accent)}
+.maphelp{position:absolute;left:12px;top:12px;z-index:5;pointer-events:none;
+  background:rgba(13,17,23,.78);border:1px solid var(--border);border-radius:var(--r-full);
+  padding:5px 13px;font-size:var(--fs-xs);color:var(--muted);backdrop-filter:blur(6px);
+  transition:opacity var(--t-base)}
+.maphelp.gone{opacity:0}
+
+.mapinfo{position:absolute;left:12px;bottom:12px;z-index:6;width:290px;max-width:calc(100% - 24px);
+  max-height:calc(100% - 90px);overflow-y:auto;overscroll-behavior:contain;
+  background:rgba(22,27,34,.96);border:1px solid var(--border-strong);border-radius:var(--r-lg);
+  padding:14px 16px 15px;box-shadow:0 12px 40px rgba(0,0,0,.55);backdrop-filter:blur(8px);
+  font-size:var(--fs-md);touch-action:pan-y}
+.mapinfo[hidden]{display:none}
+.mapinfo .ihead{display:flex;align-items:flex-start;gap:10px;margin-bottom:2px}
+.mapinfo .ihead img{width:44px;height:44px;border-radius:var(--r-md);flex-shrink:0;background:var(--raised);cursor:pointer}
+.mapinfo h3{font-size:var(--fs-lg);line-height:1.25;font-weight:700}
+.mapinfo .isub{color:var(--muted);font-size:var(--fs-sm)}
+.mapinfo .iclose{position:absolute;top:6px;right:8px;font-size:15px;color:var(--muted);padding:4px 7px;border-radius:var(--r-sm);line-height:1}
+.mapinfo .iclose:hover{color:var(--text);background:var(--raised)}
+.mapinfo .crow{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0 4px}
+.mapinfo .nlb{margin-top:12px;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+.mapinfo .near{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.mapinfo .near button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);padding:7px 10px;font-size:var(--fs-sm);color:var(--text-2)}
+.mapinfo .near button:hover{border-color:var(--accent);color:var(--text)}
+.mapinfo .near .d{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mapinfo .iacts{display:flex;gap:8px;margin-top:12px}
+.mapinfo .iacts .alink{flex:1;text-align:center;padding:7px 8px;font-size:var(--fs-sm)}
+.mapfoot{margin:12px 0 0}
+
 /* ===================== phones (≤640px) =====================
    Desktop lays these views out as wrap-when-needed flex rows. At phone width
    almost every one of them wraps into a ragged stack of differently-sized
@@ -640,4 +755,19 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
   .tname .tier{display:none}
   .tname .pico{width:28px;height:28px;border-width:1px}
   td{padding:6px 4px}th{padding:7px 4px}
+
+  /* --- map: the viewport is the content, so give it the screen. The info
+         panel becomes a bottom sheet — at 290px wide it covered half a phone
+         and its own markers. --- */
+  .mapview{height:calc(100dvh - var(--hh) - 190px);min-height:340px;border-radius:var(--r-lg)}
+  .mapbar .mfilters{display:flex}
+  .mapbar .mfilters button{flex:1 1 0;padding:9px 6px;justify-content:center}
+  .mapinfo{left:8px;right:8px;bottom:8px;width:auto;max-width:none;max-height:56%}
+  .maphelp{font-size:10px;padding:4px 10px}
+  .mapzoom button{width:32px;height:32px}
+  /* 83 alphas over a 364px-wide island is dense; give the icons back a little
+     of the gap rather than making the user zoom before anything is readable */
+  .mk-alpha .g{width:22px;height:22px}
+  .mk-fastTravel .g{width:10px;height:10px}
+  .mk-tower .g,.mk-middleBoss .g{width:18px;height:18px;font-size:11px}
 }

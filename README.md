@@ -10,10 +10,11 @@
 - **Roster** — your actual pals: species, gender, nickname, passives (full autocomplete), IVs, notes. Searchable, sortable, filterable; JSON export/import backup. Deleting the last of a species offers to un-star it.
 - **Breedable now** — everything you can breed in one step from pals you own, with a "new species only" filter. Click a result to expand your pairs inline, with gender-feasibility warnings from roster data.
 - **Paldex** — all 299 pals (including Terraria collab), sortable and filterable by element and work suitability, with full pal cards (stats, partner skill ranks, drops, egg type) — plus a browsable list of all 250 unique combos, filterable by whether a recipe needs two species or two of the same.
+- **Map** — the game's own world map, tiled from the shipped textures: 152 fast-travel statues, 90 field alphas (icon, species and level), and every syndicate tower, across both layers (Palpagos Islands and the World Tree interior). Pan/pinch/scroll, filter by marker type, and search any pal or waypoint by name. Selecting an alpha or tower lists the **three closest fast-travel points with distances** and draws a line to the nearest one — pick a marker, learn where to warp. Markers are linkable (`#/map/<marker-id>`), and pal cards with a fixed alpha spawn get a *Show on map* button.
 - **Guide** — breeding mechanics explained twice: ELI5 and deep-dive, including egg mutations (1%/3%) and the mutation-exclusive passives.
 - **Breeding trees** — planner routes render as branching tree diagrams; merge steps show approximate passive-inheritance odds.
 - **Shareable URLs** — calcs, pal cards and planner routes are linkable (`#/breed/Lamball/PinkCat`, `#/pal/Anubis`, `#/plan/SheepBall+ElecCat/Anubis`); browser back/forward navigates tabs, including in-app jumps.
-- **PWA** — installable on phone/desktop and fully offline once loaded (service worker; network-first shell, cached icons). Mobile keeps a single-row, horizontally scrollable tab bar and an icon-grid pal picker.
+- **PWA** — installable on phone/desktop and fully offline once loaded (service worker; network-first shell, cached icons). Map tiles are cached as you view them rather than precached — 22 MB up front would be a poor trade for a tab you may never open. Mobile keeps a single-row, horizontally scrollable tab bar and an icon-grid pal picker.
 - **Accessible** — WCAG 2.0/2.1 A+AA clean under axe-core in every UI state; fully keyboard-operable with managed focus, including arrow-key tablists.
 - **Ownership model** — ★ stars mark species you own; the Roster tracks individual pals. Every "Owned" filter reads both (stars ∪ roster). Pal pickers show ★ and a Recent section; a dismissible first-visit tip bar teaches the basics.
 
@@ -40,6 +41,7 @@ All user data (roster, plans, owned list) lives in the browser's localStorage �
 index.html      markup
 css/style.css   styles
 js/data.js      generated dataset (pals, combos, passives) — window.PALDATA
+js/mapdata.js   generated map markers + layer bounds — window.MAPDATA
 js/app.js       all app logic (vanilla JS, no dependencies)
 assets/pals/    pal icons (299, lossless WebP)
 assets/map/     map tile pyramid (170 lossless WebP tiles, z0–z3)
