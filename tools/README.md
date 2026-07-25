@@ -101,6 +101,7 @@ node --max-old-space-size=6144 parse-map.js  # markers + regions -> ../js/mapdat
 node parse-spawns.js                         # spawn zones    -> ../js/spawndata.js
 node tile-map.js ../assets/map lossless      # slice map textures into WebP tiles (z0-z4)
 node z4-requant.js ../assets/map 95 --apply  # optional: halve the pyramid (see below)
+node zone-ramp.js                            # regenerate the spawn-density ramp
 node gen-ui-icons.js                         # UI + item icons -> ../assets/{ui,items}
 ```
 
@@ -208,6 +209,14 @@ Re-render a contact sheet and look at it before trusting any renumbering.
 in per-cell `.umap` packages. Hence `palex scan`. An actor's `AreaName.Key` joins
 to `DT_WorldMapAreaData`, whose `MsgID` joins to `REGION_*` in
 `DT_WorldMap_Common_Text_Common`.
+
+**The spawn overlay is a sequential encoding, so it is one hue.** `zone-ramp.js`
+holds the hue constant (OKLCH, taken from the documented orange slot) and steps
+lightness and alpha monotonically. An earlier version slid amber to red, which
+is two hues doing one hue's job, and varied alpha independently of lightness so
+the two channels fought. Orange rather than the conventional blue because the
+surface is a satellite map: blue reads as ocean, green as forest. Five discrete
+buckets, not a continuous gradient — the same call ARK's spawn maps make.
 
 **`Weight` is per row, and the useful number is its share of the group.** A pal
 with weight 20 in a group totalling 60 is a third of what spawns there; the same

@@ -641,9 +641,11 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
   background:var(--raised);border:1px solid var(--border-strong);color:var(--text-2);white-space:nowrap}
 .spawnbar .sb-legend{margin-left:auto;display:flex;align-items:center;gap:8px;
   font-size:var(--fs-xs);color:var(--muted);white-space:nowrap}
-.spawnbar .sb-ramp{width:76px;height:9px;border-radius:var(--r-full);
-  background:linear-gradient(90deg,rgba(255,186,90,.35),rgba(255,90,28,.95));
-  border:1px solid var(--border-strong)}
+/* the swatches carry the same alpha the map does, so the key matches the
+   thing it's a key for */
+.spawnbar .sb-ramp{display:flex;height:11px;border-radius:3px;overflow:hidden;
+  border:1px solid var(--border-strong);background:var(--bg)}
+.spawnbar .sb-ramp i{width:15px;height:100%}
 .spawnbar .sb-clear{flex-shrink:0;padding:6px 12px;font-size:var(--fs-sm)}
 .mapinfo .inote{margin-top:9px;line-height:1.45}
 
@@ -653,11 +655,11 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
 .mapview.drag{cursor:grabbing}
 .mapstage{position:absolute;top:0;left:0;width:8192px;height:8192px;transform-origin:0 0}
 /* Spawn areas are a canvas, not SVG: a common species has thousands of
-   overlapping circles. They're filled opaque into one path and the element
-   carries the transparency, so overlaps read as one blob rather than
-   compounding into a dark core. */
-.mapzones{position:absolute;left:0;top:0;width:8192px;height:8192px;pointer-events:none;
-  opacity:.88}
+   overlapping circles. Its position and size are set in map pixels by the
+   drawing code, which sizes the backing store to the resolution it's actually
+   displayed at — a fixed canvas spanning the whole 8192px map was a
+   quarter-scale texture being stretched 4x at maximum zoom. */
+.mapzones{position:absolute;pointer-events:none}
 .mapzones[hidden]{display:none}
 .maptiles{position:absolute;inset:0}
 .maptiles img{position:absolute;display:block;pointer-events:none;-webkit-user-drag:none}
