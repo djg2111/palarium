@@ -2,3 +2,6 @@ Thumbs.db
 .DS_Store
 desktop.ini
 *.log
+# dotnet build output for tools/extractor
+bin/
+obj/

@@ -10,7 +10,12 @@
 - **Roster** — your actual pals: species, gender, nickname, passives (full autocomplete), IVs, notes. Searchable, sortable, filterable; JSON export/import backup. Deleting the last of a species offers to un-star it.
 - **Breedable now** — everything you can breed in one step from pals you own, with a "new species only" filter. Click a result to expand your pairs inline, with gender-feasibility warnings from roster data.
 - **Paldex** — all 299 pals (including Terraria collab), sortable and filterable by element and work suitability, with full pal cards (stats, partner skill ranks, drops, egg type) — plus a browsable list of all 250 unique combos, filterable by whether a recipe needs two species or two of the same.
-- **Map** — the game's own world map, tiled from the shipped textures: 152 fast-travel statues, 90 field alphas (icon, species and level), and every syndicate tower, across both layers (Palpagos Islands and the World Tree interior). Pan/pinch/scroll, filter by marker type, and search any pal or waypoint by name. Selecting an alpha or tower lists the **three closest fast-travel points with distances** and draws a line to the nearest one — pick a marker, learn where to warp. Markers are linkable (`#/map/<marker-id>`), and pal cards with a fixed alpha spawn get a *Show on map* button.
+- **Map** — the game's own world map, tiled from the shipped textures, across both layers (Palpagos Islands and the World Tree interior). Pan/pinch/scroll, filter, and search.
+  - **Markers**: 152 fast-travel statues, 90 field alphas (icon, species, level), every syndicate tower, and 123 named regions that reveal themselves as you zoom. Waypoint and tower markers are the game's own compass icons.
+  - **Spawn zones**: pick any of **272 species** and its wild spawn areas are drawn as blobs — 7,847 spawner placements from `DT_PalSpawnerPlacement`, with level band and night-only flag. Search a pal by name, or hit **Find in the wild** on any pal card.
+  - **Where to warp**: selecting an alpha or tower lists the three closest fast-travel points with distances and draws a line to the nearest. Selecting a *species* instead ranks statues by how many of its spawn areas are within 1.2 km — the answer to "where do I actually go to catch one".
+  - The 18 species with no spawner anywhere (raid bosses, sub-species, collab pals) say so plainly and link to Find Parents.
+  - Everything is linkable: `#/map/<marker-id>`, `#/map/spawn/<pal>`.
 - **Guide** — breeding mechanics explained twice: ELI5 and deep-dive, including egg mutations (1%/3%) and the mutation-exclusive passives.
 - **Breeding trees** — planner routes render as branching tree diagrams; merge steps show approximate passive-inheritance odds.
 - **Shareable URLs** — calcs, pal cards and planner routes are linkable (`#/breed/Lamball/PinkCat`, `#/pal/Anubis`, `#/plan/SheepBall+ElecCat/Anubis`); browser back/forward navigates tabs, including in-app jumps.
@@ -29,7 +34,7 @@ All user data (roster, plans, owned list) lives in the browser's localStorage �
 
 ## Data provenance
 
-- Pal stats, breeding data (CombiRank / unique-combo tables), icons and the world map are extracted **directly from the game's own data tables and textures** (Palworld 1.0.1, Steam). No third-party site is used as a source. The pipeline lives in [`tools/`](tools/) — see [`tools/README.md`](tools/README.md) to regenerate after a game update.
+- Pal stats, breeding data (CombiRank / unique-combo tables), pal icons, element and work-suitability icons, item icons, wild spawn zones, region names and the world map are all extracted **directly from the game's own data tables and textures** (Palworld 1.0.1, Steam). No third-party site is used as a source. The pipeline lives in [`tools/`](tools/) — see [`tools/README.md`](tools/README.md) to regenerate after a game update.
 - One field is still inherited from the pre-1.0 dataset: partner-skill *rank* tables (`ps.rl`/`ps.re`). The values exist in `DT_PassiveSkill_Main` but the pal→skill linkage isn't in any data table — see [`tools/README.md`](tools/README.md). It only feeds a display table on the pal card; nothing about breeding depends on it.
 - The breeding engine is a faithful port of the in-game logic: unique combos first, else the species whose breeding power is closest to `floor((A + B + 1) / 2)`, ties broken by higher `combiDuplicatePriority`; `ignoreCombi` pals and unique-combo children are excluded as averaging results.
 - The game files also contain 28 unreleased pals that are deliberately excluded — importing them would add phantom species. Documented in [`docs/unreleased-pals.md`](docs/unreleased-pals.md).
@@ -41,10 +46,13 @@ All user data (roster, plans, owned list) lives in the browser's localStorage �
 index.html      markup
 css/style.css   styles
 js/data.js      generated dataset (pals, combos, passives) — window.PALDATA
-js/mapdata.js   generated map markers + layer bounds — window.MAPDATA
+js/mapdata.js   generated map markers, regions + layer bounds — window.MAPDATA
+js/spawndata.js generated wild spawn zones (loaded on demand) — window.SPAWNDATA
 js/app.js       all app logic (vanilla JS, no dependencies)
 assets/pals/    pal icons (299, lossless WebP)
 assets/map/     map tile pyramid (170 lossless WebP tiles, z0–z3)
+assets/ui/      element, work-suitability and map-marker icons (lossless WebP)
+assets/items/   inventory item icons for drops and recipes (lossless WebP)
 tools/          extraction + generation pipeline (not part of the site)
 docs/           notes on the extracted data
 ```

@@ -202,19 +202,23 @@
         <button type="button" data-l="MainMap" class="on" aria-pressed="true">Palpagos Islands</button>
         <button type="button" data-l="Tree" aria-pressed="false">World Tree</button>
       </div>
-      <input type="search" class="search-inp" id="mapSearch" placeholder="Search a pal or waypoint…" aria-label="Search map markers">
+      <input type="search" class="search-inp" id="mapSearch" placeholder="Search a pal or waypoint…" aria-label="Search a pal or waypoint">
       <div class="segrow mfilters" id="mapFilters" role="group" aria-label="Marker types">
         <button type="button" data-t="alpha" class="on" aria-pressed="true" title="Field alpha bosses — oversized pals with a fixed spawn point"><span class="mdot alpha" aria-hidden="true"></span>Alphas</button>
         <button type="button" data-t="fastTravel" class="on" aria-pressed="true" title="Fast travel statues and dungeon entrances"><span class="mdot ft" aria-hidden="true"></span>Waypoints</button>
         <button type="button" data-t="tower" class="on" aria-pressed="true" title="Syndicate tower bosses"><span class="mdot tower" aria-hidden="true"></span>Towers</button>
+        <button type="button" data-t="region" class="on" aria-pressed="true" title="Named regions, revealed as you zoom in"><span class="mdot region" aria-hidden="true"></span>Regions</button>
       </div>
       <span class="rstats" id="mapCount" aria-live="polite"></span>
     </div>
     <div class="mapresults" id="mapResults" hidden></div>
+    <div class="spawnbar" id="spawnBar" hidden></div>
     <div class="mapview" id="mapView" tabindex="0" role="region" aria-label="Interactive map — drag to pan, arrow keys to move, plus and minus to zoom">
       <div class="mapstage" id="mapStage">
         <div class="maptiles" id="mapTiles"></div>
+        <canvas class="mapzones" id="mapZones" width="2048" height="2048" hidden></canvas>
         <svg class="maplink" id="mapLink" viewBox="0 0 8192 8192" width="8192" height="8192" aria-hidden="true"><line id="mapLinkLine" x1="0" y1="0" x2="0" y2="0"/></svg>
+        <div class="mapregions" id="mapRegions" aria-hidden="true"></div>
         <div class="mapmarks" id="mapMarks"></div>
       </div>
       <div class="mapzoom">
@@ -238,7 +242,7 @@
           <li><b>Build a Breeding Farm</b> (Technology level 19). Also build an <b>Egg Incubator</b> (level 7, needs Paldium).</li>
           <li><b>Put one boy pal and one girl pal in the farm.</b> Any two species can make a baby together — genders just have to be different. Check a pal's gender in your Palbox.</li>
           <li><b>Bake a Cake</b> and put it in the little chest attached to the farm. No cake, no baby. One cake = one egg.
-            <div class="recipe"><span class="mchip">5× Flour</span><span class="mchip">8× Red Berries</span><span class="mchip">7× Milk</span><span class="mchip">8× Eggs</span><span class="mchip">2× Honey</span></div>
+            <div class="recipe"><span class="mchip" data-item="Flour">5× Flour</span><span class="mchip" data-item="Berries">8× Red Berries</span><span class="mchip" data-item="Milk">7× Milk</span><span class="mchip" data-item="Egg">8× Eggs</span><span class="mchip" data-item="Honey">2× Honey</span></div>
             <div class="fldhint">1.0 added four premium cakes — better passives, double eggs, mutations. <button type="button" class="alink gjump" data-open="g-cakes">See the new cakes</button></div>
           </li>
           <li><b>Wait about 5 minutes.</b> An egg pops out. Stick it in the incubator and wait for it to hatch (bigger and rarer eggs take longer).</li>
@@ -275,13 +279,13 @@
           <ul>
             <li><b>Cake</b> — the baseline. One egg, normal odds (recipe above).</li>
             <li><b>Mushroom Cake</b> · Tech 30 — slightly better stat (IV) rolls on the child.
-              <div class="recipe"><span class="mchip">5× Flour</span><span class="mchip">5× Mushrooms</span><span class="mchip">3× Cavern Mushrooms</span><span class="mchip">8× Eggs</span><span class="mchip">2× Honey</span></div></li>
+              <div class="recipe"><span class="mchip" data-item="Flour">5× Flour</span><span class="mchip" data-item="Mushroom">5× Mushrooms</span><span class="mchip">3× Cavern Mushrooms</span><span class="mchip" data-item="Egg">8× Eggs</span><span class="mchip" data-item="Honey">2× Honey</span></div></li>
             <li><b>Vegetable Cake</b> · Tech 47 — <b>two eggs</b> per breeding cycle. Doubles throughput, and each egg rolls its mutation chance separately.
-              <div class="recipe"><span class="mchip">8× Flour</span><span class="mchip">8× Tomatoes</span><span class="mchip">7× Lettuce</span><span class="mchip">8× Eggs</span><span class="mchip">4× Honey</span></div></li>
+              <div class="recipe"><span class="mchip" data-item="Flour">8× Flour</span><span class="mchip" data-item="Tomato">8× Tomatoes</span><span class="mchip" data-item="Lettuce">7× Lettuce</span><span class="mchip" data-item="Egg">8× Eggs</span><span class="mchip" data-item="Honey">4× Honey</span></div></li>
             <li><b>Extravagant Vegetable Cake</b> · Tech 60 — mutation chance rises to <b>~3%</b> per egg, plus better stat rolls. The mutation-hunting pick.
-              <div class="recipe"><span class="mchip">12× Flour</span><span class="mchip">8× Cotton Candy</span><span class="mchip">10× Potatoes</span><span class="mchip">6× Onions</span><span class="mchip">8× Carrots</span></div></li>
+              <div class="recipe"><span class="mchip" data-item="Flour">12× Flour</span><span class="mchip" data-item="Sweet">8× Cotton Candy</span><span class="mchip" data-item="Potato">10× Potatoes</span><span class="mchip" data-item="Onion">6× Onions</span><span class="mchip" data-item="Carrot">8× Carrots</span></div></li>
             <li><b>Special Cake</b> · Tech 74 — much better odds that the child inherits the parents' passives. With clean parents carrying exactly the 4 passives you want, keepers become common. No effect on mutation or egg count.
-              <div class="recipe"><span class="mchip">20× Flour</span><span class="mchip">8× Caramel Cotton Candy</span><span class="mchip">15× Milk</span><span class="mchip">15× Eggs</span><span class="mchip">2× Mammorest Meat</span></div></li>
+              <div class="recipe"><span class="mchip" data-item="Flour">20× Flour</span><span class="mchip" data-item="Sweet_Caramel">8× Caramel Cotton Candy</span><span class="mchip" data-item="Milk">15× Milk</span><span class="mchip" data-item="Egg">15× Eggs</span><span class="mchip" data-item="Meat_GrassMammoth">2× Mammorest Meat</span></div></li>
           </ul>
           <div class="note">Rule of thumb: building a passive line → <b>Special</b> · hunting mutations → <b>Extravagant Vegetable</b> · mass production → <b>Vegetable</b> · stat polish on a budget → <b>Mushroom</b>.</div>
         </div></details>

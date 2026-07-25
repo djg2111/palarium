@@ -5,7 +5,10 @@
 // on a cold offline load.
 // v11: map view. mapdata.js joins the shell (45 KB, and app.js hides the Map
 // tab entirely without it); the tiles it references stay on-demand below.
-const VERSION = 'palarium-v11';
+// v12: spawn zones, region names, and the game's own element/work/item icons.
+// spawndata.js is deliberately NOT precached — it's 120 KB that only the map
+// tab reads, and it caches itself on first use through the fetch handler.
+const VERSION = 'palarium-v12';
 const SHELL = ['.', 'index.html', 'css/style.css', 'js/app.js', 'js/data.js',
   'js/mapdata.js', 'assets/favicon.svg', 'assets/lockup.svg', 'manifest.webmanifest'];
 
@@ -23,7 +26,8 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
 
-  if (url.pathname.includes('/assets/pals/') || url.pathname.includes('/assets/map/')) {
+  if (url.pathname.includes('/assets/pals/') || url.pathname.includes('/assets/map/')
+      || url.pathname.includes('/assets/items/') || url.pathname.includes('/assets/ui/')) {
     // cache-first: icons and map tiles never change for a given filename.
     // Tiles are deliberately NOT precached — there are 170 of them (~22 MB) and
     // most users never pan far enough to need most of them, so they accumulate

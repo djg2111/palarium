@@ -13,6 +13,7 @@ using SkiaSharp;
 //   palex list <regex> [max]      list mounted asset paths matching a pattern
 //   palex json <regex> <outDir>   export matching packages as JSON
 //   palex png  <regex> <outDir>   export matching textures as PNG
+//   palex enum <regex>            dump enum value->name maps from the mappings
 // Env: PAL_PAKS, PAL_USMAP
 
 var paks = Environment.GetEnvironmentVariable("PAL_PAKS")
@@ -40,6 +41,22 @@ var mounted = provider.Mount();
 Console.Error.WriteLine($"mounted {mounted} vfs · {provider.Files.Count} files");
 
 var rx = new Regex(pattern, RegexOptions.IgnoreCase);
+
+// The icon sets on disk are indexed (T_Icon_element_03, T_icon_palwork_07) with
+// nothing in the assets to say which element or work type each index means.
+// The .usmap carries the enums, so the ordering comes from the game rather than
+// from guessing at UI screenshots.
+if (mode == "enum") {
+    var enums = provider.MappingsContainer?.MappingsForGame?.Enums;
+    if (enums is null) { Console.Error.WriteLine("no enums in mappings"); return 2; }
+    Console.Error.WriteLine($"{enums.Count} enums in mappings");
+    foreach (var (name, values) in enums.Where(e => rx.IsMatch(e.Key)).OrderBy(e => e.Key)) {
+        Console.WriteLine($"## {name}");
+        foreach (var (idx, val) in values.OrderBy(v => v.Key)) Console.WriteLine($"{idx}\t{val}");
+    }
+    return 0;
+}
+
 var hits = provider.Files.Keys.Where(k => rx.IsMatch(k)).OrderBy(k => k).ToList();
 Console.Error.WriteLine($"matched {hits.Count} files");
 
@@ -47,6 +64,36 @@ if (mode == "list") {
     var max = int.TryParse(arg3, out var m) ? m : 400;
     foreach (var h in hits.Take(max)) Console.WriteLine(h);
     if (hits.Count > max) Console.Error.WriteLine($"...{hits.Count - max} more (raise the max arg)");
+    return 0;
+}
+
+// World Partition splits the level into ~20k One-File-Per-Actor packages with
+// hashed names, so you can't select the ones you want by path. scan walks them
+// all and keeps only the exports whose Type matches, writing a single array —
+// the alternative is 20k JSON files to find a dozen actors.
+//   palex scan <pathRegex> <typeRegex> <outFile>
+if (mode == "scan") {
+    if (args.Length < 4) { Console.Error.WriteLine("scan needs <pathRegex> <typeRegex> <outFile>"); return 1; }
+    var typeRx = new Regex(args[2], RegexOptions.IgnoreCase);
+    var outFile = args[3];
+    // Keep every export of a package that contains a match, keyed by package
+    // path. An actor's transform lives on a sibling SceneComponent addressed by
+    // export index, so keeping the actor alone would throw away its position.
+    var keep = new Dictionary<string, object>();
+    int scanned = 0, scanFail = 0, kept = 0;
+    foreach (var path in hits) {
+        if (!path.EndsWith(".uasset") && !path.EndsWith(".umap")) continue;
+        scanned++;
+        if (scanned % 2000 == 0) Console.Error.WriteLine($"  scanned {scanned}, kept {kept}");
+        try {
+            var objs = provider.LoadPackage(path).GetExports().ToList();
+            if (!objs.Any(o => typeRx.IsMatch(o.ExportType))) continue;
+            keep[path] = objs;
+            kept++;
+        } catch { scanFail++; }
+    }
+    File.WriteAllText(outFile, JsonConvert.SerializeObject(keep, Formatting.Indented));
+    Console.Error.WriteLine($"scanned {scanned} packages ({scanFail} unreadable), kept {kept} -> {outFile}");
     return 0;
 }
 

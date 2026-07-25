@@ -12,7 +12,23 @@ function resolvePal(x) {
 }
 const TYPE_COLORS = {normal:'var(--neutral)',fire:'var(--fire)',water:'var(--water)',electric:'var(--electric)',grass:'var(--grass)',dark:'var(--dark)',dragon:'var(--dragon)',ground:'var(--ground)',ice:'var(--ice)'};
 const WORKS = {kindling:'🔥 Kindling',watering:'💧 Watering',planting:'🌱 Planting',generatingElectricity:'⚡ Electricity',handiwork:'🛠️ Handiwork',gathering:'🧺 Gathering',lumbering:'🪓 Lumbering',mining:'⛏️ Mining',medicineProduction:'💊 Medicine',cooling:'❄️ Cooling',transporting:'📦 Transporting',farming:'🐄 Farming'};
-const workIcon = k => (WORKS[k] || k).split(' ')[0];
+// The element and work icons are the game's own textures. Their file names had
+// to be read off the rendered art rather than taken from the EPalElementType /
+// EPalWorkSuitability enums, which disagree with the icon sheet's order — see
+// tools/gen-ui-icons.js. The emoji in WORKS survive because a <select> option
+// can't hold an image.
+const UI = 'assets/ui/';
+const WORK_LABEL = k => (WORKS[k] || k).replace(/^\S+\s+/, '');
+function uiIcon(dir, key, size, cls) {
+  const i = new Image(size, size);
+  i.className = 'uii' + (cls ? ' ' + cls : '');
+  i.src = UI + dir + '/' + key + '.webp';
+  i.alt = ''; i.loading = 'lazy'; i.decoding = 'async'; i.draggable = false;
+  i.onerror = () => i.remove();
+  return i;
+}
+const workImgTag = k =>
+  `<img class="uii" src="${UI}work/${k}.webp" alt="" width="15" height="15" loading="lazy" decoding="async">`;
 // honor prefers-reduced-motion in JS-driven scrolls (CSS handles animations)
 const SMOOTH = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
 
@@ -151,13 +167,22 @@ function typeDots(p) {
 }
 function typeChips(p) {
   const f = document.createDocumentFragment();
-  for (const t of p.t) { const c = document.createElement('span'); c.className = 'chip'; c.style.background = TYPE_COLORS[t] || 'var(--muted)'; c.textContent = t; f.appendChild(c); }
+  for (const t of p.t) {
+    const c = document.createElement('span'); c.className = 'chip';
+    c.style.background = TYPE_COLORS[t] || 'var(--muted)';
+    // the icon is element-coloured and so is the chip, so it's knocked back to
+    // the chip's ink colour rather than disappearing into the background
+    c.append(uiIcon('element', t, 13), t);
+    f.appendChild(c);
+  }
   return f;
 }
 function worksEl(p, highlightKey) {
   const w = document.createElement('div'); w.className = 'works';
   for (const [k,v] of Object.entries(p.w || {}).sort((a,b) => b[1]-a[1])) {
-    const s = document.createElement('span'); s.textContent = (WORKS[k] || k) + ' ' + v; s.title = pretty(k);
+    const s = document.createElement('span');
+    s.append(uiIcon('work', k, 16), WORK_LABEL(k) + ' ' + v);
+    s.title = pretty(k);
     if (k === highlightKey) s.className = 'hot';
     w.appendChild(s);
   }
@@ -323,10 +348,20 @@ function openModal(p, rentry) {
   btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(true); pickB.set(p, true); renderBreed(); navTab('breed'); }));
   btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(true); pickPT.set(p, true); setPlanMode('new'); navTab('plan'); scheduleAuto(); }));
   btns.appendChild(mkBtn('+ Add to roster', false, () => { leaveModal(); openRosterEditor(null, p); }));
-  if (MAP_ALPHAS.has(p.k)) {
-    const spots = MAP_ALPHAS.get(p.k);
-    btns.appendChild(mkBtn(spots.length > 1 ? `Show on map (${spots.length} spots)` : 'Show on map', false,
-      () => { closeModal(true); navTab('map'); mapSelect(spots[0], true); }));
+  if (MAP) {
+    // one button, three honest outcomes: spawn areas, the single alpha that is
+    // the only one in the world, or a straight "this one only comes from breeding"
+    btns.appendChild(mkBtn('Find in the wild', false, () => {
+      closeModal(true); navTab('map');
+      mapLoadSpawns().then(() => {
+        mapSelect(null);
+        mapSetSpawn(p.k, true);
+        if (!spawnEntries(p.k).length) {
+          const alpha = MAP_ALPHAS.get(p.k);
+          if (alpha) mapSelect(alpha[0], true);
+        }
+      }).catch(() => toast('Spawn data failed to load'));
+    }));
   }
   btns.appendChild(mkBtn('Copy link', false, async () => {
     try {
@@ -392,8 +427,14 @@ function openModal(p, rentry) {
     const ds = sec('Drops');
     const dl = document.createElement('div'); dl.className = 'droplist';
     for (const [item, rate, mn, mx] of p.dr) {
-      const c = document.createElement('span'); c.className = 'mchip';
-      c.textContent = `${pretty(item)} ×${mn === mx ? mn : mn + '–' + mx} (${rate}%)`;
+      const c = document.createElement('span'); c.className = 'mchip drop';
+      // not every drop id has an icon in DT_ItemIconDataTable; those fall back
+      // to the plain text chip rather than leaving a broken image behind
+      const im = new Image(20, 20);
+      im.src = 'assets/items/' + item.toLowerCase() + '.webp';   // see tools/gen-ui-icons.js
+      im.alt = ''; im.loading = 'lazy'; im.decoding = 'async';
+      im.onerror = () => { im.remove(); c.classList.remove('drop'); };
+      c.append(im, `${pretty(item)} ×${mn === mx ? mn : mn + '–' + mx} (${rate}%)`);
       dl.appendChild(c);
     }
     ds.appendChild(dl);
@@ -732,6 +773,7 @@ function updateHash() {
     h = planHash() || h;
   } else if (currentTab === 'map') {
     if (mapSel) h += '/' + mapSel.id;
+    else if (mapSpawnKey) h += '/spawn/' + mapSpawnKey;
     else if (mapLayer === 'Tree') h += '/tree';
   }
   if (location.hash !== h) history.replaceState(null, '', h);
@@ -776,7 +818,9 @@ function applyHash(hash) {
   }
   if (tab === 'map') {
     showTab('map');           // the viewport has no size until its tab is shown
-    if (x) mapOpenRef(x); else mapSelect(null);
+    if (x === 'spawn') mapOpenSpawnRef(y);
+    else if (x) mapOpenRef(x);
+    else { mapSelect(null); mapSetSpawn(null); }
     return true;
   }
   if (tab === 'breed') {
@@ -2508,7 +2552,8 @@ function renderDex() {
     }
     const td5 = document.createElement('td'); td5.className = 'hn'; td5.textContent = p.m + '%';
     const td6 = document.createElement('td'); td6.className = 'tworks';
-    const parts = Object.entries(p.w || {}).sort((a,b) => b[1]-a[1]).map(([k,v]) => k === wk ? `<b>${workIcon(k)}${v}</b>` : workIcon(k)+v);
+    const parts = Object.entries(p.w || {}).sort((a,b) => b[1]-a[1])
+      .map(([k,v]) => k === wk ? `<b>${workImgTag(k)}${v}</b>` : workImgTag(k) + v);
     td6.innerHTML = parts.join(' ');
     tr.append(td0, td1, td2, td3, td4, td5, td6);
     tr.tabIndex = 0;
@@ -2617,9 +2662,11 @@ const mapSearchEl = document.getElementById('mapSearch');
 const mapLayerSeg = document.getElementById('mapLayer');
 const mapFilterSeg = document.getElementById('mapFilters');
 
+const MAP_PREFS_V = 2;   // bump when a filter chip ships, so saved sets don't hide it
 const mapPrefs = JSON.parse(localStorage.getItem('palarium_map') || '{}');
 let mapLayer = LAYER_DIR[mapPrefs.l] ? mapPrefs.l : 'MainMap';
-const mapTypes = new Set(Array.isArray(mapPrefs.t) ? mapPrefs.t : ['alpha', 'fastTravel', 'tower']);
+const mapTypes = new Set(mapPrefs.v === MAP_PREFS_V && Array.isArray(mapPrefs.t)
+  ? mapPrefs.t : ['alpha', 'fastTravel', 'tower', 'region']);
 let mapK = 0.1, mapMinK = 0.05, mapTX = 0, mapTY = 0;
 let mapSel = null, mapBuilt = false, mapQuery = '';
 const mapEls = new Map();    // "layer|id" -> marker button
@@ -2633,7 +2680,8 @@ let mapDragged = false;
 // map prefs live in their own key: save() runs during boot, before this
 // section has initialised, and reading these from there would be a TDZ crash
 function mapSavePrefs() {
-  localStorage.setItem('palarium_map', JSON.stringify({l: mapLayer, t: [...mapTypes]}));
+  localStorage.setItem('palarium_map',
+    JSON.stringify({v: MAP_PREFS_V, l: mapLayer, t: [...mapTypes]}));
 }
 
 const mapKey = m => m.layer + '|' + m.id;
@@ -2658,6 +2706,11 @@ function mapApply() {
   mapStageEl.style.transform = `translate3d(${mapTX}px,${mapTY}px,0) scale(${mapK})`;
   mapStageEl.style.setProperty('--iz', 1 / mapK);
   mapStageEl.classList.toggle('lab', mapK >= 0.2);
+  const rt = 'r' + (mapK < 0.12 ? 0 : mapK < 0.25 ? 1 : mapK < 0.45 ? 2 : 3);
+  if (!mapStageEl.classList.contains(rt)) {
+    mapStageEl.classList.remove('r0', 'r1', 'r2', 'r3');
+    mapStageEl.classList.add(rt);
+  }
   mapLinkLine.style.strokeWidth = 2.5 / mapK + 'px';
   mapLinkLine.style.strokeDasharray = `${14 / mapK} ${18 / mapK}`;
   mapRenderTiles();
@@ -2806,9 +2859,9 @@ function mapBuildMarkers() {
         const lv = document.createElement('span'); lv.className = 'lvl';
         lv.textContent = 'Lv ' + m.level; b.appendChild(lv);
       }
-    } else if (m.type === 'tower' || m.type === 'middleBoss') {
-      g.textContent = m.type === 'tower' ? '▲' : '◆';
     }
+    // waypoints, towers and World Tree bosses are drawn by CSS from the game's
+    // own compass icons, so .g needs nothing in it
     b.appendChild(g);
     const lb = document.createElement('span'); lb.className = 'lb';
     lb.textContent = mapTitle(m); b.appendChild(lb);
@@ -2820,6 +2873,7 @@ function mapBuildMarkers() {
   }
 }
 function mapSyncMarkers() {
+  mapRegionsEl.hidden = !mapTypes.has('region');
   const q = mapQuery.trim().toLowerCase();
   const counts = {alpha: 0, fastTravel: 0, tower: 0, middleBoss: 0};
   let matches = 0;
@@ -2833,7 +2887,13 @@ function mapSyncMarkers() {
     if (on) { counts[m.type]++; if (hit) matches++; }
   }
   if (q) {
-    mapCountEl.textContent = matches + (matches === 1 ? ' match here' : ' matches here');
+    // a query can match a species (spawn areas) as well as places, and saying
+    // "0 matches" next to a species result on screen is just wrong
+    const sp = PALS.filter(p => p.n.toLowerCase().includes(q) && spawnEntries(p.k).length).length;
+    const bits = [];
+    if (sp) bits.push(sp + (sp === 1 ? ' species' : ' species'));
+    bits.push(matches + (matches === 1 ? ' place' : ' places'));
+    mapCountEl.textContent = bits.join(' · ');
   } else {
     const parts = [];
     if (mapTypes.has('alpha')) parts.push(counts.alpha + ' alphas');
@@ -2848,6 +2908,13 @@ function mapRenderResults() {
   const q = mapQuery.trim().toLowerCase();
   mapResultsEl.textContent = '';
   if (!q) { mapResultsEl.hidden = true; return; }
+  // Two kinds of answer to "where is X": the place called X, and the species
+  // called X. Species come first — someone typing a pal name wants its range,
+  // and any alpha marker of the same name is listed right underneath.
+  const species = PALS.filter(p => p.n.toLowerCase().includes(q) && spawnEntries(p.k).length);
+  species.sort((a, b) =>
+    (b.n.toLowerCase().startsWith(q) ? 1 : 0) - (a.n.toLowerCase().startsWith(q) ? 1 : 0)
+    || a.n.localeCompare(b.n));
   const hits = MAP.markers.filter(m => mapTypeOn(m.type) && mapMatch(m, q));
   hits.sort((a, b) => {
     const an = mapTitle(a).toLowerCase(), bn = mapTitle(b).toLowerCase();
@@ -2856,15 +2923,29 @@ function mapRenderResults() {
       || an.localeCompare(bn);
   });
   mapResultsEl.hidden = false;
-  for (const m of hits.slice(0, 10)) {
+  const SPECIES_CAP = 4, MARKER_CAP = 8;
+  for (const p of species.slice(0, SPECIES_CAP)) {
+    const sum = mapSpawnSummary(p.k);
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'mres sp';
+    const im = new Image(); im.src = IMG + p.img; im.alt = ''; im.loading = 'lazy';
+    const tx = document.createElement('span');
+    tx.textContent = p.n + ' · ' + sum.spots + ' spawn areas';
+    b.append(im, tx);
+    b.title = 'Show where ' + p.n + ' spawns';
+    b.addEventListener('click', () => { mapSelect(null); mapSetSpawn(p.k, true); });
+    mapResultsEl.appendChild(b);
+  }
+  for (const m of hits.slice(0, MARKER_CAP)) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'mres';
     const p = mapPal(m);
     if (p) {
       const im = new Image(); im.src = IMG + p.img; im.alt = ''; im.loading = 'lazy'; b.appendChild(im);
     } else {
-      const s = document.createElement('span'); s.className = 'rt';
-      s.textContent = m.type === 'fastTravel' ? '🔷' : '▲'; b.appendChild(s);
+      const g = document.createElement('span');
+      g.className = 'rt ' + (m.type === 'fastTravel' ? 'ft' : 'tw');
+      b.appendChild(g);
     }
     const tx = document.createElement('span');
     tx.textContent = mapTitle(m) + (m.level ? ' · Lv ' + m.level : '')
@@ -2873,13 +2954,14 @@ function mapRenderResults() {
     b.addEventListener('click', () => mapSelect(m, true));
     mapResultsEl.appendChild(b);
   }
-  if (!hits.length) {
+  const extra = Math.max(0, species.length - SPECIES_CAP) + Math.max(0, hits.length - MARKER_CAP);
+  if (!hits.length && !species.length) {
     const s = document.createElement('span'); s.className = 'more';
     s.textContent = 'Nothing matches “' + mapQuery.trim() + '” — try a pal or waypoint name.';
     mapResultsEl.appendChild(s);
-  } else if (hits.length > 10) {
+  } else if (extra) {
     const s = document.createElement('span'); s.className = 'more';
-    s.textContent = '+' + (hits.length - 10) + ' more'; mapResultsEl.appendChild(s);
+    s.textContent = '+' + extra + ' more'; mapResultsEl.appendChild(s);
   }
 }
 
@@ -2896,8 +2978,10 @@ function mapSelect(m, focus) {
   for (const el of mapEls.values()) el.classList.remove('sel', 'near');
   mapSel = m || null;
   if (!mapSel) {
-    mapInfoEl.hidden = true; mapInfoEl.textContent = '';
     mapLinkEl.classList.add('off');
+    const sp = mapSpawnKey && byKey.get(mapSpawnKey);
+    if (sp) mapRenderSpawnInfo(sp);
+    else { mapInfoEl.hidden = true; mapInfoEl.textContent = ''; }
     updateHash();
     return;
   }
@@ -3001,8 +3085,11 @@ function mapSetLayer(l) {
   mapLinkEl.classList.add('off');
   mapResetTiles();
   mapBuildMarkers();
+  mapBuildRegions();
   mapSyncMarkers();
   mapRenderResults();
+  mapDrawZones();
+  if (mapSpawnKey) { const p = byKey.get(mapSpawnKey); if (p) mapRenderSpawnInfo(p); }
   mapFit();
   updateHash();
 }
@@ -3026,8 +3113,15 @@ function mapActivate() {
     mapBuilt = true;
     mapResetTiles();
     mapBuildMarkers();
+    mapBuildRegions();
     mapSyncMarkers();
     mapFit();
+    // the search box offers species as well as places, so the spawn table has
+    // to be here before the user types — but not before they open the tab
+    mapLoadSpawns().then(() => {
+      mapRenderResults();
+      if (mapSpawnKey) mapSetSpawn(mapSpawnKey);
+    }).catch(() => toast('Spawn data failed to load — markers still work'));
   }
   // the map now owns a screenful; bring it under the header rather than
   // leaving the user staring at filter chips with the map below the fold
@@ -3037,6 +3131,15 @@ function mapActivate() {
   });
 }
 // resolves #/map/<marker-id> and #/map/tree
+// #/map/spawn/<pal> — resolves the same aliases as every other pal link, and
+// waits on the spawn table if the map is opening cold from this URL
+function mapOpenSpawnRef(ref) {
+  if (!MAP) return;
+  const p = resolvePal(ref);
+  if (!p) { badLink('Link not recognized — unknown pal' + (ref ? ' “' + ref + '”' : '')); return; }
+  mapSelect(null);
+  mapLoadSpawns().then(() => mapSetSpawn(p.k, true)).catch(() => {});
+}
 function mapOpenRef(ref) {
   if (!MAP || !ref) return;
   const low = String(ref).toLowerCase();
@@ -3045,6 +3148,327 @@ function mapOpenRef(ref) {
   const m = MAP.markers.find(k => k.id.toLowerCase() === low);
   if (m) mapSelect(m, true);
   else badLink('Link not recognized — no map marker “' + ref + '”');
+}
+
+// ---------- spawn zones ----------
+// js/spawndata.js is ~120 KB and only the map ever reads it, so it loads on
+// first use rather than with the shell. Everything below no-ops until it lands.
+const mapZonesEl = document.getElementById('mapZones');
+const mapRegionsEl = document.getElementById('mapRegions');
+const spawnBarEl = document.getElementById('spawnBar');
+const ZONE_RES = 2048;                 // canvas is 1/4 map scale; blobs are fuzzy by nature
+const SPAWN_NIGHT = 1;
+
+let SPAWN = null, spawnLoading = null;
+let spawnByPal = null;                 // palKey -> [{gi, lo, hi, w, f}]
+let spawnRuns = null;                  // layer -> Map(gi -> [gi, x,y, x,y, ...])
+let mapSpawnKey = null;
+
+function mapLoadSpawns() {
+  if (SPAWN) return Promise.resolve(SPAWN);
+  if (spawnLoading) return spawnLoading;
+  spawnLoading = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'js/spawndata.js';
+    s.onload = () => {
+      SPAWN = window.SPAWNDATA;
+      spawnByPal = new Map();
+      SPAWN.groups.forEach((entries, gi) => {
+        for (const [k, lo, hi, w, f] of entries) {
+          if (!spawnByPal.has(k)) spawnByPal.set(k, []);
+          spawnByPal.get(k).push({gi, lo, hi, w, f});
+        }
+      });
+      spawnRuns = {};
+      for (const [layer, runs] of Object.entries(SPAWN.spots)) {
+        const m = new Map();
+        for (const run of runs) m.set(run[0], run);
+        spawnRuns[layer] = m;
+      }
+      res(SPAWN);
+    };
+    s.onerror = () => { spawnLoading = null; rej(new Error('spawn data unavailable')); };
+    document.head.appendChild(s);
+  });
+  return spawnLoading;
+}
+
+const spawnEntries = k => (spawnByPal && spawnByPal.get(k)) || [];
+// map pixels -> metres, per layer: the World Tree texture covers a quarter the
+// world span of the surface, so a pixel is worth four times less there
+const mPerPx = layer => {
+  const w = MAP.layers[layer].world;
+  return (w.maxY - w.minY) / MAP.layers[layer].size / 100;
+};
+
+// every spawn point for a species on one layer, as a flat [x,y,...] list
+function spawnPoints(palKey, layer) {
+  const runs = spawnRuns && spawnRuns[layer];
+  if (!runs) return [];
+  const pts = [];
+  for (const {gi} of spawnEntries(palKey)) {
+    const run = runs.get(gi);
+    if (!run) continue;
+    for (let i = 1; i < run.length; i += 2) pts.push(run[i], run[i + 1]);
+  }
+  return pts;
+}
+const spawnLayersFor = k => Object.keys(MAP.layers).filter(l => spawnPoints(k, l).length);
+
+// ---- the overlay ----
+// Canvas rather than SVG: a common species like Mimog has 5,327 circles, which
+// is a fine single canvas path and a terrible DOM. Circles are filled opaque
+// into one path and the *element* carries the opacity, so overlapping areas
+// read as one blob instead of compounding into a dark core.
+function mapDrawZones() {
+  const ctx = mapZonesEl.getContext('2d');
+  ctx.clearRect(0, 0, ZONE_RES, ZONE_RES);
+  if (!mapSpawnKey || !SPAWN) { mapZonesEl.hidden = true; return 0; }
+  const runs = spawnRuns[mapLayer];
+  const radii = SPAWN.radii[mapLayer];
+  if (!runs || !radii) { mapZonesEl.hidden = true; return 0; }
+  const s = ZONE_RES / MAP_SIZE;
+  let n = 0;
+  ctx.fillStyle = '#58b6ea';
+  ctx.beginPath();
+  for (const {gi} of spawnEntries(mapSpawnKey)) {
+    const run = runs.get(gi);
+    if (!run) continue;
+    const r = Math.max(2, radii[gi] * s);
+    for (let i = 1; i < run.length; i += 2) {
+      const cx = run[i] * s, cy = run[i + 1] * s;
+      ctx.moveTo(cx + r, cy);          // without this each arc joins the last
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      n++;
+    }
+  }
+  ctx.fill();
+  mapZonesEl.hidden = n === 0;
+  return n;
+}
+
+// ---- "which statue do I warp to" ----
+// Ranked by how many spawn points sit within reach of each fast-travel point,
+// not by raw distance: the nearest statue to one stray spawner is less useful
+// than the one sitting in the middle of the herd.
+function mapSpawnHubs(palKey, layer, n = 3) {
+  const pts = spawnPoints(palKey, layer);
+  if (!pts.length) return [];
+  const reach = 1200 / mPerPx(layer);          // 1.2 km, in map pixels
+  const hubs = [];
+  for (const f of MAP.markers) {
+    if (f.type !== 'fastTravel' || f.layer !== layer) continue;
+    let near = 0, best = Infinity;
+    for (let i = 0; i < pts.length; i += 2) {
+      const d = Math.hypot(pts[i] - f.map.x, pts[i + 1] - f.map.y);
+      if (d < reach) near++;
+      if (d < best) best = d;
+    }
+    hubs.push({f, near, best});
+  }
+  hubs.sort((a, b) => b.near - a.near || a.best - b.best);
+  return hubs.slice(0, n);
+}
+
+// ---- selection ----
+function mapSetSpawn(palKey, focus) {
+  const p = palKey ? byKey.get(palKey) : null;
+  mapSpawnKey = p ? p.k : null;
+  if (!mapSpawnKey) {
+    spawnBarEl.hidden = true; spawnBarEl.textContent = '';
+    mapDrawZones();
+    if (!mapSel) { mapInfoEl.hidden = true; mapInfoEl.textContent = ''; }
+    updateHash();
+    return;
+  }
+  // follow the species to whichever layer it actually lives on
+  const layers = spawnLayersFor(mapSpawnKey);
+  if (layers.length && !layers.includes(mapLayer)) mapSetLayer(layers[0]);
+  mapRenderSpawnBar(p);
+  const n = mapDrawZones();
+  if (!mapSel) mapRenderSpawnInfo(p);
+  if (focus && n) mapFocusSpawns(mapSpawnKey);
+  updateHash();
+}
+
+// frame the spawn area rather than the whole map — for a species with three
+// spawners on one island, fitting the island is the answer
+function mapFocusSpawns(palKey) {
+  const pts = spawnPoints(palKey, mapLayer);
+  if (!pts.length) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < pts.length; i += 2) {
+    x0 = Math.min(x0, pts[i]); x1 = Math.max(x1, pts[i]);
+    y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]);
+  }
+  const pad = 400;
+  x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
+  const cw = mapViewEl.clientWidth, ch = mapViewEl.clientHeight;
+  if (!cw || !ch) return;
+  const k = Math.max(mapMinK, Math.min(1, Math.min(cw / (x1 - x0), ch / (y1 - y0))));
+  const [tx, ty] = mapClampTo(k, cw / 2 - (x0 + x1) / 2 * k, ch / 2 - (y0 + y1) / 2 * k);
+  mapGlide(tx, ty, k);
+}
+
+function mapSpawnSummary(palKey) {
+  const es = spawnEntries(palKey);
+  if (!es.length) return null;
+  let lo = Infinity, hi = 0, spots = 0, night = true, dungeonOnly = true;
+  for (const e of es) {
+    lo = Math.min(lo, e.lo); hi = Math.max(hi, e.hi);
+    if (!(e.f & SPAWN_NIGHT)) night = false;
+    if (SPAWN.kinds[e.gi] === 0) dungeonOnly = false;
+    for (const layer of Object.keys(MAP.layers)) {
+      const run = spawnRuns[layer]?.get(e.gi);
+      if (run) spots += (run.length - 1) / 2;
+    }
+  }
+  return {lo, hi, spots, night, dungeonOnly, groups: es.length};
+}
+
+function mapRenderSpawnBar(p) {
+  const sum = mapSpawnSummary(p.k);
+  spawnBarEl.hidden = false;
+  spawnBarEl.textContent = '';
+  spawnBarEl.append(icon(p, 30, true));
+  const txt = document.createElement('div'); txt.className = 'sb-txt';
+  const b = document.createElement('b'); b.textContent = p.n + ' spawn areas';
+  const sub = document.createElement('span');
+  sub.textContent = sum
+    ? `${sum.spots} areas · Lv ${sum.lo === sum.hi ? sum.lo : sum.lo + '–' + sum.hi}`
+    : 'No wild spawns — breeding or raids only';
+  txt.append(b, sub);
+  spawnBarEl.appendChild(txt);
+  if (sum && sum.night) {
+    const n = document.createElement('span'); n.className = 'sbadge'; n.textContent = '🌙 Night only';
+    spawnBarEl.appendChild(n);
+  }
+  if (sum && sum.dungeonOnly) {
+    const n = document.createElement('span'); n.className = 'sbadge'; n.textContent = 'Dungeons only';
+    spawnBarEl.appendChild(n);
+  }
+  const x = document.createElement('button');
+  x.type = 'button'; x.className = 'alink sb-clear'; x.textContent = '✕ Clear';
+  x.addEventListener('click', () => mapSetSpawn(null));
+  spawnBarEl.appendChild(x);
+}
+
+function mapRenderSpawnInfo(p) {
+  mapInfoEl.hidden = false;
+  mapInfoEl.textContent = '';
+  const sum = mapSpawnSummary(p.k);
+
+  const x = document.createElement('button');
+  x.type = 'button'; x.className = 'iclose'; x.textContent = '✕';
+  x.setAttribute('aria-label', 'Stop showing spawn areas');
+  x.addEventListener('click', () => mapSetSpawn(null));
+  mapInfoEl.appendChild(x);
+
+  const head = document.createElement('div'); head.className = 'ihead';
+  head.appendChild(icon(p, 44, true));
+  const hb = document.createElement('div');
+  const h3 = document.createElement('h3'); h3.textContent = p.n; hb.appendChild(h3);
+  const sub = document.createElement('div'); sub.className = 'isub';
+  sub.textContent = sum
+    ? `Wild spawns · Lv ${sum.lo === sum.hi ? sum.lo : sum.lo + '–' + sum.hi}` +
+      (sum.night ? ' · night only' : '')
+    : 'Not catchable in the wild';
+  hb.appendChild(sub);
+  head.append(hb);
+  mapInfoEl.appendChild(head);
+
+  const crow = document.createElement('div'); crow.className = 'crow';
+  crow.appendChild(typeChips(p)); crow.appendChild(tierBadge(p));
+  mapInfoEl.appendChild(crow);
+
+  if (!sum) {
+    // legendaries, sub-species and raid bosses genuinely have no spawner; say so
+    // and hand the reader to the tab that can actually get them one
+    const e = document.createElement('div'); e.className = 'isub inote';
+    const alpha = MAP_ALPHAS.get(p.k);
+    e.textContent = alpha
+      ? 'No wild spawn area — the only one in the world is the alpha shown on the map.'
+      : 'No spawner anywhere in the world files. This one comes from breeding or a raid.';
+    mapInfoEl.appendChild(e);
+    const acts = document.createElement('div'); acts.className = 'iacts';
+    const fp = document.createElement('button');
+    fp.type = 'button'; fp.className = 'alink'; fp.textContent = 'Find parents';
+    fp.addEventListener('click', () => {
+      pickT.set(p, true); reverseShown = 120; renderReverse(); navTab('reverse');
+    });
+    acts.appendChild(fp);
+    mapInfoEl.appendChild(acts);
+    if (alpha) mapEls.get(mapKey(alpha[0]))?.classList.add('near');
+    return;
+  }
+
+  const other = spawnLayersFor(p.k).filter(l => l !== mapLayer);
+  if (other.length) {
+    const e = document.createElement('div'); e.className = 'isub inote';
+    e.textContent = `Also spawns on ${LAYER_NAME[other[0]]}.`;
+    mapInfoEl.appendChild(e);
+  }
+
+  const hubs = mapSpawnHubs(p.k, mapLayer, 3);
+  const lb = document.createElement('div'); lb.className = 'nlb';
+  lb.textContent = 'Best fast travel';
+  mapInfoEl.appendChild(lb);
+  if (!hubs.length) {
+    const e = document.createElement('div'); e.className = 'isub';
+    e.textContent = 'No spawn areas on this layer.';
+    mapInfoEl.appendChild(e);
+  } else {
+    const m = mPerPx(mapLayer);
+    const wrap = document.createElement('div'); wrap.className = 'near';
+    hubs.forEach((h, i) => {
+      const b = document.createElement('button'); b.type = 'button';
+      const n = document.createElement('span'); n.textContent = mapTitle(h.f);
+      const d = document.createElement('span'); d.className = 'd';
+      d.textContent = h.near ? h.near + ' areas' : fmtDist(h.best * m);
+      b.append(n, d);
+      b.title = h.near
+        ? `${h.near} spawn areas within 1.2 km · nearest ${fmtDist(h.best * m)}`
+        : `Nearest spawn area ${fmtDist(h.best * m)} away`;
+      b.addEventListener('click', () => mapSelect(h.f, true));
+      wrap.appendChild(b);
+      if (i === 0) mapEls.get(mapKey(h.f))?.classList.add('near');
+    });
+    mapInfoEl.appendChild(wrap);
+  }
+
+  const acts = document.createElement('div'); acts.className = 'iacts';
+  const pc = document.createElement('button');
+  pc.type = 'button'; pc.className = 'alink'; pc.textContent = 'Pal card';
+  pc.addEventListener('click', () => openModal(p));
+  const cp = document.createElement('button');
+  cp.type = 'button'; cp.className = 'alink'; cp.textContent = 'Copy link';
+  cp.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(location.href.split('#')[0] + '#/map/spawn/' + p.k);
+      toast('Link to ' + p.n + '’s spawn areas copied');
+    } catch { toast('Copy failed — clipboard blocked by browser'); }
+  });
+  acts.append(pc, cp);
+  mapInfoEl.appendChild(acts);
+}
+
+// ---------- region labels ----------
+// 123 named areas from the game's own region volumes. They're bucketed by
+// physical size so a zoomed-out map shows only the handful of big biomes and
+// the small named landmarks appear as you go in — one class write per frame
+// instead of 123 visibility checks.
+const regionTier = r => r >= 400 ? 0 : r >= 200 ? 1 : r >= 90 ? 2 : 3;
+function mapBuildRegions() {
+  mapRegionsEl.textContent = '';
+  for (const r of MAP.regions || []) {
+    if (r.layer !== mapLayer) continue;
+    const d = document.createElement('div');
+    d.className = 'rg t' + regionTier(r.r);
+    d.style.left = r.map.x + 'px';
+    d.style.top = r.map.y + 'px';
+    d.textContent = r.name;
+    mapRegionsEl.appendChild(d);
+  }
 }
 
 if (MAP) {
@@ -3178,6 +3602,18 @@ if (MAP) {
   document.querySelectorAll('[data-v="map"]').forEach(b => b.remove());
   document.getElementById('view-map')?.remove();
 }
+
+// The guide's cake recipes are hand-written markup; each ingredient chip
+// carries a data-item id so the extracted inventory icon can be dropped in
+// without duplicating the recipe text in JS.
+document.querySelectorAll('.recipe .mchip[data-item]').forEach(c => {
+  const im = new Image(18, 18);
+  im.src = 'assets/items/' + c.dataset.item.toLowerCase() + '.webp';
+  im.alt = ''; im.loading = 'lazy'; im.decoding = 'async';
+  im.onerror = () => im.remove();
+  c.prepend(im);
+  c.classList.add('drop');
+});
 
 // guide jump links: hand the reader to the tab being described
 document.querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', () => {

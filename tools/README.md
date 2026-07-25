@@ -45,22 +45,43 @@ export PAL_USMAP="C:/path/to/Mappings.usmap"
 dotnet run -- list "<regex>" [max]        # find asset paths
 dotnet run -- json "<regex>" <outDir>     # export packages as JSON
 dotnet run -- png  "<regex>" <outDir>     # export textures as PNG
+dotnet run -- enum "<regex>"              # dump enum value->name maps from the .usmap
+dotnet run -- scan "<pathRx>" "<typeRx>" <outFile>   # sweep many packages, keep matches
 ```
+
+`enum` reads the mappings rather than any asset — it's how you get the authoritative
+order of `EPalElementType`, `EPalWorkSuitability` and friends. (Read the warning
+about icon indices below before you trust that order for *file names*.)
+
+`scan` exists for World Partition. `PL_MainWorld5` is only the persistent level;
+the rest of the world lives in ~10,000 per-cell `.umap` packages with generated
+names, so you can't select the ones you want by path. `scan` walks them all and
+writes a single JSON keyed by package path, keeping **every** export of any
+package that contains a type match — the actor alone is useless, since its
+transform lives on a sibling component addressed by export index.
 
 Expect ~185,000 mounted files. Everything below assumes output lands in
 `tools/extract/{dt,l10n,level,maps,icons}`.
 
 ```bash
 # datatables
-dotnet run -- json "Pal/DataTable/(Character/DT_PalMonsterParameter|Character/DT_PalCombiUnique|Character/DT_PalDropItem|UI/DT_BossSpawnerLoactionData|WorldMapUIData/DT_WorldMapUIData|WorldMapAreaData/DT_WorldMapAreaData)\.uasset$" ../extract/dt
+dotnet run -- json "Pal/DataTable/(Character/DT_PalMonsterParameter|Character/DT_PalCombiUnique|Character/DT_PalDropItem|UI/DT_BossSpawnerLoactionData|WorldMapUIData/DT_WorldMapUIData|WorldMapAreaData/DT_WorldMapAreaData|Spawner/DT_PalWildSpawner|Spawner/DT_PalSpawnerPlacement|Item/DT_ItemIconDataTable)\.uasset$" ../extract/dt
 
 # english text
-dotnet run -- json "L10N/en/Pal/DataTable/Text/(DT_PalNameText_Common|DT_PalLongDescriptionText|DT_SkillNameText_Common|DT_SkillDescText_Common|DT_PartnerSkillAppendText|DT_MapRespawnPointInfoText|DT_UniqueNPCText_Common)\.uasset$" ../extract/l10n
+dotnet run -- json "L10N/en/Pal/DataTable/Text/(DT_PalNameText_Common|DT_PalLongDescriptionText|DT_SkillNameText_Common|DT_SkillDescText_Common|DT_PartnerSkillAppendText|DT_MapRespawnPointInfoText|DT_UniqueNPCText_Common|DT_WorldMap_Common_Text_Common|DT_ItemNameText_Common)\.uasset$" ../extract/l10n
 
 # world level (~171 MB of JSON, 31k objects) and map textures
 dotnet run -- json "Maps/MainWorld_5/PL_MainWorld5\.umap$" ../extract/level
 dotnet run -- png "Texture/UI/Map/(T_WorldMap|T_TreeMap)\.uasset$" ../extract/maps
 dotnet run -- png "Texture/PalIcon/Normal/.*\.uasset$" ../extract/icons
+
+# UI icon sets: elements, work suitability, map/compass markers
+dotnet run -- png "Texture/UI/(Main_Menu/T_Icon_element_0[0-8]|InGame/T_icon_palwork_(0[0-9]|1[0-3])|InGame/T_icon_compass_(Teleport|tower|FTtower|boss|dungeon|camp|BossGate|Oilrig|KeyBoss)|Map/T_icon_compass_Boss_Unknown)\.uasset$" ../extract/ui
+
+# region volumes: only 13 of ~124 are in the persistent level (see traps)
+dotnet run -- scan "MainWorld_5/PL_MainWorld5/_Generated_/.*\.umap$" "PalRegionTrigger" "../extract/out/regionCells.json"
+
+# item icons — the exact set is emitted by parse-spawns' sibling step; see below
 ```
 
 ## 2. Generate
@@ -70,9 +91,19 @@ cd tools
 npm install                                  # sharp, for image work
 
 node gen-data.js ../js/data.js               # rebuild the pal dataset
-node --max-old-space-size=6144 parse-map.js  # map markers -> extract/out/mapMarkers.json
+node --max-old-space-size=6144 parse-map.js  # markers + regions -> ../js/mapdata.js
+node parse-spawns.js                         # spawn zones    -> ../js/spawndata.js
 node tile-map.js ../assets/map lossless      # slice map textures into WebP tiles
+node gen-ui-icons.js                         # UI + item icons -> ../assets/{ui,items}
 ```
+
+`parse-map.js` needs `extract/out/regionCells.json` from the `scan` above, or it
+emits a map labelled with a seventh of its regions and says so.
+
+`gen-ui-icons.js` reads `extract/out/itemIcons.json` (item id -> texture name),
+which is produced from `DT_ItemIconDataTable` against the drop lists already in
+`js/data.js`. Item icons are written under the **item id**, not the texture name,
+so the app can address `assets/items/<id>.webp` with no lookup table.
 
 ## 3. Verify — do not skip this
 
@@ -134,6 +165,31 @@ world X *inverted*. Established empirically by `calibrate.js`, which scores all
 8 axis-swap/flip combinations by how many markers land on non-ocean pixels —
 75% for MainMap and 89% for Tree, against 44% for the runner-up. Re-run it if
 markers ever look offset.
+
+**Numbered icon sets are indexed by UI display order, not by the enum.** This is
+the one that will silently mislabel your whole Paldex. `EPalWorkSuitability` runs
+`... Mining=8, OilExtraction=9, ProductMedicine=10 ...`, but `T_icon_palwork_08`
+is the medicine flask and `09` is the oil barrel. Elements diverge earlier:
+`T_Icon_element_03` is the lightning bolt, where `EPalElementType` has `Leaf` in
+that slot. The orders in `gen-ui-icons.js` were read off the rendered textures.
+Re-render a contact sheet and look at it before trusting any renumbering.
+
+**Region volumes are mostly not in the level you dumped.** `PL_MainWorld5` holds
+13 of ~124 `BP_PalRegionTriggerBox_C` actors; World Partition puts the other 111
+in per-cell `.umap` packages. Hence `palex scan`. An actor's `AreaName.Key` joins
+to `DT_WorldMapAreaData`, whose `MsgID` joins to `REGION_*` in
+`DT_WorldMap_Common_Text_Common`.
+
+**Spawners are two tables joined on `SpawnerName`.** `DT_PalSpawnerPlacement` is
+where they sit (8,253 instances, 372 distinct groups); `DT_PalWildSpawner` is
+what comes out (1,691 weighted rows, up to 3 pals each, with a night-only flag).
+Radius and placement type are constant per group — verified 0 of 273 groups mix
+them — which is what lets `spawndata.js` store bare x,y pairs. Re-check that
+assumption after an update rather than assuming it still holds.
+
+**Boss placement types are excluded from spawn zones on purpose.** `FieldBoss`,
+`DungeonBoss` and `ImprisonmentBoss` are already drawn as alpha and tower
+markers. Including them would double-draw every legendary.
 
 **An 8192² image costs ~268 MB of RAM decoded**, regardless of file size — it
 will kill mobile Safari. Hence the tile pyramid.
