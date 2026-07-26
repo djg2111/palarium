@@ -99,6 +99,33 @@ for (const o of level) {
 // CharacterID is BOSS_<tribe>, which is the pal key with the prefix stripped.
 const bossRows = Object.values(JSON.parse(
   fs.readFileSync(`${P}/dt/DT_BossSpawnerLoactionData.json`, 'utf8'))[0].Rows || {});
+
+// The location table says *where* a field boss stands, but it names only one
+// pal. The roster is in DT_PalWildSpawner, keyed by the same spawner id, and a
+// spawner can list more than one alpha: 81_2_dessert_FBOSS_2 is Paladius *and*
+// Necromus, both Lv 60 in the same desert spot, and worldtree_9_11_N_FBOSS_1
+// is the same arrangement for Celesdir and Celesdir Noct. Reading CharacterID
+// alone dropped the second of each pair, so the app reported a pal you can
+// walk up to and catch as having no spawner anywhere in the world.
+//
+// Only the BOSS_-prefixed slots are alphas. The rest are the ordinary pals
+// that mill around one — BOSS_KingAlpaca's spawner also lists Lv 5-7 Alpacas,
+// which are not a second alpha and must not become a marker.
+const bossRoster = (() => {
+  const m = new Map();
+  const rows = JSON.parse(fs.readFileSync(`${P}/dt/DT_PalWildSpawner.json`, 'utf8'))[0].Rows || {};
+  for (const v of Object.values(rows)) {
+    if (!v.SpawnerName || !String(v.SpawnerType || '').includes('FieldBoss')) continue;
+    const list = [];
+    for (let i = 1; i <= 3; i++) {
+      const p = v['Pal_' + i];
+      if (typeof p === 'string' && p.startsWith('BOSS_'))
+        list.push({ key: p.replace(/^BOSS_/, ''), level: v['LvMin_' + i] ?? null });
+    }
+    if (list.length) m.set(v.SpawnerName, list);
+  }
+  return m;
+})();
 const palNames = (() => {
   const m = new Map();
   try {
@@ -117,14 +144,19 @@ for (const r of bossRows) {
   if (!layer) continue;
   const key = r.CharacterID.replace(/^BOSS_/, '');
   const px = project(layer, r.Location.X, r.Location.Y);
-  out.push({
-    id: r.SpawnerID ?? key, type: 'alpha', layer: layer.key,
-    pal: key,
-    label: palNames.get(key) ?? key,
-    level: r.Level ?? null,
+  // the location table's own pal first, then any other alpha the same spawner
+  // rolls. The primary keeps the bare SpawnerID so every #/map/<id> link that
+  // already exists still resolves; the extras take the pal key as a suffix.
+  const pals = [{ key, level: r.Level ?? null },
+    ...(bossRoster.get(r.SpawnerID) || []).filter(p => p.key !== key)];
+  pals.forEach((p, i) => out.push({
+    id: (r.SpawnerID ?? key) + (i ? '_' + p.key : ''), type: 'alpha', layer: layer.key,
+    pal: p.key,
+    label: palNames.get(p.key) ?? p.key,
+    level: p.level ?? r.Level ?? null,
     world: { x: +r.Location.X.toFixed(1), y: +r.Location.Y.toFixed(1), z: +r.Location.Z.toFixed(1) },
     map: { x: +px.x.toFixed(1), y: +px.y.toFixed(1) },
-  });
+  }));
 }
 
 // ---- tower labels ----

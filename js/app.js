@@ -1999,13 +1999,10 @@ function partnerPool() {
   let keys = PALS.map(p => p.k);
   if (partnerMode === 'wild' && acc) {
     // Factual, not a judgement: a species qualifies if it has any wild spawn
-    // area or a field alpha. That drops exactly the 18 pals with neither — six
-    // sub-species, eleven raid / tower / legendary bosses, and Eye of Cthulhu.
+    // area or a field alpha. That drops exactly the 17 pals with neither — six
+    // sub-species, ten raid / tower / legendary bosses, and Eye of Cthulhu.
     // No level, share or distance enters this test; a Lv 80 filler spawn at
     // 1.4% still counts, because a determined player can go and get it.
-    // (Known gap: Necromus has no spawner row of its own — the boss table
-    // lists only Paladius — so it reads as uncatchable here even though the
-    // pair shares a desert location in game.)
     keys = keys.filter(k => own.has(k) || acc.get(k)?.tier !== 'none');
   }
   // collab-exclusive species aren't catchable in every game version — when
@@ -3470,13 +3467,37 @@ function mapResetTiles() {
 }
 
 // ---- markers ----
+// Two spawners hold a pair of alphas at one point: Paladius and Necromus stand
+// on the same desert spot, Celesdir and Celesdir Noct on the same World Tree
+// one. Their coordinates really are identical, so drawn as-is the second
+// marker lands exactly on the first and one of the pair can never be clicked.
+// Fan a coincident group apart — purely a display offset, in --fx/--fy, which
+// the .mk transform applies *after* its counter-scale so the separation is a
+// constant number of screen pixels at every zoom, like the icon's own size.
+// left/top stay on the true position, so nothing that measures anything (the
+// link line, mapNearest, the statue ranking) sees the nudge at all.
+const MARK_FAN = 15;           // screen px; the alpha icon itself is 26
 function mapBuildMarkers() {
   mapMarksEl.textContent = ''; mapEls.clear();
+  const here = new Map(), seen = new Map();
+  for (const m of MAP.markers) {
+    if (m.layer !== mapLayer) continue;
+    const pos = m.map.x + ',' + m.map.y;
+    here.set(pos, (here.get(pos) || 0) + 1);
+  }
   for (const m of MAP.markers) {
     if (m.layer !== mapLayer) continue;
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'mk mk-' + m.type; b.tabIndex = -1;
     b.style.left = m.map.x + 'px'; b.style.top = m.map.y + 'px';
+    const pos = m.map.x + ',' + m.map.y, n = here.get(pos);
+    if (n > 1) {
+      const i = seen.get(pos) || 0;
+      seen.set(pos, i + 1);
+      const a = Math.PI * 2 * i / n - Math.PI / 2;
+      b.style.setProperty('--fx', (Math.cos(a) * MARK_FAN).toFixed(1) + 'px');
+      b.style.setProperty('--fy', (Math.sin(a) * MARK_FAN).toFixed(1) + 'px');
+    }
     const g = document.createElement('span'); g.className = 'g';
     if (m.type === 'alpha') {
       const p = mapPal(m);

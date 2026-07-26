@@ -12,7 +12,10 @@
 // and re-tiled map (unsharp mask) — every tile filename is unchanged, so the
 // cache-first rule below would happily serve the old soft ones forever.
 // v14: native z4 tiles, and z0-z3 re-sharpened under the same filenames again.
-const VERSION = 'palarium-v16';
+// v17: mapdata.js gained the second alpha of the two paired spawners (Necromus
+// beside Paladius, Celesdir beside Celesdir Noct). Same filename, so an offline
+// client would otherwise keep serving a map that says Necromus doesn't exist.
+const VERSION = 'palarium-v17';
 const SHELL = ['.', 'index.html', 'css/style.css', 'js/app.js', 'js/data.js',
   'js/mapdata.js', 'assets/favicon.svg', 'assets/lockup.svg', 'manifest.webmanifest'];
 
