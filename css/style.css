@@ -322,6 +322,8 @@ select:focus{border-color:var(--accent)}
 table{width:100%;border-collapse:collapse}
 th{position:sticky;top:var(--hh,64px);background:var(--bg);text-align:left;font-size:var(--fs-sm);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border-strong);cursor:pointer;user-select:none;white-space:nowrap;z-index:5}
 th:hover{color:var(--text)}
+th:not([data-s]){cursor:default}
+th:not([data-s]):hover{color:var(--muted)}
 th .arr{color:var(--accent)}
 .thbtn{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;padding:0}
 td{padding:5px 12px;border-bottom:1px solid var(--border);font-size:var(--fs-md)}
@@ -521,6 +523,10 @@ select#genderSel{padding:10px 12px}
 .collhead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:14px}
 .collhead h2{font-size:var(--fs-h2)}
 .collhead .collacts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+/* a view-style switch sits at the far end of its heading block, so it reads as
+   a property of the view rather than another filter */
+.collhead .viewseg{margin-left:auto;flex:0 0 auto}
+.segrow[hidden]{display:none}
 /* ---- roster: one species section, one pal per row ---- */
 .rosgrp{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:0}
 .rosgrp>summary{display:flex;align-items:center;gap:10px;font-weight:700;font-size:var(--fs-md);
@@ -532,6 +538,8 @@ select#genderSel{padding:10px 12px}
 .rosgrp>summary:hover{color:var(--accent)}
 .rosgrp .cntb{background:var(--raised);border:1px solid var(--border-strong);border-radius:var(--r-full);
   font-size:var(--fs-xs);padding:1px 9px;color:var(--muted);font-weight:600;white-space:nowrap}
+
+.sub{color:var(--muted);font-size:var(--fs-md);line-height:1.5}
 
 /* ---- Paldex gallery ----
    299 species, every one a distinct art, and 84 of them near-duplicate variant
@@ -555,8 +563,10 @@ select#genderSel{padding:10px 12px}
   overflow-wrap:anywhere;color:var(--text)}
 .dt-meta{font-size:var(--fs-xs);color:var(--muted);text-align:center;line-height:1.3}
 .dt-meta .uq{display:block}
-.dextile .star{position:absolute;top:0;right:0;z-index:1;padding:8px;line-height:1;
+.dextile .star{position:absolute;top:0;right:0;z-index:1;padding:8px;margin:0;line-height:1;
   background:none;border:0;font-size:var(--fs-md)}
+/* owned through the roster rather than starred here — same gold, lighter weight */
+.star.viaroster{color:var(--gold);opacity:.75}
 @media (max-width:640px){
   .dexgrid{grid-template-columns:repeat(auto-fill,minmax(min(72px,100%),1fr));gap:6px}
   .dextile .pico{--ico:40px}

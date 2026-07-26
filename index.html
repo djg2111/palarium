@@ -197,7 +197,7 @@
         <select id="dexType"><option value="">Any element</option></select></div>
       <div class="ctl"><label for="dexWork">Work</label>
         <select id="dexWork"><option value="">Any work</option></select></div>
-      <div class="ctl"><label for="dexSort">Sort</label>
+      <div class="ctl ctlwide"><label for="dexSort">Sort</label>
         <select id="dexSort">
           <option value="z">Paldex #</option>
           <option value="n">Name (A–Z)</option>
@@ -225,7 +225,7 @@
       <thead><tr>
         <th class="thstar"><span class="sr-only">Owned</span><span aria-hidden="true">★</span></th>
         <th data-s="z">#</th><th data-s="n">Pal</th><th data-s="t" class="hn">Element</th>
-        <th data-s="r">Breeding power</th><th data-s="m" class="hn">♂ chance</th><th data-s="w">Work suitability</th><th class="thmetric" id="dexMetricTh" aria-hidden="true"></th>
+        <th data-s="r">Breeding power</th><th data-s="m" class="hn">♂ chance</th><th data-s="w">Work suitability</th><th class="thmetric" id="dexMetricTh"></th>
       </tr></thead>
       <tbody id="dexBody"></tbody>
     </table>
@@ -242,8 +242,8 @@
             <button type="button" data-k="mix" aria-pressed="false">Two species</button>
             <button type="button" data-k="self" aria-pressed="false">Two of the same</button>
           </div></div>
-        <span class="rstats" id="comboCount" aria-live="polite"></span>
         <p class="sub ctlwide" id="comboKindWhy" aria-live="polite"></p>
+        <span class="rstats" id="comboCount" aria-live="polite"></span>
       </div>
       <div class="combos" id="comboList"></div>
     </div>

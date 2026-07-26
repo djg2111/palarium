@@ -61,6 +61,8 @@ not in this table needs a computed ratio before merge:
 | `--female` | 6.20 | 5.67 | 5.17 | 4.66 | AA all sizes |
 | `--ink` on `--accent` | — | 8.38 | — | — | AA — the solid-primary pairing |
 | `--faint` | 3.59 | 3.28 | 2.99 | 2.70 | **Below AA — non-essential text only.** Placeholders and decorative hints. A fact the user needs (an absent value, a count, a state) must be `--muted` or better. |
+| `--text` on `--gold-tint` over `--surface` | — | 14.15 | — | — | AA — the owned Paldex tile |
+| `--muted` on `--gold-tint` over `--surface` | — | 5.70 | — | — | AA — a tinted fill costs ~0.2 against the plain surface |
 | `--border-strong` | 1.99 | 1.82 | 1.66 | 1.50 | **Decorative only** — a border below 3:1 must never be the sole indicator of a control's boundary or state; pair with a fill, icon, or text change |
 
 Dark-theme rules: accents stay in this desaturated range — no saturated pure hues
@@ -131,13 +133,21 @@ second and a table is worst at the first):
 | Class | Role |
 |---|---|
 | `.dexgrid` / `.dextile` | The species gallery and one species tile. `.dextile.on` is owned. `.dextile-open` is the whole-tile press target (`::after{inset:0}`); the `.star` sits above it as a sibling, never nested. Arrow keys move between tiles (roving `tabindex`), Tab reaches the focused tile's star — the same two-stops-per-item convention as a roster row. |
+| `.viewseg` | The gallery/table switch. A `.segrow` pinned to the end of a heading block. |
 | `.sr-only` | Visually hidden, still announced. **`.nativehide` is the opposite job** — it hides a control from AT while leaving it on screen. |
 
-**Ownership is a ring and a fill, never a filter on the art.** The game greys
+**Ownership is a ring and a filled ★, never a filter on the art.** The game greys
 out un-captured pals; Palarium does not, because §7 forbids recolouring game
 art and desaturating 260 of 299 tiles would destroy the recognition the grid
-exists for. Owned = `--gold-line` border + `--gold-tint` fill + a filled ★ +
-`aria-pressed`.
+exists for. Owned = `--gold-line` ring + a filled ★, over a `--gold-tint` fill
+that is 1.03:1 against the plain tile — the tint is atmosphere, not a signal,
+and must never be counted as one of the redundant cues.
+
+A species can be owned two ways, and the tile must not let them disagree: a
+star set here (`owned`) and a pal held in the roster (`ownedSpeciesSet()`).
+Roster-derived ownership renders `.star.viaroster` — same gold, lighter weight,
+and an `aria-label` saying why — because a gold ring beside an empty ☆ reads
+as a broken control.
 
 Roster list (one layout, always grouped by species — a breeding roster is made of
 siblings, so grouping is the shape of the data, not a preference):
@@ -265,11 +275,13 @@ recoloring/filters).
   controls that change how the list is **filtered, ordered or presented** (search,
   filter, sort, collapse, density); `.collacts` holds actions on the **data itself**
   (add, read a save, backup & restore). Never mixed.
-- A view-style switch (gallery vs table) is a `.segrow` right-aligned in that
-  view's heading block, so it costs no extra vertical space and reads as a
-  property of the view rather than a filter. `.dexcontrols` becomes a 2-column
-  grid at ≤640px — five full-width stacked controls put the first result 514px
-  down a 740px screen.
+- A view-style switch (gallery vs table) is a `.segrow.viewseg` right-aligned in
+  that view's heading block (`margin-left:auto`), so it costs no extra vertical
+  space and reads as a property of the view rather than a filter. It is hidden
+  when the pane it governs is not showing. `.dexcontrols` becomes a 2-column
+  grid at ≤640px, which is worth ~79px against the same controls in a
+  single-column stack; controls whose text cannot shrink (search, sort, a
+  segmented group) take `.ctlwide` and span both columns.
 - A control in `.dex-controls` whose purpose isn't obvious from its own text carries
   a visible `.ctl` label. A bare select whose only label is a prefix inside its own
   options ("Sort: Name") is not labelled. A self-describing button ("Collapse all")

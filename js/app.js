@@ -4267,6 +4267,9 @@ function setDexMode(m) {
   });
   document.getElementById('dexPalsBlock').hidden = m !== 'pals';
   document.getElementById('dexCombosBlock').hidden = m !== 'combos';
+  // both describe the species list; on the combos pane they governed nothing
+  document.getElementById('dexView').hidden = m !== 'pals';
+  document.getElementById('dexOwnedCount').hidden = m !== 'pals';
   if (m === 'combos') renderCombos();
 }
 dexModeEl.addEventListener('click', e => {
@@ -4306,6 +4309,19 @@ function renderCombos() {
   rows.sort((x, y) => x.c.n.localeCompare(y.c.n));
   document.getElementById('comboCount').textContent =
     rows.length === DATA.combos.length ? DATA.combos.length + ' combos' : rows.length + ' of ' + DATA.combos.length + ' combos';
+  if (!rows.length) {
+    const h = document.createElement('div'); h.className = 'hint';
+    h.append('No combos match. ');
+    const b = document.createElement('button'); h.appendChild(b);
+    b.className = 'alink'; b.textContent = '✕ Clear filters';
+    b.addEventListener('click', () => {
+      document.getElementById('comboSearch').value = '';
+      setComboKind('');
+      document.getElementById('comboSearch').focus();
+    });
+    list.appendChild(h);
+    return;
+  }
   for (const r of rows) {
     // Result first, recipe underneath. Three equal pal units on one line left
     // every name truncated to "Azuro…" and read as a wall of same-sized icons;
@@ -5043,8 +5059,16 @@ function syncSortSel() {
 
 dexSearch.addEventListener('input', renderDex);
 dexType.addEventListener('change', () => { save(); renderDex(); });
+let dexSortBeforeWork = null;
 dexWork.addEventListener('change', () => {
-  if (dexWork.value) dexSort = {key: 'w', dir: -1};
+  // Picking a work filter sorts by that work, which is almost always what you
+  // meant. Clearing it puts back the sort you had chosen yourself.
+  if (dexWork.value) {
+    if (dexSort.key !== 'w') dexSortBeforeWork = {...dexSort};
+    dexSort = {key: 'w', dir: -1};
+  } else if (dexSortBeforeWork) {
+    dexSort = dexSortBeforeWork; dexSortBeforeWork = null;
+  }
   save(); renderDex();
 });
 dexSortSel.addEventListener('change', () => {
@@ -5085,7 +5109,7 @@ document.querySelectorAll('th[data-s]').forEach(th => {
 function dexMetric(p, wk) {
   const k = dexSort.key;
   if (k === 'r') {
-    const w = document.createElement('span'); w.textContent = p.r;
+    const w = document.createElement('span'); w.textContent = 'Power ' + p.r;
     if (p.ic || uniqueChildren.has(p.k)) { const u = document.createElement('span'); u.className = 'uq'; u.textContent = 'unique only'; w.appendChild(u); }
     return w;
   }
@@ -5100,16 +5124,34 @@ function dexMetric(p, wk) {
   const s = document.createElement('span'); s.textContent = zk(p); return s;
 }
 
+// A species can be owned two ways: starred here, or held in the roster. The
+// table never showed ownership on the row, so the split was invisible; on a
+// tile the ring and the star sit 6px apart and must not disagree.
 function dexStar(p, onToggle) {
   const star = document.createElement('button');
-  star.className = 'star' + (owned.has(p.k) ? ' on' : '');
+  const starred = owned.has(p.k);
+  const viaRoster = !starred && roster.some(r => r.k === p.k);
+  star.className = 'star' + (starred ? ' on' : '') + (viaRoster ? ' viaroster' : '');
   star.type = 'button';
-  star.textContent = owned.has(p.k) ? '★' : '☆';
-  star.title = 'Mark as owned';
-  star.setAttribute('aria-label', 'Mark ' + p.n + ' as owned');
-  star.setAttribute('aria-pressed', String(owned.has(p.k)));
+  star.textContent = starred || viaRoster ? '★' : '☆';
+  star.title = viaRoster ? 'In your roster — already counts as owned' : 'Mark as owned';
+  star.setAttribute('aria-label', viaRoster
+    ? p.n + ' is in your roster and already counts as owned'
+    : 'Mark ' + p.n + ' as owned');
+  star.setAttribute('aria-pressed', String(starred));
   star.addEventListener('click', e => { e.stopPropagation(); onToggle(star); });
   return star;
+}
+// the grid is one composite widget: exactly one tile and its star are in the
+// tab order at a time, and they move together
+function focusTile(tile, moveFocus) {
+  if (!tile) return;
+  for (const t of dexGrid.querySelectorAll('.dextile-open')) t.tabIndex = -1;
+  for (const st of dexGrid.querySelectorAll('.dextile .star')) st.tabIndex = -1;
+  tile.tabIndex = 0;
+  const st = tile.parentElement.querySelector('.star');
+  if (st) st.tabIndex = 0;
+  if (moveFocus) tile.focus();
 }
 
 function renderDex() {
@@ -5144,12 +5186,12 @@ function renderDex() {
 
   const filtering = !!(q || ty || wk || dexShow !== 'all');
   document.getElementById('dexCount').textContent =
-    filtering ? `${rows.length} of ${PALS.length} species` : PALS.length + ' species';
+    filtering ? `${rows.length} of ${PALS.length} species` : '';
   // a visible way out of persisted filters ("1 of 299" a week later)
   document.getElementById('dexClear').hidden = !filtering;
   document.getElementById('dexOwnedCount').textContent = `${os.size} of ${PALS.length} owned`;
   // said once to someone who has starred nothing, then gone for good
-  document.getElementById('dexIntro').hidden = os.size > 0;
+  document.getElementById('dexIntro').hidden = owned.size > 0;
 
   // the phone table shows one value column; it says which one
   const SORT_SHORT = {z: '#', n: '#', t: 'Element', r: 'Power', m: '♂', w: 'Work'};
@@ -5169,12 +5211,12 @@ function renderDex() {
     if (dexShow === 'owned' && !os.size) {
       h.append('You haven’t starred any species yet. Pals in your roster count automatically. ');
       act('Show all species', showAll);
-    } else if (dexShow === 'missing' && !filtering) {
+    } else if (dexShow === 'missing' && !(q || ty || wk)) {
       h.append('You own every species that matches. Nice. ');
       act('Show all species', showAll);
     } else {
       h.append('No species match these filters. ');
-      act('Clear filters', clearDexFilters);
+      act('✕ Clear filters', clearDexFilters);
     }
     empty.appendChild(h);
     return;
@@ -5197,7 +5239,7 @@ function emitGallery(rows, wk, os) {
     meta.appendChild(dexMetric(p, wk)); b.appendChild(meta);
     b.addEventListener('click', () => openModal(p));
     li.appendChild(b);
-    li.appendChild(dexStar(p, star => {
+    const st = dexStar(p, star => {
       toggleOwned(p.k); renderReverse();
       // Show=All keeps the tile, so mutate it in place: a re-render would
       // destroy the button under the user's finger and drop focus.
@@ -5209,7 +5251,7 @@ function emitGallery(rows, wk, os) {
         li.classList.toggle('on', ownedSpeciesSet().has(p.k));
         const oc = ownedSpeciesSet();
         document.getElementById('dexOwnedCount').textContent = `${oc.size} of ${PALS.length} owned`;
-        document.getElementById('dexIntro').hidden = oc.size > 0;
+        document.getElementById('dexIntro').hidden = owned.size > 0;
       } else {
         // the tile leaves the set; hand focus to whatever takes its place
         const at = [...dexGrid.children].indexOf(li);
@@ -5217,11 +5259,12 @@ function emitGallery(rows, wk, os) {
         const next = dexGrid.children[Math.min(at, dexGrid.children.length - 1)];
         (next ? next.querySelector('.star') : document.querySelector('#dexEmpty .alink') || dexSearch).focus();
       }
-    }));
+    });
+    st.tabIndex = -1;
+    li.appendChild(st);
     dexGrid.appendChild(li);
   }
-  const first = dexGrid.querySelector('.dextile-open');
-  if (first) first.tabIndex = 0;
+  focusTile(dexGrid.querySelector('.dextile-open'), false);
 }
 
 // The grid is one composite widget, not 299 tab stops: arrows move between
@@ -5248,7 +5291,7 @@ dexGrid.addEventListener('keydown', e => {
   else if (e.key === 'PageUp') j = Math.max(i - cols * 4, 0);
   if (j === null) return;
   e.preventDefault();
-  cur.tabIndex = -1; tiles[j].tabIndex = 0; tiles[j].focus();
+  focusTile(tiles[j], true);
   tiles[j].scrollIntoView({block: 'nearest',
     behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
 });
