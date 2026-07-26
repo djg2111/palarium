@@ -15,7 +15,9 @@
 // v17: mapdata.js gained the second alpha of the two paired spawners (Necromus
 // beside Paladius, Celesdir beside Celesdir Noct). Same filename, so an offline
 // client would otherwise keep serving a map that says Necromus doesn't exist.
-const VERSION = 'palarium-v17';
+// v18: mapdata.js again — the two Dualith alphas shared one SpawnerID, so one
+// of them had no working #/map/ link. Same reasoning as v17.
+const VERSION = 'palarium-v18';
 const SHELL = ['.', 'index.html', 'css/style.css', 'js/app.js', 'js/data.js',
   'js/mapdata.js', 'assets/favicon.svg', 'assets/lockup.svg', 'manifest.webmanifest'];
 

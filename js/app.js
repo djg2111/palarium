@@ -3476,6 +3476,10 @@ function mapResetTiles() {
 // constant number of screen pixels at every zoom, like the icon's own size.
 // left/top stay on the true position, so nothing that measures anything (the
 // link line, mapNearest, the statue ranking) sees the nudge at all.
+//
+// Sideways, starting at 0° rather than straight up: an alpha wears its level
+// badge above its own icon, so fanning a pair vertically put the lower one's
+// "Lv 60" squarely over the upper one's face.
 const MARK_FAN = 15;           // screen px; the alpha icon itself is 26
 function mapBuildMarkers() {
   mapMarksEl.textContent = ''; mapEls.clear();
@@ -3494,7 +3498,7 @@ function mapBuildMarkers() {
     if (n > 1) {
       const i = seen.get(pos) || 0;
       seen.set(pos, i + 1);
-      const a = Math.PI * 2 * i / n - Math.PI / 2;
+      const a = Math.PI * 2 * i / n;
       b.style.setProperty('--fx', (Math.cos(a) * MARK_FAN).toFixed(1) + 'px');
       b.style.setProperty('--fy', (Math.sin(a) * MARK_FAN).toFixed(1) + 'px');
     }

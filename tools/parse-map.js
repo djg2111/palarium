@@ -257,6 +257,29 @@ for (const r of rawRegions) {
 }
 regions.sort((a, b) => b.r - a.r);
 
+// ---- unique marker ids ----
+// SpawnerIDs are not unique in the source. Two different Dualith spawners --
+// one Lv 75 in the north-east, one Lv 55 at the far south-west -- both call
+// themselves remainsIsland_1_GrassGolem_FBOSS. The id is what a #/map/<id>
+// link resolves against and what the app keys its marker elements by, so a
+// collision leaves one of the pair unreachable and unhighlightable.
+//
+// First seen keeps the bare id, because that is the one existing links already
+// resolve to; each later collision takes the lowest free numeric suffix.
+{
+  const used = new Set();
+  let renamed = 0;
+  for (const m of out) {
+    if (!m.id) continue;                 // the app names the id-less ones off their actor
+    if (!used.has(m.id)) { used.add(m.id); continue; }
+    let n = 2, id;
+    do { id = `${m.id}-${n++}`; } while (used.has(id));
+    console.log(`duplicate id ${m.id} -> ${id} (${m.type} ${m.label}${m.level ? ' Lv ' + m.level : ''})`);
+    m.id = id; used.add(id); renamed++;
+  }
+  if (!renamed) console.log('marker ids: all unique as generated');
+}
+
 fs.mkdirSync(`${P}/out`, { recursive: true });
 fs.writeFileSync(`${P}/out/mapMarkers.json`, JSON.stringify(out, null, 1));
 fs.writeFileSync(`${P}/out/mapRegions.json`, JSON.stringify(regions, null, 1));
