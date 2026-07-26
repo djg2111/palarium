@@ -1,0 +1,41 @@
+# Palarium — project instructions
+
+Static vanilla-JS Palworld breeding tool. No build step, no dependencies, dark-only,
+offline PWA. `index.html` (markup) · `js/app.js` (all logic) · `css/style.css` ·
+`js/data.js` (generated dataset — do not hand-edit) · `sw.js` · `assets/pals/`.
+
+Serve with `python -m http.server 8123` (or open `index.html` directly). Syntax check:
+`node --check js/app.js`.
+
+## Design workflow (this is the point — follow it)
+
+`DESIGN.md` is the binding design standard (tokens, component tiers, copy lexicon,
+WCAG commitments). For any user-facing change:
+
+1. **New feature, new view, or flow rework** → run the **ux-designer** agent first
+   and implement its spec. Don't design ad hoc in the main loop.
+2. **Implement** following DESIGN.md: reuse canon components (§4), tokens only (§1),
+   copy lexicon (§6). No new one-off styles without documenting them in DESIGN.md in
+   the same change.
+3. **Before committing UI changes** → run **design-reviewer** and **a11y-auditor**
+   (they can run in parallel). Fix P0/P1 findings and any a11y FAIL before commit;
+   note deliberately skipped P2/P3 in the commit message.
+4. If a change makes DESIGN.md wrong, amend DESIGN.md in the same commit.
+
+Trivial non-visual changes (data regen, README, comments) skip the agents.
+
+## Hard constraints
+
+- Vanilla JS, no frameworks, no build step, no CDN/network assets (offline PWA).
+- axe-core must stay clean (WCAG 2.1 A+AA) in every state; keyboard operability and
+  focus management must not regress. WCAG 2.2 AA for new work (targets ≥24px, drag
+  alternatives, focus not obscured).
+- Breeding math and dataset are correct — out of scope for UI work.
+- All user data is localStorage (`palbreed*` keys); never break existing stored state
+  without a migration.
+
+## Conventions
+
+- Commit style: short imperative subject, body explains the why (see git log).
+- Deep links: `#/breed/A/B`, `#/pal/K`, `#/plan/A+B/T` — keys or display names.
+- Test both cold start and a lived-in state (seed keys: DESIGN.md §9).
