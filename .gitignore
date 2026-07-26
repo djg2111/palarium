@@ -5,3 +5,7 @@ desktop.ini
 # dotnet build output for tools/extractor
 bin/
 obj/
+
+# Palworld saves — never commit; they contain a Steam ID, world GUID and player names
+*.sav
+tools/saves/

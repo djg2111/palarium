@@ -213,7 +213,11 @@ for (const [key, g] of Object.entries(passiveRows)) {
     parts.push(unit === 'flag' ? `${type.toLowerCase()}${party}`
       : `${type.toLowerCase()} ${val >= 0 ? '+' : ''}${val}${unit === '%' ? '%' : ''}${party}`);
   }
-  const p = { n, r: g.Rank ?? 0, e: parts.join(', ') };
+  // k is the DT_PassiveSkill_Main row name — the id a save file stores. Display
+  // names are localised and change; this doesn't, so it's what a save import
+  // matches on. All 115 displayable rows have one, and every passive seen on a
+  // pal in a real save is a displayable row, so the app never has to guess.
+  const p = { n, k: key, r: g.Rank ?? 0, e: parts.join(', ') };
   if (g.AddMutationPal && !g.AddPal && !g.AddRarePal && !g.AddWorldTreePal) p.mt = 1;
   passives.push(p);
 }
