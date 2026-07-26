@@ -5101,6 +5101,8 @@ document.querySelectorAll('th[data-s]').forEach(th => {
     const k = th.dataset.s;
     dexSort = {key: k, dir: dexSort.key === k ? -dexSort.dir : (k === 'w' ? -1 : 1)};
     save(); renderDex();
+    th.querySelector('.thbtn')?.focus();   // renderDex rewrote this header
+
   });
 });
 
@@ -5207,7 +5209,13 @@ function renderDex() {
   if (!rows.length) {
     const h = document.createElement('div'); h.className = 'hint';
     const act = (label, fn) => { const b = document.createElement('button'); b.className = 'alink'; b.textContent = label; b.addEventListener('click', fn); h.appendChild(b); };
-    const showAll = () => { dexShow = 'all'; setSeg(document.getElementById('dexShow'), 'all', 'v'); save(); renderDex(); };
+    const showAll = () => {
+      dexShow = 'all'; setSeg(document.getElementById('dexShow'), 'all', 'v');
+      save(); renderDex();
+      // the button that was pressed lived in the empty state this just cleared,
+      // so hand focus to the control that now carries the same state
+      document.querySelector('#dexShow button[data-v="all"]').focus();
+    };
     if (dexShow === 'owned' && !os.size) {
       h.append('You haven’t starred any species yet. Pals in your roster count automatically. ');
       act('Show all species', showAll);
@@ -5257,6 +5265,7 @@ function emitGallery(rows, wk, os) {
         const at = [...dexGrid.children].indexOf(li);
         renderDex();
         const next = dexGrid.children[Math.min(at, dexGrid.children.length - 1)];
+        if (next) focusTile(next.querySelector('.dextile-open'), false);
         (next ? next.querySelector('.star') : document.querySelector('#dexEmpty .alink') || dexSearch).focus();
       }
     });
@@ -5277,9 +5286,11 @@ dexGrid.addEventListener('keydown', e => {
   const i = tiles.indexOf(cur);
   const first = dexGrid.querySelector('.dextile');
   const second = first && first.nextElementSibling;
+  const gap = parseFloat(getComputedStyle(dexGrid).columnGap) || 0;
   // read the column count off the layout rather than hard-coding a breakpoint
   const cols = second && second.getBoundingClientRect().top === first.getBoundingClientRect().top
-    ? Math.max(1, Math.round(dexGrid.getBoundingClientRect().width / first.getBoundingClientRect().width)) : 1;
+    ? Math.max(1, Math.round((dexGrid.getBoundingClientRect().width + gap)
+        / (first.getBoundingClientRect().width + gap))) : 1;
   let j = null;
   if (e.key === 'ArrowRight') j = Math.min(i + 1, tiles.length - 1);
   else if (e.key === 'ArrowLeft') j = Math.max(i - 1, 0);

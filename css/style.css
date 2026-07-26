@@ -563,8 +563,11 @@ select#genderSel{padding:10px 12px}
   overflow-wrap:anywhere;color:var(--text)}
 .dt-meta{font-size:var(--fs-xs);color:var(--muted);text-align:center;line-height:1.3}
 .dt-meta .uq{display:block}
-.dextile .star{position:absolute;top:0;right:0;z-index:1;padding:8px;margin:0;line-height:1;
+.dextile .star{position:absolute;top:0;right:0;z-index:1;padding:11px;margin:0;line-height:1;
   background:none;border:0;font-size:var(--fs-md)}
+/* 36x36, not the 44 §8 prefers for a primary mobile action: at 44 the star's
+   hit box covers a quarter of an 80px tile and overlaps the art, stealing
+   presses from the tile itself. Both are real targets here. */
 /* owned through the roster rather than starred here — same gold, lighter weight */
 .star.viaroster{color:var(--gold);opacity:.75}
 @media (max-width:640px){
