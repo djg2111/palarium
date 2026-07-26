@@ -41,9 +41,11 @@ function check(label, got, want) {
 
   await page.click('#importBtn');
   await page.waitForSelector('#smPick:not([hidden])');
+  // backups moved to their own screen behind "Backup & restore"; this one is
+  // now only about the save, and says so before anything is picked
   const heads = await page.$$eval('#smPick .smh3', els => els.map(e => e.textContent.trim()));
-  check('both sources are described before anything is picked', heads,
-    ['From my Palworld save', 'From a Palarium backup']);
+  check('the save source is described before anything is picked', heads, ['From my Palworld save']);
+  check('and there is a way over to backups', await page.isVisible('#smToHub'), true);
   await page.waitForTimeout(400);   // let the dialog's pop animation settle
   await page.screenshot({path: path.join(__dirname, 'shot-import-desktop.png')});
 
@@ -98,16 +100,27 @@ function check(label, got, want) {
   await page.waitForTimeout(400);
   await page.evaluate(() => location.hash = '#/roster');
   await page.waitForTimeout(250);
-  await page.click('#importBtn');
-  await page.waitForSelector('#smPick:not([hidden])');
+  // backups have their own door now — "Backup & restore", not the save reader
+  await page.click('#exportBtn');
+  await page.waitForSelector('#smHub:not([hidden])');
   await page.setInputFiles('#importFile', tmp);
   await page.waitForSelector('#smBackup:not([hidden])', {timeout: 15000});
   const bsum = (await page.textContent('#smBackupSum')).trim();
-  const bwarn = (await page.textContent('#smBackupWarn')).trim();
   console.log('  ' + bsum);
-  console.log('  ' + bwarn);
   check('the backup is described before it is applied', /holds \d+ pals/.test(bsum), true);
-  check('and it says plainly what it replaces', /replaces your current roster/.test(bwarn), true);
+  // the owned list survived, so this is not a cold start: merge is offered and
+  // is the default, and the destructive option has to be chosen on purpose
+  check('merge is offered and defaults on', await page.evaluate(() =>
+    !document.getElementById('smMode').hidden &&
+    document.getElementById('smmode-merge').classList.contains('on')), true);
+  const beff = (await page.textContent('#smBackupEffect')).trim();
+  console.log('  ' + beff);
+  check('merging says nothing of yours is touched', /Nothing you have is changed or removed/.test(beff), true);
+  await page.click('#smmode-replace');
+  await page.waitForTimeout(200);
+  const bwarn = (await page.textContent('#smBackupWarn')).trim();
+  console.log('  ' + bwarn);
+  check('and replacing says plainly what it removes', /^Removes your /.test(bwarn), true);
   await page.screenshot({path: path.join(__dirname, 'shot-backup-desktop.png')});
   await page.click('#smBackupApply');
   await page.waitForTimeout(800);

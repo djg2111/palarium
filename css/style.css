@@ -7,7 +7,9 @@
   /* text — three tiers + non-text glyph tier */
   --text:#e6edf3; --text-2:#c3ccd8; --muted:#8b98a9; --faint:#5f6d80;
   --ink:#0d1117; /* text on solid accent / colored chips */
-  /* accent + semantic roles (desaturated ~20%; all ≥6.2:1 on any surface) */
+  /* accent + semantic roles (desaturated ~20%; all ≥4.5:1 AA on every surface
+     in the ladder — see DESIGN.md §1 for the computed matrix. --faint is the
+     one exception and is non-essential text only.) */
   --accent:#58b6ea; --accent-hover:#6fc1ee;
   --success:#7fd49e; --gold:#d9b25c; --danger:#ef8fb8;
   --male:#6aa8f0; --female:#e0708f;
@@ -278,6 +280,15 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
   mask-image:linear-gradient(90deg,#000,#000 calc(100% - 24px),transparent)}
 .tablewrap.panning.atend{-webkit-mask-image:none;mask-image:none}
 .dex-controls .search-inp{width:auto;flex:1;min-width:160px;max-width:300px}
+/* The roster row labels its controls. stretch + justify-content:flex-end puts
+   every control on one bottom line whatever its height, so the uppercase
+   labels above them line up instead of staggering by a few px. */
+.roscontrols{align-items:stretch}
+.roscontrols[hidden]{display:none} /* a display: of its own outranks the UA's [hidden] */
+.roscontrols .ctl{display:flex;flex-direction:column;justify-content:flex-end}
+/* the search field is the one that should take the slack, not sit at 202px */
+.roscontrols>.ctl:first-child{flex:1 1 260px;max-width:340px}
+.roscontrols .search-inp{max-width:none;width:100%}
 .dex-controls .isel{flex:0 1 auto}
 @media(max-width:640px){.dex-controls select,.dex-controls .isel{flex:1;min-width:140px}}
 select{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);color:var(--text);padding:10px 14px;outline:none;cursor:pointer}
@@ -426,8 +437,10 @@ tbody tr:hover{background:var(--surface)}
 .pchip.ro{cursor:default}
 .pchip.ro:hover{border-color:var(--success-line);color:var(--success)}
 .pchip.neg.ro:hover{border-color:var(--danger-line);color:var(--danger)}
-/* min(…,100%) so a 300px track floor can't outgrow a 268px column on a 320px phone */
-.roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:10px;margin-top:16px}
+/* A full-width stack of species sections. Rows are wide enough for four
+   passive chips on one line, which is where the density comes from — the old
+   300px grid tiles could never fit two. */
+.roster{display:flex;flex-direction:column;gap:10px;margin-top:16px}
 .strip{display:flex;flex-wrap:wrap;gap:8px}
 .spal{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-full);padding:4px 13px 4px 5px;cursor:pointer;font-size:var(--fs-md);font-weight:600}
 .spal:hover{border-color:var(--border-strong)}
@@ -436,7 +449,6 @@ tbody tr:hover{background:var(--surface)}
 .gm{color:var(--male)}.gf{color:var(--female)}
 .g svg{width:.95em;height:.95em;display:inline-block;vertical-align:-.08em}
 .rstats{color:var(--muted);font-size:var(--fs-sm);white-space:nowrap}
-.rospal .nick{color:var(--muted);font-weight:400;font-size:var(--fs-sm);margin-left:6px}
 select#genderSel{padding:10px 12px}
 .ivrow{display:flex;gap:6px}
 .iv{width:62px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 8px;outline:none;text-align:center;-moz-appearance:textfield}
@@ -444,8 +456,9 @@ select#genderSel{padding:10px 12px}
 .iv:focus{border-color:var(--accent)}
 .ivchip{font-size:var(--fs-xs);color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:1px 7px;margin-left:6px;white-space:nowrap;display:inline-block}
 /* a roster note is a caption, not a callout — reset the guide's .note blockquote */
-.rospal .note{border:0;background:none;padding:0;border-radius:0;
-  color:var(--muted);font-size:var(--fs-sm);font-style:italic;margin:4px 0 0}
+.rosrow .note{border:0;background:none;padding:0;border-radius:0;
+  color:var(--muted);font-size:var(--fs-sm);font-style:italic;margin:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .warnbox{border-left:3px solid var(--danger);background:var(--danger-tint);padding:10px 14px;border-radius:0 10px 10px 0;font-size:var(--fs-md);margin-bottom:12px;color:var(--text-2)}
 .rmodal{width:min(480px,100%)}
 .rmtitle{font-size:var(--fs-h2);margin-bottom:16px}
@@ -489,14 +502,62 @@ select#genderSel{padding:10px 12px}
 .collhead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:14px}
 .collhead h2{font-size:var(--fs-h2)}
 .collhead .collacts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
-.rospal.editing{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.rosgroup{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 15px}
-.rosgroup .ghead{display:flex;align-items:center;gap:10px;font-weight:700;font-size:var(--fs-md)}
-.rosgroup .cntb{background:var(--raised);border:1px solid var(--border-strong);border-radius:var(--r-full);font-size:var(--fs-xs);padding:1px 9px;color:var(--muted);font-weight:600}
-.rosgroup .gentry{display:flex;align-items:center;gap:8px;margin-top:9px;padding-top:9px;border-top:1px solid var(--border);flex-wrap:wrap}
-.rosgroup .gentry .who{font-size:var(--fs-sm);font-weight:600;min-width:0}
-.rosgroup .gentry .acts{margin-left:auto;display:flex;gap:5px}
-.rosgroup .gentry.editing{border-top-color:var(--accent)}
+/* ---- roster: one species section, one pal per row ---- */
+.rosgrp{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:0}
+.rosgrp>summary{display:flex;align-items:center;gap:10px;font-weight:700;font-size:var(--fs-md);
+  padding:9px 15px;cursor:pointer;list-style:none;border-radius:var(--r-lg)}
+.rosgrp>summary::-webkit-details-marker{display:none}
+.rosgrp>summary::before{content:'▸';color:var(--muted);font-size:var(--fs-sm);
+  transition:transform var(--t-fast) var(--ease-out);display:inline-block}
+.rosgrp[open]>summary::before{transform:rotate(90deg)}
+.rosgrp>summary:hover{color:var(--accent)}
+.rosgrp .cntb{background:var(--raised);border:1px solid var(--border-strong);border-radius:var(--r-full);
+  font-size:var(--fs-xs);padding:1px 9px;color:var(--muted);font-weight:600;white-space:nowrap}
+.rosgrp .gname2{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.roslist{list-style:none;margin:0;padding:0}
+/* Identical tracks on every row, so columns line up down the whole section.
+   The identity track has to be able to give ground: fixed at 240px it starved
+   the passives track to 0px between 641 and ~860px and painted the chips on
+   top of the note. Passives are what you scan for, so they yield last. */
+.rosrow{display:grid;grid-template-columns:minmax(140px,240px) minmax(200px,1fr) minmax(0,220px) 116px;
+  align-items:center;gap:12px;padding:6px 15px;border-top:1px solid var(--border);
+  transition:background var(--t-fast)}
+/* below this the note can't have a column of its own without squeezing the
+   chips, so it drops to its own line and keeps the row on two tracks */
+@media (max-width:1000px){
+  .rosrow{grid-template-columns:minmax(0,1fr) minmax(0,2fr) 116px}
+  /* the toolbar has to be pinned to row 1 explicitly: the note spans the full
+     width before it in DOM order, which would otherwise push it to a third row
+     and leave an empty band under every row that has a note */
+  .rosrow .who{grid-area:1/1}
+  .rosrow .pscol{grid-area:1/2}
+  .rosrow .acts{grid-area:1/3}
+  .rosrow .note{grid-area:2/1/3/-1;margin-top:2px}
+}
+.rosrow:hover{background:var(--raised)}
+.rosrow.editing{box-shadow:inset 2px 0 0 var(--accent);background:var(--accent-tint)}
+.rosrow .who{display:flex;align-items:center;gap:2px;min-width:0;flex-wrap:wrap}
+.rosrow .nm{font-weight:600;font-size:var(--fs-md);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* gender not recorded — same slot and weight as ♂/♀, so the column still aligns */
+.rosrow .gu{color:var(--muted);font-weight:700}
+.rosrow .pscol{min-width:0}
+.rosrow .note:empty{display:none}
+/* "No passives" is a fact about the pal, not decoration — --muted (6.45:1),
+   never --faint, which is below AA for text */
+.rosrow .nops{color:var(--muted);font-size:var(--fs-sm);font-style:italic}
+.rosrow .acts{display:flex;gap:5px;justify-content:flex-end}
+/* the gutter is reserved at all times, so revealing the buttons shifts nothing */
+@media (hover:hover) and (pointer:fine){
+  .rosrow .acts{opacity:0;transition:opacity var(--t-fast)}
+  .rosrow:hover .acts,.rosrow:focus-within .acts{opacity:1}
+}
+/* a meta chip that carries a warning — never colour alone, it says the words */
+.mchip.warn{color:var(--danger);border-color:var(--danger-line);background:var(--danger-tint)}
+/* compact: the same row, less air */
+.roster.dense .rosrow{padding:3px 15px;gap:10px}
+.roster.dense .rosgrp>summary{padding:8px 15px}
+/* every action for one entry, named, at comfortable size — see openModal */
+.rentacts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
 /* shared small ghost button: roster actions, plan delete, step-open, chain nav */
 .acts button,.stepopen,.planhead .del,.chainhead .nav button{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:4px 10px;font-size:var(--fs-sm);font-weight:600;color:var(--muted)}
 .acts button:hover,.stepopen:hover,.planhead .del:hover,.chainhead .nav button:hover:not(:disabled){color:var(--text);border-color:var(--border-strong)}
@@ -626,16 +687,12 @@ select#genderSel{padding:10px 12px}
 .pop .srcrow button{flex:1;padding:5px 10px;border-radius:var(--r-sm);font-size:var(--fs-sm);font-weight:700;color:var(--muted);background:var(--raised)}
 .pop .srcrow button.on{color:var(--text);background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-line)}
 .pop .srcrow button:hover:not(.on){color:var(--text)}
-.rospal{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:11px 14px;display:flex;gap:12px;align-items:flex-start;cursor:pointer;transition:border-color var(--t-fast)}
-.rospal:hover{border-color:var(--border-strong)}
-.rosgroup .ghead{cursor:pointer}
-.rosgroup .ghead:hover{color:var(--accent)}
-/* the action buttons take ~135px of a ~360px grid tile; sharing a row with them
-   left the body too narrow to put two passive chips side by side, at any width */
-.rospal{flex-wrap:wrap}
-.rospal .body{flex:1 1 150px;min-width:0}
-.rospal .nm{font-weight:700;font-size:var(--fs-md)}
-.rospal .acts{display:flex;gap:5px;flex-shrink:0;width:100%;justify-content:flex-end;margin-top:4px}
+/* A text-styled button that opens the pal card from inside a row. It is the
+   only way into that card, so it carries a real 24px target — padding plus a
+   matching negative margin, which grows the hit area and moves nothing. */
+.rosrow .thbtn{background:none;border:0;padding:5px 6px;margin:-5px -6px;min-height:24px;min-width:24px;
+  display:inline-flex;align-items:center;color:var(--text);text-align:left;cursor:pointer}
+.rosrow .thbtn:hover{color:var(--accent)}
 .plansec{display:flex;align-items:center;gap:12px;font-size:var(--fs-sm);font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--accent);margin:22px 0 12px}
 .plansec::after{content:'';flex:1;height:1px;background:var(--border);order:1}
 .plansec .alink{order:2;text-transform:none;letter-spacing:0}
@@ -971,7 +1028,11 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 .confmine,.confsave{font-size:var(--fs-sm);color:var(--text-2);line-height:1.5;margin-bottom:4px;overflow-wrap:anywhere}
 .confsave.amb{color:var(--muted);font-style:italic}
 .conflab{display:block;font-size:var(--fs-xs);color:var(--muted);margin:8px 0 4px}
-.confseg{margin-top:8px}
+.confseg,#smMode{margin-top:8px}
+/* the way out to the other import path — quiet, but always in the same place
+   at the foot of both entry screens */
+.smxlink{margin-top:22px;padding-top:14px;border-top:1px solid var(--border)}
+.smxlink .alink{margin-left:6px}
 .smprev{margin-top:4px}
 .smlist{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto;
   border:1px solid var(--border);border-radius:var(--r-lg);padding:8px 10px;background:var(--raised)}
@@ -988,6 +1049,7 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 
 /* the two ways in, and the world list a folder produces */
 .smchoose{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.smchoose[hidden],.segrow[hidden]{display:none} /* a display: of its own outranks the UA's [hidden] */
 .pathrow{display:flex;gap:8px;align-items:center}
 .pathrow .mono{flex:1;min-width:0}
 .worldlist{display:flex;flex-direction:column;gap:8px;margin:4px 0 4px}
@@ -1012,6 +1074,10 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
          every toast underneath the nav. --- */
   footer{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
   .toasts{bottom:calc(76px + env(safe-area-inset-bottom))}
+  /* sequential focus navigation honours scroll-padding, so tabbing to a control
+     near the fold scrolls it clear of the fixed nav instead of parking it
+     underneath (WCAG 2.4.11 Focus Not Obscured) */
+  html{scroll-padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 
   /* --- density: desktop gutters cost ~50px of a 390px screen --- */
   .pcard{padding:16px 14px}
@@ -1023,7 +1089,7 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 
   /* --- filter/search rows: one full-width control per line --- */
   .controls,.dex-controls{gap:10px}
-  .controls>.ctl,
+  .controls>.ctl,.dex-controls>.ctl,
   .dex-controls>.search-inp,.dex-controls>select,.dex-controls>.isel,
   .dex-controls>.toggle,.dex-controls>.segrow{flex:1 1 100%;width:100%;min-width:0;max-width:none}
   .search-inp{width:100%}
@@ -1031,7 +1097,8 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .ctl .picker,.ctl select,.ctl .search-inp,.ctl .toggle{width:100%;max-width:none;min-width:0}
   /* an &nbsp; label exists only to bottom-align the desktop row — on a stack
      it renders as a phantom gap above the toggle */
-  .controls .ctl label[aria-hidden="true"]{display:none}
+  .controls .ctl label[aria-hidden="true"],
+  .dex-controls .ctl label[aria-hidden="true"]{display:none}
   #hatchDepth button,#comboKind button{flex:1 1 0;padding:9px 6px}
 
   /* --- breed: equal full-width parent slots, swap between them --- */
@@ -1046,10 +1113,21 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .pair{flex-wrap:wrap}
   .pair .pside{flex:1 1 128px;min-width:128px}
 
-  /* --- roster: .rospal already wraps its actions (see above); here the header
-         buttons stop being pushed into the middle by margin-left:auto --- */
+  /* --- roster: the header buttons stop being pushed into the middle by
+         margin-left:auto, and a row stacks into three lines --- */
   .collhead .collacts{margin-left:0;width:100%}
-  .rosgroup .gentry .acts{margin-left:0}
+  /* identity + toolbar on line 1, passives on line 2, note on line 3 */
+  .rosrow{grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;padding:10px 12px}
+  .rosrow .who{grid-column:1}
+  .rosrow .acts{grid-column:2;grid-row:1;opacity:1}
+  .rosrow .pscol{grid-column:1/-1}
+  /* the note has the full width here, so it wraps rather than ellipsising into
+     a title attribute touch users can never open (DESIGN.md §8) */
+  .rosrow .note{grid-column:1/-1;white-space:normal}
+  /* thumb-sized targets without changing how the buttons look */
+  .rosrow .acts button{min-width:32px;min-height:32px}
+  .rosgrp>summary{min-height:44px}
+  .roster.dense .rosrow{padding:7px 12px}
 
   /* --- add-pal dialog: three buttons in one row collapsed the primary to a
          73px column of single words --- */
@@ -1118,8 +1196,8 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 
   /* --- read-a-save dialog: the segmented choice per collision and the
          action row both need one full-width column here --- */
-  .confseg{flex-direction:column}
-  .confseg button{width:100%}
+  .confseg,#smMode{flex-direction:column}
+  .confseg button,#smMode button{width:100%}
   .smacts{flex-direction:column}
   .smacts .alink{width:100%;justify-content:center}
   .smlist{max-height:200px}

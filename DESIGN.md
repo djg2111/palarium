@@ -19,34 +19,49 @@ Never add a token without a role and a contrast entry here.**
 | Token | Value | Role |
 |---|---|---|
 | `--bg` | `#0d1117` | App background (level 0) |
-| `--bg2` | `#161b22` | Card / surface (level 1) |
-| `--bg3` | `#1c2330` | Raised control, hover fill (level 2) |
+| `--surface` | `#161b22` | Card / surface (level 1) |
+| `--raised` | `#1c2330` | Raised control, hover fill (level 2) |
+| `--overlay` | `#232b3a` | Popover / menu surface (level 3) |
+| `--scrim` | `rgba(5,8,12,.82)` | Modal backdrop |
 | `--border` | `#2a3342` | Hairline borders, dividers (decorative) |
-| `--border2` | `#3a465c` | Emphasized borders, control outlines |
+| `--border-strong` | `#3a465c` | Emphasized borders, control outlines |
 | `--text` | `#e6edf3` | Primary text |
-| `--dim` | `#8b98a9` | Secondary text, labels |
-| `--accent` | `#4cc2ff` | Interactive / primary actions / focus rings / links |
-| `--accent2` | `#7ee0a3` | Positive: passives, success, "new" |
-| `--gold` | `#e3b341` | Ownership (★), rarity, unique combos |
-| `--pink` | `#ff7eb6` | Warnings, destructive hover, ♀ gender |
+| `--text-2` | `#c3ccd8` | Body copy inside dialogs and cards |
+| `--muted` | `#8b98a9` | Secondary text, labels |
+| `--faint` | `#5f6d80` | Placeholder / absent-value text only — never load-bearing |
+| `--ink` | `#0d1117` | Text **on** a solid accent or colored chip |
+| `--accent` / `--accent-hover` | `#58b6ea` / `#6fc1ee` | Interactive / primary actions / focus rings / links |
+| `--success` | `#7fd49e` | Positive: passives, success, "new" |
+| `--gold` | `#d9b25c` | Ownership (★), rarity, unique combos |
+| `--danger` | `#ef8fb8` | Warnings, destructive hover |
+| `--male` / `--female` | `#6aa8f0` / `#e0708f` | Gender glyphs only |
 | `--neutral` + element colors | various | Element typing only (chips/dots) |
 
-**Elevation = lighter surface, never shadow alone.** The ladder is bg → bg2 → bg3;
-popovers/toasts sit on bg2/bg3 with a border plus shadow. Don't invent intermediate
-grays.
+**Tint recipe.** Each semantic color gets exactly two alphas and no others:
+`--<name>-tint` (`.08`, fills) and `--<name>-line` (`.35`, borders) — defined for
+`accent`, `success`, `gold`, `danger`. Don't write a new `rgba()` in a rule.
 
-**Contrast matrix (WCAG ratios, computed 2026-07).** Approved pairings — anything not
-derivable from this table needs a computed ratio before merge:
+**Elevation = lighter surface, never shadow alone.** The ladder is
+bg → surface → raised → overlay; popovers/toasts sit on raised/overlay with a border
+plus shadow. Don't invent intermediate grays.
 
-| Foreground | on `--bg` | on `--bg2` | on `--bg3` | Verdict |
-|---|---|---|---|---|
-| `--text` | 16.0 | 14.6 | 13.3 | AA/AAA all sizes |
-| `--dim` | 6.5 | 5.9 | 5.4 | AA all sizes |
-| `--accent` | 9.4 | 8.6 | 7.9 | AA all sizes |
-| `--accent2` | 11.8 | 10.8 | 9.8 | AA all sizes |
-| `--gold` | 9.7 | 8.9 | 8.1 | AA all sizes |
-| `--pink` | 8.0 | 7.3 | 6.7 | AA all sizes |
-| `--border2` | 2.0 | 1.8 | 1.7 | **Decorative only** — a border below 3:1 must never be the sole indicator of a control's boundary or state; pair with a fill, icon, or text change |
+**Contrast matrix (WCAG ratios, computed 2026-07-26).** Approved pairings — anything
+not in this table needs a computed ratio before merge:
+
+| Foreground | on `--bg` | on `--surface` | on `--raised` | on `--overlay` | Verdict |
+|---|---|---|---|---|---|
+| `--text` | 16.02 | 14.64 | 13.34 | 12.02 | AA/AAA all sizes |
+| `--text-2` | 11.67 | 10.67 | 9.72 | 8.76 | AA/AAA all sizes |
+| `--muted` | 6.45 | 5.90 | 5.37 | 4.85 | AA all sizes |
+| `--accent` | 8.38 | 7.66 | 6.98 | 6.29 | AA all sizes |
+| `--success` | 10.65 | 9.73 | 8.87 | 7.99 | AA all sizes |
+| `--gold` | 9.44 | 8.63 | 7.86 | 7.09 | AA all sizes |
+| `--danger` | 8.37 | 7.65 | 6.97 | 6.29 | AA all sizes |
+| `--male` | 7.63 | 6.98 | 6.36 | 5.73 | AA all sizes |
+| `--female` | 6.20 | 5.67 | 5.17 | 4.66 | AA all sizes |
+| `--ink` on `--accent` | — | 8.38 | — | — | AA — the solid-primary pairing |
+| `--faint` | 3.59 | 3.28 | 2.99 | 2.70 | **Below AA — non-essential text only.** Placeholders and decorative hints. A fact the user needs (an absent value, a count, a state) must be `--muted` or better. |
+| `--border-strong` | 1.99 | 1.82 | 1.66 | 1.50 | **Decorative only** — a border below 3:1 must never be the sole indicator of a control's boundary or state; pair with a fill, icon, or text change |
 
 Dark-theme rules: accents stay in this desaturated range — no saturated pure hues
 (they vibrate on dark). Text is dimmed white (`--text`), never `#fff`. Large solid
@@ -54,23 +69,34 @@ areas of accent color are avoided; accents are for interactive elements and mean
 
 ## 2 · Spacing & radius
 
-Target scale (px): **4 · 8 · 12 · 16 · 20 · 24 · 32**. New rules use the scale;
-existing off-scale values (7, 9, 11, 13, 14, 18, 22, 26…) migrate opportunistically
-when a rule is already being touched — no mass rewrites. Radii: `4` (inline code/small),
-`8` (small controls), `12` (inputs, cards inner), `14` (`--radius`, inputs/pickers),
-`18–20` (cards, modals), `20px+`/pill (chips). Reuse the nearest existing radius;
-don't add new ones.
+Spacing tokens: `--sp-1…7` = **4 · 8 · 12 · 16 · 20 · 24 · 32**. New rules use the
+scale; existing off-scale values (7, 9, 11, 13, 14, 18, 22, 26…) migrate
+opportunistically when a rule is already being touched — no mass rewrites.
+
+Radius tokens — reuse the nearest, don't add new ones:
+
+| Token | Value | Use |
+|---|---|---|
+| `--r-sm` | 6px | inline code, chips inside chips, level/IV chips |
+| `--r-md` | 10px | small controls, buttons, segmented items |
+| `--r-lg` | 14px | inputs, pickers, cards inner, list rows |
+| `--r-xl` | 18px | cards, modals |
+| `--r-full` | 999px | pills, count badges, switches |
 
 ## 3 · Typography
 
 System stack (`"Segoe UI", system-ui, sans-serif`) — webfonts only if self-hosted,
 subset, and justified (offline PWA). Base body: 15px/1.5.
 
-Scale (px): **11 (micro labels/badges) · 12 (meta) · 13.5 (secondary UI) · 15 (body/controls)
-· 19 (card headings) · 23–25 (display, result cards/modal titles)**. Weights: 400
-(body), 600 (emphasis, buttons, names), 700–800 (headings, uppercase micro-labels).
-Hierarchy comes from weight + color (`--text` vs `--dim`), not from adding font sizes.
-Uppercase micro-labels always pair with `letter-spacing: .5–.7px` and 700+.
+Scale — seven tokens: `--fs-xs` **11** (micro labels/badges) ·
+`--fs-sm` **12.5** (meta, captions) · `--fs-md` **14** (secondary UI, buttons) ·
+`--fs-base` **15** (body/controls) · `--fs-lg` **17** · `--fs-h2` **19** (card
+headings) · `--fs-h1` **24** (display, result cards/modal titles). The heading jumps
+are ≥1.26×. Weights: 400 (body), 600 (emphasis, buttons, names), 700–800 (headings,
+uppercase micro-labels). Hierarchy comes from weight + color (`--text` vs `--muted`),
+not from adding font sizes. Uppercase micro-labels always pair with
+`letter-spacing: .5–.7px` and 700+. New rules use the tokens; the ~20 remaining
+literal `font-size:*px` declarations migrate opportunistically, as in §2.
 
 ## 4 · Components
 
@@ -81,8 +107,8 @@ Button tiers (one primary per view, never mix tiers inside one button group):
 
 | Tier | Class | Look | Use |
 |---|---|---|---|
-| Primary | `.alink.primary` | accent border + accent text, hover accent tint fill | The one main action of a view/dialog |
-| Secondary | `.alink` | bg2 + border, hover accent border | Everything actionable but not primary |
+| Primary | `.alink.primary` | solid `--accent` fill, `--ink` text, 700; hover `--accent-hover` | The one main action of a view/dialog |
+| Secondary | `.alink` | `--surface` + `--border`, `--muted` text; hover accent border | Everything actionable but not primary |
 | Quiet/tertiary | `.tx`, `.thbtn`, text-styled buttons | no border until hover | Dismiss, inline meta actions |
 | Icon | `.star`, `.tvp-ctrl button`, `.mnav`, `.close` | square/round, ≥24px hit area | Single-glyph actions, always `aria-label` |
 | Switch | `.toggle` (+ `.kn`) | pill + knob, `role="switch"` | Boolean filters/options; label states the *outcome* ("Pairs I can make") |
@@ -97,6 +123,25 @@ Other canon components: `.pcard` (view card), `.hint` (empty state — must incl
 next action), `.warnbox` (inline warning), `.toast` (feedback ≤8s, with Undo for
 destructive), `.pchip` (passive), `.tchip` (pal chip), `.badge` (outcome kinds),
 `.mchip` (meta), `.picker` (pal select), `.ptag` (tag input), `.needrow`, `.rsummary`.
+
+Roster list (one layout, always grouped by species — a breeding roster is made of
+siblings, so grouping is the shape of the data, not a preference):
+
+| Class | Role |
+|---|---|
+| `.rosgrp` | One species section. A native `<details>/<summary>` — native keyboard, native `aria-expanded`, no JS. `<summary>` holds no nested interactive elements. |
+| `.roslist` / `.rosrow` | The section's `<ul>` and one pal per `<li>`. Fixed grid tracks (identity · passives · note · actions) so columns align down the whole section. Replaces the former `.rospal` **and** `.gentry`. |
+| `.mchip.warn` | A meta chip carrying a warning — `--danger` text, tint fill, `--danger-line` border. Always states the warning in words; colour is never the only signal. |
+| `.rentacts` | The full, named action set for one entry, inside its pal card. Row toolbars stay to three glyphs; everything else lives here at comfortable size. |
+
+**Row action toolbars** use `role="toolbar"` with roving `tabindex` (arrows/Home/End
+move within, Tab leaves), so a row costs **two** tab stops — its name and its
+toolbar — not one per action. Actions are revealed on hover only under
+`@media (hover:hover)`; under `@media (hover:none)` they are always visible, and the
+gutter is reserved in both cases so nothing shifts.
+
+A `[hidden]` element whose class sets its own `display` needs an explicit
+`.cls[hidden]{display:none}` — the UA rule loses to any class rule.
 
 ## 5 · Motion
 
@@ -114,10 +159,13 @@ no looping/attention animation, ever.
 - Lexicon (one concept, one name): **species** (a kind of pal) · **pal** (an
   individual) · **owned** (★ or in roster) · **target species** (what you're breeding
   toward — not "target child") · **passives** · **route** (computed) · **plan**
-  (saved route) · **partner** (non-line parent in a step).
+  (saved route) · **partner** (non-line parent in a step) · **backup** (Palarium's own
+  JSON file — you export and restore it) · **save** (the Palworld game file — Palarium
+  only ever reads it). Never use the bare word "import" as a button label for either:
+  it named two unrelated jobs and told the user nothing about which one they were in.
 - Sentence case for all labels, buttons, and tab names. Title Case is not used.
 - Empty states: 1 sentence of what this is + 1 action button. Errors: what happened +
-  the next step, colored `--pink` *plus* text (never color alone).
+  the next step, colored `--danger` *plus* text (never color alone).
 - Icons & glyphs: see §7. Emoji are last-resort placeholders, never design elements
   in new work.
 
@@ -179,8 +227,18 @@ recoloring/filters).
 - Mobile (≤640px): no horizontal page scroll ever — wide content scrolls inside its
   own container. Primary actions within thumb reach where feasible. The tab bar fades
   its clipped edge (`fadeL/fadeR`).
-- Group controls by proximity: filter controls in one `.dex-controls` row, actions in
-  `.collacts`, never mixed.
+- Group controls by proximity, split by what they act on: `.dex-controls` holds
+  controls that change how the list is **filtered, ordered or presented** (search,
+  filter, sort, collapse, density); `.collacts` holds actions on the **data itself**
+  (add, read a save, backup & restore). Never mixed.
+- A control in `.dex-controls` whose purpose isn't obvious from its own text carries
+  a visible `.ctl` label. A bare select whose only label is a prefix inside its own
+  options ("Sort: Name") is not labelled. A self-describing button ("Collapse all")
+  or switch ("Compact rows") takes a `<label aria-hidden="true">&nbsp;</label>`
+  spacer instead — that is alignment, not a label, and it is hidden on mobile.
+- A `<label for>` pointing at a control that `makeIconSelect` has replaced names
+  nothing: the native select is `aria-hidden`. `makeIconSelect` re-points the label
+  at the button it draws — don't remove an `aria-label` assuming the label covers it.
 - Progressive disclosure for optional complexity (`.moredet` details, slot reveal).
 
 ## 10 · Verification recipes
@@ -201,18 +259,24 @@ visual claims; contrast ratios computed, not eyeballed.
 
 ## 11 · Known-clunky backlog (ux-designer: start here)
 
-- **Save-import & backup flows** (Roster header: "Read my save", "Backup &
-  restore"): flows work but feel bolted-on — wants a designed sequence: what will be
-  read/replaced, merge-vs-replace choice, progress state, success summary with
-  counts, and clear separation between "read game save" and "Palarium backup".
-- **Roster "Group by species" layout**: `.rosgroup` rows cram identity, passives,
-  note, and actions into one wrapping line — poor scannability at exactly the moment
-  the user has many pals.
+- **The save reader's conflict segrow** (`js/app.js`, `renderSavePreview`): Combine /
+  Keep mine / Use the save's explain themselves only in `title` attributes. On touch
+  that is three unexplained words deciding whether a nickname survives. Wants one
+  visible line under the segrow describing the selected option — the same fix the
+  backup flow's `#smBackupEffect` already uses.
+- **Bulk select & remove in the roster**: after reading a save you often want to drop
+  a dozen duds; that is a dozen separate ✕ presses and a dozen toasts. Wants a
+  checkbox column and one bulk action bar with a single Undo. New selection model, so
+  it did not belong in the layout pass.
+- **Toast Undo is far from the keyboard**: `.toasts` sits at the end of `<body>` and
+  is never focused, so reaching Undo means tabbing past the whole page. App-wide, not
+  specific to one view.
 - **Emoji migration (§7)**: replace remaining pictographic emoji with game assets or
   Lucide SVGs — 🎮 (Read my save), 🍰 (guide; `items/cake.webp` exists), 🧬 mutation
   marks (`ui/egg/mutation.webp`), 🐣, 🔍, 🗺, 🌙 nocturnal, 🌳 tree button,
   🍖 food stat, ⚠ warnboxes, 🎲 odds, 📦, 📍.
 - View heading inconsistency (Breed / Find parents have no heading block).
 - Toggle label grammar varies across views (§4 switch rule).
-- Select conventions: "All elements" vs "Any work suitability"; "Sort:" prefix exists
-  only in Roster.
+- Select conventions: "All elements" vs "Any work suitability". The Roster's "Sort:"
+  option prefixes are gone and its selects now carry visible `.ctl` labels (§9);
+  Paldex and Skills still use bare, unlabelled selects and should follow.

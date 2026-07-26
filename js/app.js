@@ -352,10 +352,24 @@ function openModal(p, rentry) {
       ivc.textContent = 'IV ' + rentry.iv.map(v => v === null ? '–' : v).join('·');
       ivc.title = 'HP · Attack · Defense IVs'; r1.appendChild(ivc);
     }
-    const ed = document.createElement('button'); ed.className = 'alink'; ed.style.marginLeft = 'auto';
-    ed.textContent = '✎ Edit'; ed.title = 'Edit this roster entry';
-    ed.addEventListener('click', () => { leaveModal(); openRosterEditor(rentry); });
-    r1.appendChild(ed);
+    // The row in the Roster carries only ✎ ⧉ ✕; the rest of an entry's
+    // actions live here, at comfortable size, where there is room to name them.
+    const acts = document.createElement('div'); acts.className = 'rentacts';
+    const mk = (label, title, fn) => {
+      const b = document.createElement('button'); b.className = 'alink';
+      b.textContent = label; b.title = title;
+      b.addEventListener('click', fn); acts.appendChild(b);
+    };
+    mk('✎ Edit', 'Edit this roster entry', () => { leaveModal(); openRosterEditor(rentry); });
+    // leaveModal() first, both times: closing restores focus to the row that
+    // opened the card, and that row has to still exist when it does.
+    mk('⧉ Duplicate', 'Another with the same passives, gender and note',
+      () => { leaveModal(); duplicateEntry(rentry); });
+    mk('Use as planner start', 'Add to the next free Planner start slot',
+      () => { leaveModal(); setSlotAuto(rentry); });
+    mk('✕ Remove', 'Remove this pal from your roster',
+      () => { leaveModal(); removeEntry(rentry); });
+    r1.appendChild(acts);
     box.appendChild(r1);
     if (rentry.ps.length) box.appendChild(passiveChips(rentry.ps));
     if (rentry.note) { const nt = document.createElement('div'); nt.className = 'rnote'; nt.textContent = rentry.note; box.appendChild(nt); }
@@ -670,14 +684,23 @@ function makeIconSelect(sel, dir, keyOf) {
   btn.setAttribute('aria-haspopup', 'listbox');
   btn.setAttribute('aria-expanded', 'false');
   btn.setAttribute('aria-controls', 'iselpop-' + sel.id);
-  if (sel.getAttribute('aria-label')) btn.setAttribute('aria-label', sel.getAttribute('aria-label'));
+  // The name can come from an aria-label or from a visible <label for>. The
+  // select itself is aria-hidden, so a <label for> pointing at it names
+  // nothing — the label has to be re-pointed at the button we actually draw.
+  const srcLabel = sel.id ? document.querySelector(`label[for="${CSS.escape(sel.id)}"]`) : null;
+  const selName = sel.getAttribute('aria-label') || (srcLabel && srcLabel.textContent.trim()) || '';
+  if (selName) btn.setAttribute('aria-label', selName);
+  if (srcLabel) {
+    srcLabel.removeAttribute('for');
+    srcLabel.addEventListener('click', () => btn.focus());
+  }
   const pop = document.createElement('div');
   pop.className = 'isel-pop'; pop.setAttribute('role', 'listbox');
   pop.id = 'iselpop-' + sel.id;
   // the list scrolls, and a scrollable region has to be reachable; the rows are
   // options driven by aria-activedescendant rather than tab stops of their own
   pop.tabIndex = -1;
-  if (sel.getAttribute('aria-label')) pop.setAttribute('aria-label', sel.getAttribute('aria-label'));
+  if (selName) pop.setAttribute('aria-label', selName);
   sel.replaceWith(wrap);
   wrap.append(sel, btn, pop);
 
@@ -787,7 +810,7 @@ const state = readStore('palbreed', {});
 function save() {
   const s = {
     tab: currentTab, a: pickA.get()?.k, b: pickB.get()?.k, t: pickT.get()?.k, l: pickL.get()?.k,
-    ownedOnly, dexOwnedOnly, rgroup: typeof groupBySpecies !== 'undefined' && groupBySpecies,
+    ownedOnly, dexOwnedOnly, rdense: typeof denseRows !== 'undefined' && denseRows,
     pt: pickPT.get()?.k, po: partnerMode, ml: myLevel, ac: avoidCollab, sp: slotPassives, sg: slotGenders,
     dp: desiredPick.get(),
     ro: !!currentRoute, chain: breedChain,
@@ -1630,13 +1653,72 @@ for (const ps of PASSIVES) {
 rosterSearch.addEventListener('input', renderRoster);
 rosterPassiveFilter.addEventListener('change', renderRoster);
 rosterSort.addEventListener('change', renderRoster);
-let groupBySpecies = false;
-const groupToggle = document.getElementById('groupToggle');
-groupToggle.addEventListener('click', () => {
-  groupBySpecies = !groupBySpecies;
-  setSwitch(groupToggle, groupBySpecies);
-  save(); renderRoster();
+// A breeding roster is made of duplicates — siblings from the same line — so
+// grouping by species is not a preference, it is the shape of the data. What
+// used to be the "Group by species" switch is now a density switch: the
+// question worth asking is how much of each pal you want to see at once.
+// An older stored state.rgroup is simply ignored; nothing to migrate.
+let denseRows = false;
+let collapsed = new Set();     // species keys, this session only
+let lastSections = [];
+const denseToggle = document.getElementById('denseToggle');
+denseToggle.addEventListener('click', () => {
+  denseRows = !denseRows;
+  setSwitch(denseToggle, denseRows);
+  document.getElementById('rosterList').classList.toggle('dense', denseRows);
+  save();
 });
+const collapseAllBtn = document.getElementById('collapseAll');
+collapseAllBtn.addEventListener('click', () => {
+  const allShut = lastSections.length && lastSections.every(k => collapsed.has(k));
+  if (allShut) for (const k of lastSections) collapsed.delete(k);
+  else for (const k of lastSections) collapsed.add(k);
+  renderRoster();
+  collapseAllBtn.focus();
+});
+// One pal, two places to act on it — the Roster row and the pal card. Both go
+// through these, so a duplicate always stars its species and a removal always
+// offers the same Undo and the same "species still ★ owned" follow-up.
+function duplicateEntry(r) {
+  const p = byKey.get(r.k);
+  // Passives, gender and the note describe the line and come along; the
+  // nickname and the IVs belong to the individual you copied and would be
+  // wrong on its sibling.
+  const copy = {id: newEntryId(), k: r.k, ps: [...r.ps], g: r.g || null, nick: '', note: r.note || '', iv: null};
+  const at = roster.findIndex(x => x.id === r.id) + 1;
+  roster.splice(at < 1 ? roster.length : at, 0, copy);
+  if (!owned.has(copy.k)) toggleOwned(copy.k);
+  saveRoster(); renderRoster(); renderDex(); renderReverse();
+  toast('Added another ' + p.n, () => {
+    const i = roster.findIndex(x => x.id === copy.id);
+    if (i >= 0) roster.splice(i, 1);
+    saveRoster(); renderRoster(); renderDex(); renderReverse();
+  }, {label: 'Edit it', fn: () => { const e2 = roster.find(x => x.id === copy.id); if (e2) openRosterEditor(e2); }});
+}
+function removeEntry(r) {
+  const idx = roster.findIndex(x => x.id === r.id);
+  if (idx < 0) return;
+  const removed = roster[idx];
+  roster.splice(idx, 1); saveRoster(); renderRoster(); renderDex(); renderReverse();
+  const undo = () => {
+    roster.splice(Math.min(idx, roster.length), 0, removed);
+    saveRoster(); renderRoster(); renderDex(); renderReverse();
+  };
+  const name = removed.nick || byKey.get(removed.k).n;
+  // last roster entry of a species: offer to also drop the owned ★
+  if (!roster.some(x => x.k === removed.k) && owned.has(removed.k)) {
+    toast('Removed ' + name + ' — species still ★ owned', undo, {
+      label: 'Un-star ' + byKey.get(removed.k).n,
+      fn: () => {
+        if (owned.has(removed.k)) toggleOwned(removed.k);
+        renderDex(); renderReverse();
+        toast('Un-starred ' + byKey.get(removed.k).n);
+      },
+    });
+  } else {
+    toast('Removed ' + name + ' from roster', undo);
+  }
+}
 const ivSum = r => (r.iv || []).reduce((a, b) => a + (b || 0), 0);
 const ROSTER_SORTS = {
   z: (a, b) => byKey.get(a.k).z - byKey.get(b.k).z,
@@ -1645,37 +1727,88 @@ const ROSTER_SORTS = {
   ps: (a, b) => b.ps.length - a.ps.length,
   iv: (a, b) => ivSum(b) - ivSum(a),
 };
+// Within a species the species-level keys (Paldex #, name) say nothing, so
+// they fall through to "newest first" — the sibling you just hatched.
+const ROW_SORTS = {
+  z: (a, b) => +b.id.slice(0, 13) - +a.id.slice(0, 13),
+  n: (a, b) => (a.nick || '').localeCompare(b.nick || '') || +b.id.slice(0, 13) - +a.id.slice(0, 13),
+  new: (a, b) => +b.id.slice(0, 13) - +a.id.slice(0, 13),
+  ps: (a, b) => b.ps.length - a.ps.length,
+  iv: (a, b) => ivSum(b) - ivSum(a),
+};
+// How a whole section ranks: its best row under the active sort.
+const SECTION_RANK = {
+  z: es => byKey.get(es[0].k).z,
+  n: es => byKey.get(es[0].k).n,
+  new: es => -Math.max(...es.map(r => +r.id.slice(0, 13))),
+  ps: es => -Math.max(...es.map(r => r.ps.length)),
+  iv: es => -Math.max(...es.map(ivSum)),
+};
 
 function renderRoster() {
   const list = document.getElementById('rosterList');
   const stats = document.getElementById('rosterStats');
-  const species = new Set(roster.map(r => r.k));
-  stats.textContent = roster.length ? `${roster.length} pal${roster.length === 1 ? '' : 's'} · ${species.size} species` : '';
+
+  // A re-render throws the whole list away, so remember what had focus and
+  // hand it back afterwards — DESIGN.md §7. Every caller gets this for free.
+  const ae = document.activeElement;
+  let restore = null;
+  if (ae && list.contains(ae)) {
+    const row = ae.closest('.rosrow');
+    const sum = ae.closest('summary');
+    if (row) restore = {id: row.dataset.id, act: ae.dataset.act || 'name',
+      idx: [...list.querySelectorAll('.rosrow')].indexOf(row)};
+    else if (sum) restore = {k: sum.parentElement.dataset.k};
+  }
   list.innerHTML = '';
+  list.classList.toggle('dense', denseRows);
+
   const q = rosterSearch.value.trim().toLowerCase();
   const pf = rosterPassiveFilter.value;
-  let rows = roster.filter(r => {
+  const filtering = !!(q || pf);
+  const rows = roster.filter(r => {
     const p = byKey.get(r.k);
     const hit = !q || p.n.toLowerCase().includes(q) || (r.nick && r.nick.toLowerCase().includes(q)) || r.ps.some(x => x.toLowerCase().includes(q));
     return hit && (!pf || r.ps.includes(pf));
   });
-  rows.sort(ROSTER_SORTS[rosterSort.value] || ROSTER_SORTS.z);
+
+  const shownSpecies = new Set(rows.map(r => r.k));
+  stats.textContent = !roster.length ? ''
+    : filtering
+      ? `${rows.length} of ${roster.length} pal${roster.length === 1 ? '' : 's'} · ${shownSpecies.size} species`
+      : `${roster.length} pal${roster.length === 1 ? '' : 's'} · ${new Set(roster.map(r => r.k)).size} species`;
+
+  const controls = document.querySelector('.roscontrols');
+  if (controls) controls.hidden = !roster.length;
+
   if (!rows.length) {
+    lastSections = [];
+    syncCollapseBtn();   // nothing to collapse: the button must say so, not go stale
     const h = document.createElement('div'); h.className = 'hint';
-    h.style.gridColumn = '1/-1'; h.style.padding = '14px 0';
     if (roster.length) {
-      h.textContent = 'No roster pals match these filters.';
+      // an empty state without a way out is a dead end (DESIGN.md §4).
+      // The count stays a count — the sentence belongs to the hint, and the
+      // header is the only place that says how much you actually own.
+      stats.textContent = `0 of ${roster.length} pal${roster.length === 1 ? '' : 's'}`;
+      h.append('No pals match these filters. ');
+      const b = document.createElement('button'); b.className = 'alink'; b.textContent = 'Clear filters';
+      b.addEventListener('click', () => {
+        rosterSearch.value = ''; rosterPassiveFilter.value = '';
+        if (rosterPassiveSel) rosterPassiveSel.sync();
+        renderRoster(); rosterSearch.focus();
+      });
+      h.appendChild(b);
     } else {
       h.append('No pals in your roster yet. ');
       const b = document.createElement('button'); b.className = 'alink primary'; b.textContent = '+ Add your first pal';
       b.addEventListener('click', () => openRosterEditor(null));
       h.appendChild(b);
-      h.append(' — or use “Add to roster” on any pal card.');
+      h.append(' Or use “Add to roster” on any pal card.');
       // the cheapest improvement for someone about to grind the dialog for
       // pals they only need marked as owned is telling them not to
       const w = document.createElement('div'); w.className = 'emptywhy';
       const wt = document.createElement('span');
-      wt.textContent = 'You don’t need an entry for every pal. Starring a species ★ in the Paldex already satisfies every “owned” filter — a roster entry is for when you care about one individual’s passives, gender or IVs.';
+      wt.textContent = 'You don’t need an entry for every pal. Star a species ★ in the Paldex to satisfy every owned filter. An entry is for when one pal’s passives, gender or IVs matter.';
       w.appendChild(wt);
       const b2 = document.createElement('button'); b2.className = 'alink'; b2.textContent = 'Open the Paldex';
       b2.addEventListener('click', () => navTab('dex'));
@@ -1683,134 +1816,196 @@ function renderRoster() {
       h.appendChild(w);
     }
     list.appendChild(h);
+    // an early return is still a re-render — focus must not land on <body>
+    if (restore) (h.querySelector('button') || document.getElementById('rosterOpenAdd')).focus();
     renderRosterStrip(); return;
   }
+
+  // ---- one row's action cluster: a single tab stop, arrows move inside ----
   const mkActs = r => {
-    const acts = document.createElement('div'); acts.className = 'acts';
-    const b1 = document.createElement('button'); b1.textContent = '+ Start'; b1.title = 'Add to the next free Planner start slot';
-    b1.addEventListener('click', () => setSlotAuto(r));
-    const be = document.createElement('button'); be.textContent = '✎'; be.title = 'Edit';
-    be.addEventListener('click', () => openRosterEditor(r));
-    // "another one like that" in one click. Passives, gender and the note
-    // describe the line and come along; the nickname and the IVs belong to the
-    // individual you copied and would be wrong on its sibling.
-    const bd = document.createElement('button'); bd.textContent = '⧉';
-    bd.title = 'Duplicate — another with the same passives, gender and note';
-    bd.setAttribute('aria-label', 'Duplicate ' + (r.nick || byKey.get(r.k).n));
-    bd.addEventListener('click', () => {
-      const copy = {id: newEntryId(), k: r.k, ps: [...r.ps], g: r.g || null, nick: '', note: r.note || '', iv: null};
-      const at = roster.findIndex(x => x.id === r.id) + 1;
-      roster.splice(at, 0, copy);
-      if (!owned.has(copy.k)) toggleOwned(copy.k);
-      saveRoster(); renderRoster(); renderDex(); renderReverse();
-      toast('Added another ' + byKey.get(copy.k).n, () => {
-        const i = roster.findIndex(x => x.id === copy.id);
-        if (i >= 0) roster.splice(i, 1);
-        saveRoster(); renderRoster();
-      }, {label: 'Edit it', fn: () => { const e2 = roster.find(x => x.id === copy.id); if (e2) openRosterEditor(e2); }});
+    const p = byKey.get(r.k);
+    const who = r.nick || p.n;
+    const acts = document.createElement('div');
+    acts.className = 'acts'; acts.setAttribute('role', 'toolbar');
+    acts.setAttribute('aria-label', 'Actions for ' + who);
+    acts.setAttribute('aria-orientation', 'horizontal');
+    const mk = (act, glyph, label, title) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = glyph; b.dataset.act = act;
+      b.setAttribute('aria-label', label); b.title = title;
+      acts.appendChild(b); return b;
+    };
+    mk('edit', '✎', 'Edit ' + who, 'Edit').addEventListener('click', () => openRosterEditor(r));
+    // "another one like that" in one click — see duplicateEntry
+    mk('dup', '⧉', 'Duplicate ' + who, 'Duplicate — another with the same passives, gender and note')
+      .addEventListener('click', () => duplicateEntry(r));
+    mk('remove', '✕', 'Remove ' + who + ' from roster', 'Remove from roster')
+      .addEventListener('click', () => removeEntry(r));
+    const btns = [...acts.children];
+    btns.forEach((b, i) => { b.tabIndex = i ? -1 : 0; });
+    acts.addEventListener('keydown', e => {
+      const i = btns.indexOf(e.target);
+      if (i < 0) return;
+      let j = null;
+      if (e.key === 'ArrowRight') j = (i + 1) % btns.length;
+      else if (e.key === 'ArrowLeft') j = (i - 1 + btns.length) % btns.length;
+      else if (e.key === 'Home') j = 0;
+      else if (e.key === 'End') j = btns.length - 1;
+      if (j === null) return;
+      e.preventDefault();
+      btns[i].tabIndex = -1; btns[j].tabIndex = 0; btns[j].focus();
     });
-    const bx = document.createElement('button'); bx.textContent = '✕'; bx.title = 'Remove from roster';
-    bx.setAttribute('aria-label', 'Remove ' + (r.nick || byKey.get(r.k).n) + ' from roster');
-    bx.addEventListener('click', () => {
-      const idx = roster.findIndex(x => x.id === r.id);
-      if (idx < 0) return;
-      const removed = roster[idx];
-      roster.splice(idx, 1); saveRoster(); renderRoster();
-      const undo = () => {
-        roster.splice(Math.min(idx, roster.length), 0, removed);
-        saveRoster(); renderRoster(); renderDex(); renderReverse();
-      };
-      const name = removed.nick || byKey.get(removed.k).n;
-      // last roster entry of a species: offer to also drop the owned ★
-      if (!roster.some(x => x.k === removed.k) && owned.has(removed.k)) {
-        toast('Removed ' + name + ' — species still ★ owned', undo, {
-          label: 'Un-star ' + byKey.get(removed.k).n,
-          fn: () => {
-            if (owned.has(removed.k)) toggleOwned(removed.k);
-            renderDex(); renderReverse();
-            toast('Un-starred ' + byKey.get(removed.k).n);
-          },
-        });
-      } else {
-        toast('Removed ' + name + ' from roster', undo);
-      }
-    });
-    acts.append(b1, be, bd, bx);
     return acts;
   };
-  const identity = r => {
-    const nm = document.createElement('div'); nm.className = 'nm';
+
+  // ---- one pal, one row ----
+  const mkRow = r => {
+    const p = byKey.get(r.k);
+    const li = document.createElement('li');
+    li.className = 'rosrow' + (r.id === editingId ? ' editing' : '');
+    li.dataset.id = r.id;
+
+    const who = document.createElement('div'); who.className = 'who';
+    const nm = document.createElement('button');
+    nm.type = 'button'; nm.className = 'thbtn nm'; nm.dataset.act = 'name';
+    // The accessible name has to contain what the button visibly says, or
+    // speech input can't reach it (WCAG 2.5.3). A save-imported pal shows its
+    // in-game name, so that name has to be in the chain too.
+    nm.setAttribute('aria-label', 'View ' + (r.nick || r.gname || p.n) + ' details');
+    nm.title = 'View ' + p.n + '’s full card';
+    // The section header already says the species, so a row never repeats it.
+    // A pal with no recorded gender says so instead of falling back to a name
+    // that is on every row above it.
     if (r.g) { nm.appendChild(gEl(gsymR(r.g))); nm.append(' '); }
-    if (r.nick) { const nk = document.createElement('span'); nk.textContent = '“' + r.nick + '” '; nm.appendChild(nk); }
+    else {
+      const u = document.createElement('span'); u.className = 'gu';
+      u.textContent = '?'; u.title = 'Gender not recorded';
+      u.setAttribute('role', 'img'); u.setAttribute('aria-label', 'gender not recorded');
+      nm.appendChild(u); nm.append(' ');
+    }
+    if (r.nick) { const nk = document.createElement('span'); nk.textContent = '“' + r.nick + '”'; nm.appendChild(nk); }
     // The save has a nickname field of its own. It is shown here rather than in
     // the nick field, because a pal renamed in-game must not overwrite the name
     // you typed — and hiding the disagreement would be worse than showing it.
-    else if (r.gname) { const gn = document.createElement('span'); gn.className = 'gname'; gn.textContent = '“' + r.gname + '” '; gn.title = 'Name from your save file'; nm.appendChild(gn); }
+    else if (r.gname) { const gn = document.createElement('span'); gn.className = 'gname'; gn.textContent = '“' + r.gname + '”'; gn.title = 'Name from your save file'; nm.appendChild(gn); }
+    nm.addEventListener('click', () => openModal(p, r));
+    who.appendChild(nm);
     if (r.lv) {
       const lc = document.createElement('span'); lc.className = 'lvchip';
-      lc.textContent = 'Lv ' + r.lv; lc.title = 'Level, from your save file'; nm.appendChild(lc);
+      lc.textContent = 'Lv ' + r.lv; lc.title = 'Level, from your save file'; who.appendChild(lc);
     }
     if (r.iv) {
       const ivc = document.createElement('span'); ivc.className = 'ivchip';
       ivc.textContent = 'IV ' + r.iv.map(v => v === null ? '–' : v).join('·');
-      ivc.title = 'HP · Attack · Defense IVs'; nm.appendChild(ivc);
+      ivc.title = 'HP · Attack · Defense IVs'; who.appendChild(ivc);
     }
-    return nm;
+    li.appendChild(who);
+
+    // the passive column is what you are actually scanning for, so it is
+    // always in the same place and never blank — an empty cell reads as a bug
+    const pc = document.createElement('div'); pc.className = 'pscol';
+    if (r.ps.length) pc.appendChild(passiveChips(r.ps));
+    else { const none = document.createElement('span'); none.className = 'nops'; none.textContent = 'No passives'; pc.appendChild(none); }
+    li.appendChild(pc);
+
+    const nt = document.createElement('div'); nt.className = 'note';
+    if (r.note) { nt.textContent = r.note; nt.title = r.note; }
+    li.appendChild(nt);
+
+    li.appendChild(mkActs(r));
+    return li;
   };
-  if (groupBySpecies) {
-    const groups = new Map();
-    for (const r of rows) (groups.get(r.k) || groups.set(r.k, []).get(r.k)).push(r);
-    for (const [k, entries] of groups) {
-      const p = byKey.get(k);
-      const g = document.createElement('div'); g.className = 'rosgroup';
-      const head = document.createElement('div'); head.className = 'ghead';
-      const entry1 = entries.length === 1 ? entries[0] : null;
-      head.tabIndex = 0;
-      head.setAttribute('aria-label', 'View ' + p.n + ' details');
-      head.title = 'View ' + p.n + '’s full card';
-      head.addEventListener('click', e => { if (e.target.closest('button, input, a')) return; openModal(p, entry1); });
-      head.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === head) { e.preventDefault(); openModal(p, entry1); } });
-      head.appendChild(icon(p, 36));
-      const nm = document.createElement('span'); nm.textContent = p.n; head.appendChild(nm);
-      const cnt = document.createElement('span'); cnt.className = 'cntb'; cnt.textContent = '×' + entries.length; head.appendChild(cnt);
-      g.appendChild(head);
-      for (const r of entries) {
-        const row = document.createElement('div'); row.className = 'gentry' + (r.id === editingId ? ' editing' : '');
-        const who = document.createElement('span'); who.className = 'who';
-        who.appendChild(identity(r));
-        row.appendChild(who);
-        if (r.ps.length) row.appendChild(passiveChips(r.ps));
-        if (r.note) { const nt = document.createElement('span'); nt.className = 'nick'; nt.textContent = r.note; nt.title = r.note; row.appendChild(nt); }
-        row.appendChild(mkActs(r));
-        g.appendChild(row);
-      }
-      list.appendChild(g);
+
+  // ---- sections, ordered by the active sort ----
+  const groups = new Map();
+  for (const r of rows) (groups.get(r.k) || groups.set(r.k, []).get(r.k)).push(r);
+  const sortKey = ROSTER_SORTS[rosterSort.value] ? rosterSort.value : 'z';
+  const rank = SECTION_RANK[sortKey];
+  const sections = [...groups.entries()].sort((a, b) => {
+    const ra = rank(a[1]), rb = rank(b[1]);
+    return typeof ra === 'string' ? ra.localeCompare(rb) : ra - rb;
+  });
+  lastSections = sections.map(([k]) => k);
+
+  for (const [k, entries] of sections) {
+    const p = byKey.get(k);
+    entries.sort(ROW_SORTS[sortKey]);
+    const total = roster.filter(r => r.k === k).length;
+
+    const det = document.createElement('details');
+    det.className = 'moredet rosgrp';
+    det.dataset.k = k;
+    det.open = !collapsed.has(k);
+    det.addEventListener('toggle', () => {
+      if (det.open) collapsed.delete(k); else collapsed.add(k);
+      syncCollapseBtn();
+    });
+
+    const sum = document.createElement('summary');
+    sum.appendChild(icon(p, 28));
+    const nm = document.createElement('span'); nm.className = 'gname2'; nm.textContent = p.n; sum.appendChild(nm);
+    const cnt = document.createElement('span'); cnt.className = 'cntb';
+    cnt.textContent = entries.length < total ? `${entries.length} of ${total}` : '×' + entries.length;
+    sum.appendChild(cnt);
+    // The breeding question, answered on a closed section. The tally always
+    // counts the whole species, so while a filter is on it says so — two
+    // numbers in one summary must not describe two different populations.
+    const gi = speciesGenderInfo(k);
+    if (gi) {
+      const oneSided = gi.n >= 2 && !gi.U && (!gi.M || !gi.F);
+      const chip = document.createElement('span');
+      chip.className = 'mchip' + (oneSided ? ' warn' : '');
+      const tally = [gi.M ? gi.M + '♂' : '', gi.F ? gi.F + '♀' : '', gi.U ? gi.U + ' ?' : ''].filter(Boolean).join(' · ');
+      const filtered = entries.length < total;
+      chip.appendChild(genderize(oneSided
+        ? `All ${gi.M ? '♂' : '♀'} — no ${gi.M ? '♀' : '♂'} to breed with`
+        : filtered ? `of all ${total}: ${tally}` : tally));
+      sum.appendChild(chip);
     }
-  } else {
-    for (const r of rows) {
-      const p = byKey.get(r.k);
-      const card = document.createElement('div'); card.className = 'rospal' + (r.id === editingId ? ' editing' : '');
-      // the whole card opens the pal's page with this entry's details;
-      // inner action buttons keep their own behavior
-      card.tabIndex = 0;
-      card.setAttribute('aria-label', 'View ' + (r.nick || p.n) + ' details');
-      card.title = 'View ' + p.n + '’s full card';
-      card.addEventListener('click', e => { if (e.target.closest('button, input, a')) return; openModal(p, r); });
-      card.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === card) { e.preventDefault(); openModal(p, r); } });
-      card.appendChild(icon(p, 44));
-      const body = document.createElement('div'); body.className = 'body';
-      const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = p.n + ' ';
-      const id = identity(r);
-      while (id.firstChild) nm.appendChild(id.firstChild);
-      body.appendChild(nm);
-      if (r.ps.length) body.appendChild(passiveChips(r.ps));
-      if (r.note) { const nt = document.createElement('div'); nt.className = 'note'; nt.textContent = r.note; body.appendChild(nt); }
-      card.appendChild(body);
-      card.appendChild(mkActs(r));
-      list.appendChild(card);
-    }
+    det.appendChild(sum);
+
+    const ul = document.createElement('ul');
+    ul.className = 'roslist';
+    ul.setAttribute('aria-label', `${p.n} — ${entries.length} pal${entries.length === 1 ? '' : 's'}`);
+    for (const r of entries) ul.appendChild(mkRow(r));
+    det.appendChild(ul);
+    list.appendChild(det);
   }
+
+  syncCollapseBtn();
+
+  // ---- hand focus back ----
+  if (restore) {
+    let target = null;
+    if (restore.k) {
+      const d = list.querySelector(`details[data-k="${CSS.escape(restore.k)}"]`);
+      target = d && d.querySelector('summary');
+    } else if (restore.id) {
+      const row = list.querySelector(`.rosrow[data-id="${CSS.escape(restore.id)}"]`);
+      if (row) target = row.querySelector(`[data-act="${restore.act}"]`) || row.querySelector('.nm');
+      else {
+        // the row is gone (removed, or filtered away) — take the next one,
+        // then the previous, then the section, and never <body>
+        const all = [...list.querySelectorAll('.rosrow')];
+        const near = all[Math.min(restore.idx, all.length - 1)];
+        target = near ? near.querySelector('.nm') : list.querySelector('summary');
+      }
+    }
+    // A fresh toolbar always seeds tabIndex=0 on its first button. If focus
+    // lands on a different one, move the tab stop with it — otherwise the
+    // toolbar holds a focused -1 button and a separate 0 elsewhere.
+    const bar = target && target.closest && target.closest('.acts');
+    if (bar) for (const b of bar.querySelectorAll('button')) b.tabIndex = b === target ? 0 : -1;
+    (target || document.getElementById('rosterOpenAdd')).focus();
+    if (target && target.scrollIntoView) target.scrollIntoView({block: 'nearest'});
+  }
+
   renderRosterStrip();
+}
+function syncCollapseBtn() {
+  const allShut = lastSections.length && lastSections.every(k => collapsed.has(k));
+  collapseAllBtn.textContent = allShut ? 'Expand all' : 'Collapse all';
+  collapseAllBtn.disabled = !lastSections.length;
 }
 function renderRosterStrip() {
   const strip = document.getElementById('rosterStrip');
@@ -1844,25 +2039,274 @@ function renderRosterStrip() {
 // — and deliberately not the settings (filters, toggles, map prefs, recents),
 // which belong to the device you're on. The wording says so everywhere it's
 // shown, because "backup" reads as "everything" and this isn't that.
-document.getElementById('exportBtn').addEventListener('click', () => {
+// Counts read as a sentence, not a table: zero terms are dropped entirely so
+// "43 starred species" never arrives as "0 pals, 0 saved plans and 43…".
+function countsPhrase(nr, np, no) {
+  const parts = [];
+  if (nr) parts.push(`${nr} pal${nr === 1 ? '' : 's'}`);
+  if (np) parts.push(`${np} saved plan${np === 1 ? '' : 's'}`);
+  if (no) parts.push(`${no} starred species`);
+  if (!parts.length) return 'nothing';
+  if (parts.length === 1) return parts[0];
+  return parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1];
+}
+// Dated, because palarium-data.json → "palarium-data (3).json" tells you
+// nothing about which of the three is the one you want back.
+function backupFilename() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `palarium-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.json`;
+}
+const LAST_BACKUP_KEY = 'palbreed_lastbackup';
+
+function doExport() {
   const blob = new Blob([JSON.stringify({app: 'palarium', savedAt: new Date().toISOString(),
     roster, plans, owned: [...owned]}, null, 1)], {type: 'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'palarium-data.json';
-  a.click(); URL.revokeObjectURL(a.href);
-});
+  a.download = backupFilename();
+  try {
+    a.click();
+  } catch (err) {
+    URL.revokeObjectURL(a.href);
+    smFail('Your browser blocked the download. Check its download settings and try again.');
+    return;
+  }
+  URL.revokeObjectURL(a.href);
+  localStorage.setItem(LAST_BACKUP_KEY, String(Date.now()));
+  renderHub();
+  toast('Backup saved — ' + countsPhrase(roster.length, plans.length, owned.size) + '.');
+}
+
+function renderHub() {
+  const empty = !roster.length && !plans.length && !owned.size;
+  document.getElementById('smHubCounts').textContent = empty ? '' : 'You have ' + countsPhrase(roster.length, plans.length, owned.size) + '.';
+  const last = +localStorage.getItem(LAST_BACKUP_KEY) || 0;
+  document.getElementById('smHubLast').textContent = empty ? ''
+    : last ? 'Last backup: ' + (relTime(last) || 'just now') + '.' : 'You haven’t saved a backup yet.';
+  document.getElementById('smHubFile').textContent = empty ? '' : `Writes ${backupFilename()} to your downloads folder.`;
+  // A disabled Export button can't explain itself on touch, so the whole
+  // export block is swapped for a hint that names the way out.
+  document.getElementById('smHubExportRow').hidden = empty;
+  const eh = document.getElementById('smHubEmpty');
+  eh.hidden = !empty;
+  if (empty && !eh.childElementCount) {
+    eh.append('Nothing to back up yet — add a pal or star a species first. ');
+    const b = document.createElement('button'); b.className = 'alink'; b.textContent = 'Read my save';
+    b.addEventListener('click', openSaveReader);
+    eh.appendChild(b);
+  }
+}
+
+function openBackupHub() {
+  smCancelRead();
+  smBackupData = null;
+  smHome = 'backup';
+  renderHub();
+  if (!sov.classList.contains('open')) {
+    smLastFocus = document.activeElement;
+    sov.classList.add('open'); sov.scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+  }
+  document.getElementById('smTitle').textContent = 'Backup & restore';
+  smShow('smHub');
+  const empty = !roster.length && !plans.length && !owned.size;
+  (empty ? document.getElementById('smHubEmpty').querySelector('button') : document.getElementById('smExport')).focus();
+}
 // Restoring a backup used to fire the file picker straight off the button,
 // with the explanation arriving afterwards in a toast — by which point you had
 // already chosen a file. It now lives in the same dialog as the save reader,
 // where both options can say what they do before anything happens, and where
 // "this replaces your roster" is a stage you have to read past rather than a
 // notification you can miss.
-let smBackupData = null;
+let smBackupData = null, smBackupPlan = null, smBackupMode = 'merge', smBackupName = '', smHome = 'save';
+
+// Two entries are "the same pal" by the same ladder the save reader uses:
+// a stable id first, then every field a human could have typed. Field identity
+// is a last resort, and each local entry can absorb only one incoming twin —
+// three identical Lamballs in a backup against one here must still add two.
+const entrySig = r => JSON.stringify([r.k, r.g || null, r.iv ? r.iv.map(v => (v === null ? null : v)) : null,
+  [...r.ps].sort(), r.nick || '', r.note || '']);
+const planSig = p => JSON.stringify([p.tK, p.steps.map(s => [s.aK, s.bK, s.cK])]);
+
+function planBackup(d) {
+  const rawR = Array.isArray(d.roster) ? d.roster : [];
+  const rawP = Array.isArray(d.plans) ? d.plans : [];
+  const inRoster = normRoster(rawR), inPlans = normPlans(rawP);
+  const inOwned = (Array.isArray(d.owned) ? d.owned : []).filter(k => byKey.has(k));
+  // Every local entry can be claimed once and once only, by whichever rung of
+  // the ladder reaches it first. Without that, a pal matched by id would still
+  // be sitting in the field-identity pool, and a genuinely new twin arriving
+  // later would be absorbed by it and silently dropped.
+  const claimed = new Set();
+  const localById = new Map(roster.map(r => [r.id, r]));
+  const localBySid = new Map();
+  for (const r of roster) if (r.sid && !localBySid.has(r.sid)) localBySid.set(r.sid, r);
+  const bySig = new Map();
+  for (const r of roster) {
+    const s = entrySig(r);
+    if (!bySig.has(s)) bySig.set(s, []);
+    bySig.get(s).push(r.id);
+  }
+  const addPals = [], keptPals = [];
+  for (const r of inRoster) {
+    const bySid = r.sid ? localBySid.get(r.sid) : null;
+    if (bySid && !claimed.has(bySid.id)) { claimed.add(bySid.id); keptPals.push(r); continue; }
+    const byId = localById.get(r.id);
+    if (byId && !claimed.has(byId.id)) { claimed.add(byId.id); keptPals.push(r); continue; }
+    const stack = bySig.get(entrySig(r)) || [];
+    while (stack.length && claimed.has(stack[stack.length - 1])) stack.pop();
+    if (stack.length) { claimed.add(stack.pop()); keptPals.push(r); continue; }
+    addPals.push(r);
+  }
+  // a plan's identity is its route; matching means keeping the local copy,
+  // because the local one carries the steps you have already ticked off
+  const seenPlans = new Set(plans.map(planSig));
+  const addPlans = [], keptPlans = [];
+  for (const p of inPlans) {
+    const s = planSig(p);
+    if (seenPlans.has(s)) { keptPlans.push(p); continue; }
+    seenPlans.add(s); addPlans.push(p);
+  }
+  return {inRoster, inPlans, inOwned, addPals, keptPals, addPlans, keptPlans,
+    newOwned: inOwned.filter(k => !owned.has(k)),
+    droppedPals: rawR.length - inRoster.length, droppedPlans: rawP.length - inPlans.length};
+}
+
+// A capped, scrolling list is a scrollable region, and a scrollable region has
+// to be reachable by keyboard even when nothing inside it is focusable.
+function mkSmList(label) {
+  const ul = document.createElement('div');
+  ul.className = 'smlist';
+  ul.tabIndex = 0;
+  ul.setAttribute('role', 'group');
+  ul.setAttribute('aria-label', label || 'Pals in this backup');
+  return ul;
+}
+
+function renderBackupPreview() {
+  const P = smBackupPlan;
+  if (!P) return;
+  const merge = smBackupMode === 'merge';
+  const coldStart = !roster.length && !plans.length && !owned.size;
+  const prev = document.getElementById('smBackupPreview');
+  prev.innerHTML = '';
+
+  const pals = merge ? P.addPals : P.inRoster;
+  const plns = merge ? P.addPlans : P.inPlans;
+  const stars = merge ? P.newOwned.length : P.inOwned.length;
+
+  // effect line — the consequence of the choice, in visible text
+  const eff = document.getElementById('smBackupEffect');
+  const warn = document.getElementById('smBackupWarn');
+  if (coldStart) {
+    eff.textContent = 'Palarium is empty, so this simply restores everything in the file.';
+    warn.hidden = true;
+  } else if (merge) {
+    const adds = countsPhrase(pals.length, plns.length, stars);
+    eff.textContent = adds === 'nothing' ? 'Everything in this backup is already here.'
+      : `Adds ${adds}. Nothing you have is changed or removed.`;
+    warn.hidden = true;
+  } else {
+    // the live region has to keep speaking on the destructive branch too —
+    // the warnbox is not live, so switching mode would announce nothing
+    eff.textContent = `Replaces everything here with the ${countsPhrase(P.inRoster.length, P.inPlans.length, P.inOwned.length)} in this backup.`;
+    warn.hidden = false;
+    warn.textContent = `Removes your ${countsPhrase(roster.length, plans.length, owned.size)}. ` +
+      `Then restores the ${countsPhrase(P.inRoster.length, P.inPlans.length, P.inOwned.length)} above. ` +
+      'You can undo this straight after.';
+  }
+
+  const h3 = t => { const h = document.createElement('h3'); h.className = 'smh3'; h.textContent = t; prev.appendChild(h); };
+  const sub = t => { const p = document.createElement('p'); p.className = 'sub'; p.textContent = t; prev.appendChild(p); };
+
+  if (!pals.length && !plns.length && !stars) {
+    h3('Nothing to add');
+    sub('Everything in this backup is already here.');
+  }
+  if (pals.length) {
+    h3(merge ? `Pals to add (${pals.length})` : `Your roster after restoring (${pals.length})`);
+    const ul = mkSmList('Pals in this backup');
+    for (const r of pals.slice(0, 60)) {
+      const d = document.createElement('div'); d.className = 'smitem';
+      d.appendChild(icon(byKey.get(r.k), 22));
+      const bits = [byKey.get(r.k).n];
+      if (r.g) bits.push(r.g === 'M' ? '♂' : '♀');
+      if (r.iv) bits.push('IV ' + r.iv.map(v => (v === null ? '–' : v)).join('·'));
+      if (r.ps.length) bits.push(r.ps.join(', '));
+      if (r.nick) bits.push('“' + r.nick + '”');
+      const t = document.createElement('span'); t.textContent = bits.join(' · ');
+      d.appendChild(t); ul.appendChild(d);
+    }
+    prev.appendChild(ul);
+    if (pals.length > 60) sub(merge ? `…and ${pals.length - 60} more. All ${pals.length} will be added.`
+      : `…and ${pals.length - 60} more. All ${pals.length} will be restored.`);
+  }
+  if (merge && P.keptPals.length) sub(`${P.keptPals.length} pal${P.keptPals.length === 1 ? ' is' : 's are'} already in your roster — they keep the details you have now.`);
+  if (plns.length) {
+    h3(merge ? `Plans to add (${plns.length})` : `Your saved plans after restoring (${plns.length})`);
+    const ul = mkSmList('Plans in this backup');
+    for (const p of plns) {
+      const d = document.createElement('div'); d.className = 'smitem';
+      d.appendChild(icon(byKey.get(p.tK), 22));
+      const t = document.createElement('span');
+      t.textContent = `${p.name || byKey.get(p.tK).n} · ${p.steps.length} step${p.steps.length === 1 ? '' : 's'}`;
+      d.appendChild(t); ul.appendChild(d);
+    }
+    prev.appendChild(ul);
+  }
+  if (merge && P.keptPlans.length) sub(`${P.keptPlans.length} plan${P.keptPlans.length === 1 ? ' is' : 's are'} already saved — ${P.keptPlans.length === 1 ? 'it keeps' : 'they keep'} your ticked-off steps.`);
+  if (stars) sub(merge ? `${stars} more species will be starred as owned.`
+    : `${stars} species will be starred as owned, replacing your current ${owned.size}.`);
+  if (P.droppedPals || P.droppedPlans) {
+    sub(`${countsPhrase(P.droppedPals, P.droppedPlans, 0)} in this file can’t be read and will be skipped.`);
+  }
+
+  // the apply button is named for what it does, never "OK"
+  const apply = document.getElementById('smBackupApply');
+  let label;
+  if (!merge) label = coldStart ? 'Restore my data' : 'Replace my data';
+  else if (pals.length) label = 'Add ' + countsPhrase(pals.length, plns.length, 0);
+  else if (plns.length) label = 'Add ' + countsPhrase(0, plns.length, 0);
+  else if (stars) label = `Star ${stars} species`;
+  else label = 'Nothing to restore';
+  apply.textContent = label;
+  apply.disabled = merge && !pals.length && !plns.length && !stars;
+}
+
+function showBackupStage(d, fileName) {
+  smBackupData = d; smBackupName = fileName || '';
+  smBackupPlan = planBackup(d);
+  const P = smBackupPlan;
+  const coldStart = !roster.length && !plans.length && !owned.size;
+  smBackupMode = coldStart ? 'replace' : 'merge';
+  document.getElementById('smTitle').textContent = 'Restore from a backup';
+  const when = d.savedAt ? new Date(d.savedAt) : null;
+  document.getElementById('smBackupSum').textContent =
+    'This backup holds ' + countsPhrase(P.inRoster.length, P.inPlans.length, P.inOwned.length) +
+    (when && !isNaN(when) ? `, exported ${relTime(when.getTime()) || 'just now'}.` : '.');
+  document.getElementById('smBackupFile').textContent = fileName ? 'From ' + fileName : '';
+  document.getElementById('smBackupOld').hidden = !(P.droppedPals || P.droppedPlans);
+  // with nothing here to protect, merge and replace do the same thing —
+  // so there is no choice to present
+  const modeRow = document.getElementById('smMode');
+  modeRow.hidden = coldStart;
+  setSeg(modeRow, smBackupMode, 'm');
+  renderBackupPreview();
+  smShow('smBackup');
+  (coldStart ? document.getElementById('smBackupApply') : document.getElementById('smmode-merge')).focus();
+}
+
 document.getElementById('importFile').addEventListener('change', e => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f) return;
+  const wrongDoor = /\.sav$/i.test(f.name)
+    ? {label: 'Read my save', fn: openSaveReader} : null;
+  if (wrongDoor) {
+    smFail('That looks like a Palworld save, not a Palarium backup. Nothing was changed.', wrongDoor);
+    return;
+  }
   const rd = new FileReader();
   rd.onload = () => {
     let d;
@@ -1873,17 +2317,16 @@ document.getElementById('importFile').addEventListener('change', e => {
       smFail('That file isn’t a Palarium backup — it should be the JSON file “Export data” writes. Nothing was changed.');
       return;
     }
-    smBackupData = d;
-    const nr = (d.roster || []).length, np = (d.plans || []).length, no = (d.owned || []).length;
-    const when = d.savedAt ? new Date(d.savedAt) : null;
-    document.getElementById('smBackupSum').textContent =
-      `This backup holds ${nr} pal${nr === 1 ? '' : 's'}, ${np} saved plan${np === 1 ? '' : 's'} and ${no} starred species` +
-      (when && !isNaN(when) ? `, exported ${relTime(when.getTime()) || 'just now'}.` : '.');
-    document.getElementById('smBackupWarn').textContent =
-      `Restoring replaces your current roster (${roster.length}), saved plans (${plans.length}) and owned list (${owned.size}) with the ones above. ` +
-      'Your settings — filters, toggles, map preferences — are left alone. This can be undone.';
-    smShow('smBackup');
-    document.getElementById('smBackupApply').focus();
+    const P = planBackup(d);
+    // "replace everything with nothing" is a data wipe wearing a restore
+    // costume — no other flow offers one, so this one doesn't either
+    if (!P.inRoster.length && !P.inPlans.length && !P.inOwned.length) {
+      smFail((P.droppedPals || P.droppedPlans)
+        ? 'Palarium couldn’t read anything in that file. It may be from a much older version.'
+        : 'This backup is empty — no pals, plans or starred species. Nothing was changed.');
+      return;
+    }
+    showBackupStage(d, f.name);
   };
   rd.onerror = () => smFail('That file couldn’t be read. Nothing was changed.');
   rd.readAsText(f);
@@ -1922,7 +2365,7 @@ let smRead = 0;
 
 function smCancelRead() { smRead++; if (smWorker) { smWorker.terminate(); smWorker = null; } }
 function smShow(which) {
-  for (const id of ['smPick', 'smWorlds', 'smBackup', 'smBusy', 'smResult', 'smError'])
+  for (const id of ['smPick', 'smHub', 'smWorlds', 'smBackup', 'smBusy', 'smResult', 'smError'])
     document.getElementById(id).hidden = id !== which;
 }
 
@@ -2054,11 +2497,15 @@ function renderWorldList() {
 function openSaveReader() {
   smCancelRead();
   smParsed = null; smPlan = null; smScope = 'all'; smWorldsFound = []; smBackupData = null;
+  smHome = 'save';
   setSeg(document.getElementById('smScope'), 'all', 's');
+  document.getElementById('smTitle').textContent = 'Read my save';
   smShow('smPick');
-  smLastFocus = document.activeElement;
-  sov.classList.add('open'); sov.scrollTop = 0;
-  document.body.style.overflow = 'hidden';
+  if (!sov.classList.contains('open')) {
+    smLastFocus = document.activeElement;
+    sov.classList.add('open'); sov.scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+  }
   document.getElementById('smChooseDir').focus();
 }
 function closeSaveReader() {
@@ -2077,13 +2524,21 @@ function setSeg(row, val, attr) {
 document.getElementById('importBtn').addEventListener('click', openSaveReader);
 document.getElementById('smClose').addEventListener('click', closeSaveReader);
 document.getElementById('smAbort').addEventListener('click', closeSaveReader);
+// Back goes to the room you came in through. Without this, cancelling a
+// backup restore drops you on the save reader — a place you never chose.
 function smBack() {
   smCancelRead();
+  if (smHome === 'backup') { openBackupHub(); return; }
   if (smWorldsFound.length) { smShow('smWorlds'); (document.querySelector('#smWorldList button') || document.getElementById('smRescan')).focus(); }
   else { smShow('smPick'); document.getElementById('smChooseDir').focus(); }
 }
 document.getElementById('smCancel').addEventListener('click', smBack);
-document.getElementById('smRetry').addEventListener('click', smBack);
+// "Choose a different file" means exactly that on the backup path — reopening
+// the picker, not walking the user back to a screen to press it again.
+document.getElementById('smRetry').addEventListener('click', () => {
+  if (smHome === 'backup') { document.getElementById('importFile').click(); return; }
+  smBack();
+});
 sov.addEventListener('click', e => { if (e.target === sov) closeSaveReader(); });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && sov.classList.contains('open')) closeSaveReader();
@@ -2092,7 +2547,23 @@ document.addEventListener('keydown', e => { if (sov.classList.contains('open')) 
 
 document.getElementById('smChoose').addEventListener('click', () => document.getElementById('saveFile').click());
 document.getElementById('smChooseDir').addEventListener('click', () => document.getElementById('saveDir').click());
+document.getElementById('exportBtn').addEventListener('click', openBackupHub);
+document.getElementById('smExport').addEventListener('click', doExport);
+document.getElementById('smToHub').addEventListener('click', openBackupHub);
+document.getElementById('smToSave').addEventListener('click', openSaveReader);
 document.getElementById('smChooseBackup').addEventListener('click', () => document.getElementById('importFile').click());
+// Switching merge/replace rebuilds the preview, so hand focus back to the
+// button that was just pressed rather than dropping it on <body>.
+document.getElementById('smMode').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  smBackupMode = b.dataset.m;
+  setSeg(document.getElementById('smMode'), smBackupMode, 'm');
+  const id = document.activeElement && document.activeElement.id;
+  renderBackupPreview();
+  const back = (id && document.getElementById(id)) || document.getElementById('smBackupApply');
+  if (back && !back.disabled) back.focus();
+});
 document.getElementById('saveDir').addEventListener('change', e => {
   const files = [...e.target.files];
   e.target.value = '';
@@ -2107,17 +2578,40 @@ document.getElementById('smCopyPath').addEventListener('click', async e => {
 document.getElementById('smRescan').addEventListener('click', () => document.getElementById('saveDir').click());
 document.getElementById('smBackupCancel').addEventListener('click', smBack);
 document.getElementById('smBackupApply').addEventListener('click', () => {
-  const d = smBackupData;
-  if (!d) return;
+  const P = smBackupPlan;
+  if (!P) return;
   const before = {roster: JSON.stringify(roster), plans: JSON.stringify(plans), owned: [...owned]};
-  roster = normRoster(Array.isArray(d.roster) ? d.roster : []);
-  plans = normPlans(Array.isArray(d.plans) ? d.plans : []);
-  owned.clear();
-  for (const k of Array.isArray(d.owned) ? d.owned : []) if (byKey.has(k)) owned.add(k);
+  const merge = smBackupMode === 'merge';
+  let msg;
+  if (merge) {
+    const usedIds = new Set(roster.map(r => r.id));
+    for (const r of P.addPals) {
+      const e = {...r};
+      while (usedIds.has(e.id)) e.id = newEntryId();
+      usedIds.add(e.id); roster.push(e);
+    }
+    const usedPlanIds = new Set(plans.map(p => p.id));
+    for (const p of P.addPlans) {
+      const e = {...p};
+      while (usedPlanIds.has(e.id)) e.id = Date.now() + '' + Math.floor(Math.random() * 1e4);
+      usedPlanIds.add(e.id); plans.push(e);
+    }
+    for (const k of P.newOwned) owned.add(k);
+    const added = countsPhrase(P.addPals.length, P.addPlans.length, 0);
+    msg = 'Backup merged — ' + (added === 'nothing'
+      ? `starred ${P.newOwned.length} new species.`
+      : `added ${added}` + (P.newOwned.length ? ` and starred ${P.newOwned.length} species.` : '.'));
+  } else {
+    roster = P.inRoster.map(r => ({...r}));
+    plans = P.inPlans.map(p => ({...p}));
+    owned.clear();
+    for (const k of P.inOwned) owned.add(k);
+    msg = `Restored ${countsPhrase(roster.length, plans.length, 0)} from that backup.`;
+  }
   saveRoster(); savePlans(); localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
   renderRoster(); renderPlans(); renderDex(); renderReverse();
   closeSaveReader();
-  toast(`Restored ${roster.length} pal${roster.length === 1 ? '' : 's'} and ${plans.length} plan${plans.length === 1 ? '' : 's'} from that backup.`, () => {
+  toast(msg, () => {
     roster = normRoster(JSON.parse(before.roster));
     plans = normPlans(JSON.parse(before.plans));
     owned.clear(); for (const k of before.owned) owned.add(k);
@@ -2128,11 +2622,27 @@ document.getElementById('smBackupApply').addEventListener('click', () => {
 document.getElementById('saveFile').addEventListener('change', e => {
   const f = e.target.files[0];
   e.target.value = '';
-  if (f) readSaveFile(f);
+  if (!f) return;
+  // mirror of the .sav-in-the-backup-picker case: point at the right door
+  if (/\.json$/i.test(f.name)) {
+    smFail('That looks like a Palarium backup, not a Palworld save. Nothing was changed.',
+      {label: 'Backup & restore', fn: openBackupHub});
+    return;
+  }
+  readSaveFile(f);
 });
 
 
-function smFail(msg) { smShow('smError'); document.getElementById('smErrMsg').textContent = msg; document.getElementById('smRetry').focus(); }
+// alt is the "you picked the wrong door" button — offered only when the file
+// itself tells us which door was meant, so it never guesses.
+function smFail(msg, alt) {
+  smShow('smError');
+  document.getElementById('smErrMsg').textContent = msg;
+  const b = document.getElementById('smErrAlt');
+  b.hidden = !alt;
+  if (alt) { b.textContent = alt.label; b.onclick = alt.fn; } else { b.onclick = null; }
+  document.getElementById('smRetry').focus();
+}
 
 function readSaveFile(file) {
   const token = ++smRead;
@@ -2347,7 +2857,7 @@ function renderSavePreview() {
   h.textContent = P.added.length ? `Will be added (${P.added.length})` : 'Nothing new to add';
   prev.appendChild(h);
   if (P.added.length) {
-    const ul = document.createElement('div'); ul.className = 'smlist';
+    const ul = mkSmList('Pals that will be added from your save');
     for (const sp of P.added.slice(0, 60)) {
       const d = document.createElement('div'); d.className = 'smitem';
       d.appendChild(icon(byKey.get(sp.palKey), 22));
@@ -4561,7 +5071,7 @@ if (state.t && byKey.get(state.t)) pickT.set(byKey.get(state.t), true);
 if (state.l && byKey.get(state.l)) pickL.set(byKey.get(state.l), true);
 if (state.ownedOnly) { ownedOnly = true; setSwitch(ownedToggle, true); }
 if (state.dexOwnedOnly) { dexOwnedOnly = true; setSwitch(dexOwnedBtn, true); }
-if (state.rgroup) { groupBySpecies = true; setSwitch(groupToggle, true); }
+if (state.rdense) { denseRows = true; setSwitch(denseToggle, true); document.getElementById('rosterList').classList.add('dense'); }
 // planner, chain, and filter state
 for (const n of SLOTS) {
   const k = state['s' + n];

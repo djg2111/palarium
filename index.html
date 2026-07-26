@@ -91,25 +91,31 @@
         <span class="rstats" id="rosterStats" aria-live="polite"></span>
         <div class="collacts">
           <button class="alink primary" id="rosterOpenAdd">+ Add pal</button>
-          <button class="alink" id="exportBtn" title="Download your roster, saved plans and owned list as JSON. Settings — map filters, Paldex filters, toggles — are not included.">Export data</button>
-          <button class="alink savebtn" id="importBtn" title="Fill your roster from your Palworld save, or restore a Palarium backup."><span class="sicon" aria-hidden="true">🎮</span>Import</button>
+          <button class="alink savebtn" id="importBtn" title="Fill your roster from your Palworld save file. Your save is never changed."><span class="sicon" aria-hidden="true">🎮</span>Read my save</button>
+          <button class="alink" id="exportBtn">Backup &amp; restore</button>
           <input type="file" id="importFile" accept="application/json,.json" style="display:none">
           <input type="file" id="saveFile" accept=".sav" style="display:none">
           <input type="file" id="saveDir" webkitdirectory multiple style="display:none">
         </div>
       </div>
       <div class="sub">Your roster tracks <b>individual pals</b> — passives, gender, IVs. Adding one automatically stars ★ its species as owned; the Planner and the Breedable now tab use both.</div>
-      <div class="dex-controls">
-        <input type="search" class="search-inp" id="rosterSearch" placeholder="Search name, nickname or passive…" aria-label="Search roster">
-        <select id="rosterPassiveFilter" aria-label="Filter by passive"><option value="">Any passive</option></select>
-        <select id="rosterSort" aria-label="Sort roster">
-          <option value="z">Sort: Paldex #</option>
-          <option value="n">Sort: Name</option>
-          <option value="new">Sort: Newest first</option>
-          <option value="ps">Sort: Most passives</option>
-          <option value="iv">Sort: Best IVs</option>
-        </select>
-        <button type="button" class="toggle" id="groupToggle" role="switch" aria-checked="false" title="Collapse duplicate species into one tile"><span class="kn"></span>Group by species</button>
+      <div class="dex-controls roscontrols">
+        <div class="ctl"><label for="rosterSearch">Search</label>
+          <input type="search" class="search-inp" id="rosterSearch" placeholder="Name, nickname or passive…"></div>
+        <div class="ctl"><label for="rosterPassiveFilter">Passive</label>
+          <select id="rosterPassiveFilter"><option value="">Any passive</option></select></div>
+        <div class="ctl"><label for="rosterSort">Sort</label>
+          <select id="rosterSort">
+            <option value="z">Paldex #</option>
+            <option value="n">Name</option>
+            <option value="new">Newest first</option>
+            <option value="ps">Most passives</option>
+            <option value="iv">Best IVs</option>
+          </select></div>
+        <div class="ctl"><label aria-hidden="true">&nbsp;</label>
+          <button type="button" class="alink" id="collapseAll">Collapse all</button></div>
+        <div class="ctl"><label aria-hidden="true">&nbsp;</label>
+          <button type="button" class="toggle" id="denseToggle" role="switch" aria-checked="false"><span class="kn"></span>Compact rows</button></div>
       </div>
       <div class="roster" id="rosterList"></div>
     </div>
@@ -451,16 +457,43 @@
       </div>
     </details>
 
-    <h3 class="smh3">From a Palarium backup</h3>
-    <p class="sub">The JSON file <b>Export data</b> writes. Restoring it <b>replaces</b> your roster, saved plans and owned list with the ones in the file. Your settings — filters, toggles, map preferences — are left alone.</p>
+    <p class="sub smxlink">Restoring a Palarium backup instead? <button type="button" class="alink" id="smToHub">Backup &amp; restore</button></p>
+  </section>
+
+  <section id="smHub" hidden>
+    <p class="privacy"><b>Backups are written and read on this device.</b> Nothing is uploaded or sent anywhere.</p>
+
+    <h3 class="smh3">Save a backup</h3>
+    <p class="sub">One JSON file holding your roster, saved plans and owned list.</p>
+    <p class="sub">Filters, toggles and map preferences stay on this device.</p>
+    <p class="smsum" id="smHubCounts"></p>
+    <p class="sub" id="smHubLast"></p>
+    <div class="smchoose" id="smHubExportRow">
+      <button type="button" class="alink primary big" id="smExport">Export data</button>
+    </div>
+    <p class="sub" id="smHubFile"></p>
+    <div class="hint" id="smHubEmpty" hidden></div>
+
+    <h3 class="smh3">Restore from a backup</h3>
+    <p class="sub">Adds to, or replaces, what is here now — you choose next.</p>
     <div class="smchoose">
       <button type="button" class="alink big" id="smChooseBackup">Choose a backup file…</button>
     </div>
+
+    <p class="sub smxlink">Filling your roster from Palworld? <button type="button" class="alink" id="smToSave">Read my save</button></p>
   </section>
 
   <section id="smBackup" hidden>
-    <p class="smsum" id="smBackupSum" aria-live="polite"></p>
-    <p class="warnbox" id="smBackupWarn"></p>
+    <p class="smsum" id="smBackupSum"></p>
+    <p class="sub" id="smBackupFile"></p>
+    <p class="sub" id="smBackupOld" hidden>This is an older backup. Anything Palarium no longer recognises is skipped.</p>
+    <div class="segrow" id="smMode" role="group" aria-label="How to restore this backup">
+      <button type="button" data-m="merge" id="smmode-merge">Merge with mine</button>
+      <button type="button" data-m="replace" id="smmode-replace">Replace mine</button>
+    </div>
+    <p class="sub" id="smBackupEffect" aria-live="polite"></p>
+    <p class="warnbox" id="smBackupWarn" hidden></p>
+    <div id="smBackupPreview"></div>
     <div class="smacts">
       <button type="button" class="alink primary" id="smBackupApply">Replace my data</button>
       <button type="button" class="alink" id="smBackupCancel">Cancel</button>
@@ -503,7 +536,10 @@
 
   <section id="smError" hidden>
     <p class="smerr" id="smErrMsg" role="alert"></p>
-    <button type="button" class="alink" id="smRetry">Choose a different file</button>
+    <div class="smacts">
+      <button type="button" class="alink" id="smRetry">Choose a different file</button>
+      <button type="button" class="alink" id="smErrAlt" hidden></button>
+    </div>
   </section>
 </div></div>
 

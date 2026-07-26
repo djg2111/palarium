@@ -204,10 +204,14 @@ async function focusSane(page, label) {
     await page.setViewportSize({width: 320, height: 900}); await page.waitForTimeout(300);
     await page.screenshot({path: path.join(__dirname, 'shot-roster-320.png')});
     await page.setViewportSize({width: 1280, height: 900}); await page.waitForTimeout(200);
-    // group-by-species view too, since imports make it worth using
-    await page.click('#groupToggle'); await page.waitForTimeout(500);
-    await audit(page, 'roster grouped by species after an import');
-    await overflow(page, 'roster grouped by species');
+    // the roster is always grouped now; audit the two states the user can
+    // reach from the controls — compact rows, and every section collapsed
+    await page.click('#denseToggle'); await page.waitForTimeout(400);
+    await audit(page, 'roster in compact rows after an import');
+    await overflow(page, 'roster in compact rows');
+    await page.click('#collapseAll'); await page.waitForTimeout(400);
+    await audit(page, 'roster with every species collapsed');
+    await overflow(page, 'roster collapsed');
   } else console.log('  (skipped — no real save available)');
 
   const probs = problems(h);

@@ -33,7 +33,7 @@ It's a fully static site with no build step and no network dependency (icons are
 - **Locally:** open `index.html` in a browser.
 - **Hosted:** serve the folder from any static host (GitHub Pages: Settings → Pages → deploy from branch, root).
 
-All user data (roster, plans, owned list) lives in the browser's localStorage — it does **not** transfer between origins (e.g. local file vs. hosted site). Use Roster → Export/Import to move it.
+All user data (roster, plans, owned list) lives in the browser's localStorage — it does **not** transfer between origins (e.g. local file vs. hosted site). Use Roster → **Backup & restore** to move it: export writes one dated JSON file, and restoring it offers to merge with what's already there or replace it.
 
 ## Data provenance
 
@@ -44,7 +44,7 @@ All user data (roster, plans, owned list) lives in the browser's localStorage �
 
 ### Reading your save file
 
-Roster → **Import** does both jobs from one place: fill the roster from your Palworld save, or restore a Palarium backup. Point it at your save folder and it lists your worlds by name — world, host character, level, in-game day — so you pick the right one rather than guessing at a folder GUID.
+Roster → **Read my save** fills your roster from your Palworld save. Point it at your save folder and it lists your worlds by name — world, host character, level, in-game day — so you pick the right one rather than guessing at a folder GUID. Restoring a Palarium backup is a separate door, **Backup & restore**, because it is a different job: one reads the game, the other replaces or merges your own data.
 
 Everything is parsed **in your browser and nowhere else** — the site is static, has no backend, and never uploads or transmits anything. Save reading is read-only; your save is never modified.
 

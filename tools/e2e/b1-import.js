@@ -38,7 +38,7 @@ const SAVE = process.argv[2] || path.join(__dirname, '..', 'saves', 'Level.sav')
   if (pick && opts.includes(pick.name)) {
     await page.selectOption('#rosterPassiveFilter', pick.name);
     await page.waitForTimeout(300);
-    const shown = await page.$$eval('#rosterList .rospal', els => els.length);
+    const shown = await page.$$eval('#rosterList .rosrow', els => els.length);
     console.log(`filter "${pick.name}": storage says ${pick.n}, roster shows ${shown}`, shown === pick.n ? 'MATCH ✓' : 'MISMATCH ✗');
   } else console.log('passive filter: could not pick a common passive', pick);
   await page.screenshot({path: path.join(__dirname, 'shot-roster-desktop.png'), fullPage: false});
