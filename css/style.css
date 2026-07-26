@@ -986,6 +986,19 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   border-radius:var(--r-sm);padding:1px 7px;margin-left:6px;white-space:nowrap;display:inline-block}
 .gname{color:var(--muted);font-style:italic}
 
+/* the two ways in, and the world list a folder produces */
+.smchoose{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.pathrow{display:flex;gap:8px;align-items:center}
+.pathrow .mono{flex:1;min-width:0}
+.worldlist{display:flex;flex-direction:column;gap:8px;margin:4px 0 4px}
+.worldbtn{display:block;width:100%;text-align:left;background:var(--raised);border:1px solid var(--border);
+  border-radius:var(--r-lg);padding:12px 15px;cursor:pointer;color:var(--text);transition:border-color var(--t-fast),background var(--t-fast)}
+.worldbtn:hover{border-color:var(--accent);background:var(--surface)}
+.worldbtn .wname{display:block;font-weight:600;font-size:var(--fs-md);margin-bottom:2px}
+.worldbtn .wsub{display:block;color:var(--text-2);font-size:var(--fs-sm);line-height:1.45}
+.worldbtn .wpath{display:block;color:var(--muted);font-size:var(--fs-xs);margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 /* ===================== phones (≤640px) =====================
    Desktop lays these views out as wrap-when-needed flex rows. At phone width
    almost every one of them wraps into a ragged stack of differently-sized
@@ -1111,4 +1124,9 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .smacts .alink{width:100%;justify-content:center}
   .smlist{max-height:200px}
   .mono{font-size:10px}
+
+  /* --- the two entry buttons and each world row want a full column --- */
+  .smchoose{flex-direction:column}
+  .smchoose .alink{width:100%;justify-content:center}
+  .pathrow{flex-direction:column;align-items:stretch}
 }

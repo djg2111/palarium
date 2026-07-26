@@ -434,14 +434,28 @@
 
   <section id="smPick">
     <p class="privacy"><b>Your save is read on this device and never leaves it.</b> Palarium is a static site with no server: the file is opened in your browser, the pals are read out of it, and nothing is uploaded, sent or stored anywhere else. Your save file is never modified — this only reads it.</p>
-    <div class="fld"><button type="button" class="alink primary big" id="smChoose">Choose a save file…</button></div>
+    <div class="smchoose">
+      <button type="button" class="alink primary big" id="smChooseDir" hidden>Choose my save folder…</button>
+      <button type="button" class="alink big" id="smChoose">Choose a single file…</button>
+    </div>
+    <p class="sub" id="smDirHint" hidden>Pick the folder your worlds live in and Palarium will list them by name, so you don’t have to work out which folder is which. Your browser asks permission first, and only for that folder.</p>
     <details class="moredet"><summary>Where is my save file?</summary>
       <div>
-        <p>Look for <b>Level.sav</b> inside your world's folder:</p>
-        <p class="mono">%LOCALAPPDATA%\Pal\Saved\SaveGames\&lt;your Steam ID&gt;\&lt;world&gt;\Level.sav</p>
-        <p>Paste that path into the address bar of File Explorer. If there are several world folders, the one you want is the most recently changed. Close the game first, or save and return to the title screen — a save being written to is incomplete.</p>
+        <p>Your worlds live under this folder — paste it into the address bar of File Explorer:</p>
+        <p class="pathrow"><span class="mono" id="smPath">%LOCALAPPDATA%\Pal\Saved\SaveGames</span><button type="button" class="alink" id="smCopyPath">Copy</button></p>
+        <p>Inside it is one folder per Steam account, and inside that one folder per world, each holding a <b>Level.sav</b>. Close the game first, or save and return to the title screen — a save that is still being written is incomplete.</p>
+        <p class="sub">Browsers can’t open a folder for you, so this path can’t be pre-filled — a site that could point your file picker anywhere would be a security problem. Pasting it is the closest thing there is.</p>
       </div>
     </details>
+  </section>
+
+  <section id="smWorlds" hidden>
+    <p class="smsum" id="smWorldsSum" aria-live="polite"></p>
+    <div class="worldlist" id="smWorldList" role="list"></div>
+    <div class="smacts">
+      <button type="button" class="alink" id="smRescan">Choose a different folder</button>
+      <button type="button" class="alink" id="smForget" hidden>Forget this folder</button>
+    </div>
   </section>
 
   <section id="smBusy" hidden>

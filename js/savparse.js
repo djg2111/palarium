@@ -925,6 +925,68 @@ function extractPals(gvas, limit) {
   return {pals, players, skipped, count: cnt};
 }
 
+// ---------- LevelMeta.sav ----------
+// 2 KB beside every Level.sav, and it carries exactly what a world picker
+// needs: the world's name, the host's character and level, and how far in the
+// save is. Without it a folder of worlds is a list of GUIDs.
+function extractMeta(gvas) {
+  const magic = ASCII.decode(gvas.subarray(0, 4));
+  if (magic !== 'GVAS') throw SaveError('That file isn’t a Palworld save.', 'bad');
+  const r = new Reader(gvas, 4);
+  r.u32(); r.u32(); r.u32(); r.p += 6; r.u32(); r.str(); r.u32();
+  const nc = r.u32(); r.p += nc * 20; r.str();
+  const out = {};
+  for (let guard = 0; guard < 32; guard++) {
+    const name = r.str();
+    if (name === 'None' || name === '') break;
+    const type = r.str(); const size = r.u64();
+    let dataAt;
+    if (type === 'StructProperty') { r.str(); r.p += 17; dataAt = r.p; }
+    else if (type === 'ArrayProperty') { r.str(); r.p += 1; dataAt = r.p; }
+    else if (type === 'MapProperty') { r.str(); r.str(); r.p += 1; dataAt = r.p; }
+    else if (type === 'EnumProperty' || type === 'ByteProperty') { r.str(); r.p += 1; dataAt = r.p; }
+    else if (type === 'BoolProperty') { r.u8(); r.u8(); dataAt = r.p; }
+    else { r.p += 1; dataAt = r.p; }
+    // UE DateTime is 100-nanosecond ticks since year 1
+    if (name === 'Timestamp' && type === 'StructProperty') out.savedAt = Math.round(r.u64() / 10000) - 62135596800000;
+    if (name === 'SaveData' && type === 'StructProperty') {
+      const end = dataAt + size;
+      while (r.p < end) {
+        const cn = r.str(); if (cn === 'None' || cn === '') break;
+        const ct = r.str(); const cs = r.u64(); let cd;
+        if (ct === 'StructProperty') { r.str(); r.p += 17; cd = r.p; }
+        else if (ct === 'ArrayProperty') { r.str(); r.p += 1; cd = r.p; }
+        else if (ct === 'MapProperty') { r.str(); r.str(); r.p += 1; cd = r.p; }
+        else if (ct === 'EnumProperty' || ct === 'ByteProperty') { r.str(); r.p += 1; cd = r.p; }
+        else if (ct === 'BoolProperty') { r.u8(); r.u8(); cd = r.p; }
+        else { r.p += 1; cd = r.p; }
+        if (cn === 'WorldName') out.worldName = r.str();
+        else if (cn === 'HostPlayerName') out.hostName = r.str();
+        else if (cn === 'HostPlayerLevel') out.hostLevel = r.i32();
+        else if (cn === 'InGameDay') out.inGameDay = r.i32();
+        r.p = cd + cs;
+      }
+    }
+    r.p = dataAt + size;
+  }
+  return out;
+}
+
+async function parseMeta(buf) {
+  const bytes = new Uint8Array(buf);
+  const h = readHeader(bytes);
+  let gvas;
+  if (h.magic === MAGIC_ZLIB) {
+    gvas = await inflate(bytes, 12);
+    if (h.type === 0x32) gvas = await inflate(gvas, 12);
+  } else {
+    // LevelMeta is a couple of kilobytes; there is nothing to stream
+    gvas = new Uint8Array(h.uncompressed);
+    oodleDecode(bytes, 12, gvas, h.uncompressed, null);
+  }
+  return extractMeta(gvas);
+}
+
 // ---------- top level ----------
 async function inflate(bytes, off) {
   const ds = new DecompressionStream('deflate');
@@ -990,10 +1052,22 @@ function finish(res, h) {
 // ---------- worker plumbing ----------
 if (typeof self !== 'undefined' && typeof importScripts === 'function') {
   self.onmessage = async ev => {
-    const {buf} = ev.data || {};
+    const d = ev.data || {};
+    // A batch of LevelMeta.sav files — a couple of kilobytes each, so they are
+    // answered one by one and a broken world reports itself rather than
+    // taking the whole folder scan down with it.
+    if (d.type === 'meta') {
+      const out = [];
+      for (const it of d.items) {
+        try { out.push({id: it.id, meta: await parseMeta(it.buf)}); }
+        catch (e) { out.push({id: it.id, error: (e && e.message) || String(e)}); }
+      }
+      self.postMessage({type: 'metaDone', items: out});
+      return;
+    }
     try {
       const t0 = Date.now();
-      const res = await parseSave(buf, (phase, pct) => self.postMessage({type: 'progress', phase, pct}));
+      const res = await parseSave(d.buf, (phase, pct) => self.postMessage({type: 'progress', phase, pct}));
       res.ms = Date.now() - t0;
       self.postMessage({type: 'done', res});
     } catch (e) {
@@ -1002,5 +1076,5 @@ if (typeof self !== 'undefined' && typeof importScripts === 'function') {
   };
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {parseSave, oodleDecode, readHeader, extractPals, Reader, readProps};
+  module.exports = {parseSave, parseMeta, extractMeta, oodleDecode, readHeader, extractPals, Reader, readProps};
 }

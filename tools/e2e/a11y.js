@@ -2,6 +2,7 @@
  *
  * The site was clean across fifteen states before this; these are the new ones
  * and they must not regress it.
+ *   0 the picker with the folder button and the world list a folder produces
  *   1 the picker           2 reading (progress + cancel)
  *   3 the preview, no collisions            4 the preview with collisions
  *   5 the ambiguous-match preview           6 the error state
@@ -60,6 +61,41 @@ async function focusSane(page, label) {
   await page.waitForTimeout(400);
   await page.evaluate(() => location.hash = '#/roster');
   await page.waitForTimeout(300);
+
+  console.log('\nSTATE 0 — the folder button, and the world list a folder produces');
+  // showDirectoryPicker is a real OS dialog, so a stub handle over the
+  // fixtures stands in for it. Everything downstream is the code we wrote.
+  const fakeTree = {name: 'SaveGames', kind: 'directory', children: [
+    {name: 'MyWorld', kind: 'directory', children: [
+      {name: 'Level.sav', kind: 'file', data: [...fs.readFileSync(path.join(TESTS, 'fixture-before.sav'))]},
+      {name: 'LevelMeta.sav', kind: 'file', data: [...fs.readFileSync(path.join(TESTS, 'fixture-before.sav'))]},
+    ]},
+  ]};
+  await page.evaluate(tree => {
+    function mk(node) {
+      if (node.kind === 'file') return {kind: 'file', name: node.name,
+        getFile: async () => new File([new Uint8Array(node.data)], node.name)};
+      return {kind: 'directory', name: node.name, queryPermission: async () => 'granted',
+        entries: async function* () { for (const c of node.children) yield [c.name, mk(c)]; }};
+    }
+    window.showDirectoryPicker = async () => mk(tree);
+  }, fakeTree);
+  await page.click('#savereadBtn');
+  await page.waitForSelector('#smPick:not([hidden])');
+  await audit(page, 'picker offering both a folder and a file');
+  await overflow(page, 'picker offering both');
+  await page.click('#smChooseDir');
+  await page.waitForSelector('#smWorlds:not([hidden])', {timeout: 20000});
+  await focusSane(page, 'the world list takes focus');
+  await audit(page, 'world list');
+  await overflow(page, 'world list');
+  await page.click('#smClose');
+  await page.waitForTimeout(200);
+  await page.evaluate(() => { delete window.showDirectoryPicker; });
+  await page.reload({waitUntil: 'load'});
+  await page.waitForTimeout(400);
+  await page.evaluate(() => location.hash = '#/roster');
+  await page.waitForTimeout(250);
 
   console.log('\nSTATE 1 — the picker');
   await page.click('#savereadBtn');

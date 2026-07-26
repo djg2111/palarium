@@ -369,6 +369,89 @@ a version blob. Sniff before parsing; `sav-explore.js --raw` does.
 
 ---
 
+## 5a. `LevelMeta.sav` — naming a world
+
+Two kilobytes beside every `Level.sav`, and the only cheap way to tell one
+world folder from another. **Mapped and in use** — it is what the folder picker
+lists worlds by.
+
+```
+Version    Int
+Timestamp  Struct<DateTime>              when the world was last saved
+SaveData   Struct<PalWorldBaseInfoSaveData>
+    WorldName        Str    "Palpagos Islands"
+    HostPlayerName   Str    "Horus"
+    HostPlayerLevel  Int    34
+    InGameDay        Int    73
+```
+
+`Timestamp` is a UE `DateTime`: 100-nanosecond ticks since year 1, so
+`ms = ticks / 10000 - 62135596800000`.
+
+---
+
+## 5b. Per-player records — `Players/<uid>.sav`
+
+`SaveData : PalWorldPlayerSaveData`. **Surveyed, not consumed.** The joins
+below were checked against a real save; nothing in the app reads them yet.
+
+| field | what | joins to |
+|---|---|---|
+| `RecordData.PalCaptureCount` | Map Name→Int, how many of each species caught | **78/78 keys join to `data.js` pal keys** |
+| `RecordData.PaldeckUnlockFlag` | Map Name→Bool, registered in the Paldex | same keys |
+| `RecordData.FastTravelPointUnlockFlag` | Map Name→Bool, waypoints unlocked | **keys are GUIDs** — see below |
+| `RecordData.TowerBossDefeatFlag` | Map Name→Bool | `BOSS_BATTLE_NAME_GrassBoss` etc., needs a small lookup |
+| `RecordData.RelicObtainForInstanceFlag` | Map Name→Bool, 69 Lifmunk effigies | unchecked |
+| `RecordData.NoteObtainForInstanceFlag` | Map Name→Bool, 11 notes | unchecked |
+| `UnlockedRecipeTechnologyNames` | Array[Name], 106 | unchecked |
+| `CompletedQuestArray_FullRelease` | Array[Name], 16 | unchecked |
+| `PalStorageContainerId`, `OtomoCharacterContainerId` | the palbox and party containers | `CharacterContainerSaveData` |
+
+**The one join that does not exist yet.** `FastTravelPointUnlockFlag` is keyed
+by 32-hex-character GUIDs, while `js/mapdata.js` keys its fast-travel markers by
+actor name (`WorldTree_MiddleBoss_1`). Nothing currently shipped can connect the
+two. It looks solvable — `tools/parse-map.js` already walks the
+`BP_LevelObject_TowerFastTravelPoint_C` actors these markers come from, so
+capturing each actor's GUID alongside its transform would close it — but that is
+a pipeline change, not app work.
+
+**No field/alpha boss defeat flag was found.** `Level.sav` has
+`EnemyCampSaveData…RespawnBossTimeAt`, which suggests they respawn rather than
+staying dead, so "alphas I have beaten" may simply not be recorded. Worth
+confirming before promising it.
+
+---
+
+## 5c. Fog of war — `LocalData.sav`
+
+**Found and confirmed; nothing reads it yet.** This is the most directly usable
+unmapped thing in a save.
+
+```
+SaveData.WorldMapUISaveDataMap : Map<Name → Struct>   2 entries
+    "MainMap" -> MaskTextureData : Array[Byte]  4,194,304 bytes = 2048 x 2048
+    "Tree"    -> MaskTextureData : Array[Byte]  1,048,576 bytes = 1024 x 1024
+```
+
+The keys are **literally `MainMap` and `Tree`** — the same two layer names the
+app's map already uses, which come from `DT_WorldMapUIData`. Values are `0x00`
+unexplored and `0xFF` explored, with a small fraction of intermediate bytes
+feathering the edges (0.4% on the sample world, which was 24% explored).
+
+5.2 MB uncompressed, inside a 29 KB file, so it is cheap to read.
+
+Two things to settle before trusting it: the mask lives in `LocalData.sav`,
+which is **per device**, so it is one player's exploration and not the world's;
+and the mask's orientation has not been checked against the map's
+`swap + flipX` projection. That is a `tools/calibrate.js`-shaped job — score the
+candidate transforms and see which lines the explored region up with land.
+
+Other per-device state, unmapped: `Local_HiddenLocationFlagMap` (125),
+`Local_PalEncountFlag` (92, encountered rather than caught),
+`Local_NewUnlockedTechs` (206).
+
+---
+
 ## 6. Containers
 
 `CharacterContainerSaveData` maps a container GUID to
@@ -390,7 +473,9 @@ Essentially everything except the pal list. In rough order of how much a
 breeding tool would gain:
 
 1. **Container types** — party vs palbox vs base vs viewing cage (§6). Small,
-   and it would let an import be filtered by where a pal actually is.
+   and it would let an import be filtered by where a pal actually is. The
+   player save names two of them outright (`PalStorageContainerId`,
+   `OtomoCharacterContainerId`), which is most of the answer.
 2. **`GroupSaveDataMap`** — guilds, and which players belong to them. Needed for
    anything multiplayer.
 3. **`ItemContainerSaveData` + `DynamicItemSaveData`** — the item stacks. Eggs
@@ -400,6 +485,10 @@ breeding tool would gain:
 5. **`MapObjectSaveData`** — 1.6 MB of world objects; breeding pens are in here.
 6. **`FoliageGridSaveDataMap`, `DungeonSaveData`, `EnemyCampSaveData`** — large,
    and of no obvious use to a breeding tool.
+
+Already surveyed and ready to use, needing app work rather than format work:
+the fog-of-war masks (§5c) and the capture/Paldex records (§5b). The only
+piece with a genuine unknown is the fast-travel GUID join.
 
 The method for attacking any of them is
 [save-reverse-engineering.md](save-reverse-engineering.md).

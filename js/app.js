@@ -1912,18 +1912,212 @@ let smRead = 0;
 
 function smCancelRead() { smRead++; if (smWorker) { smWorker.terminate(); smWorker = null; } }
 function smShow(which) {
-  for (const id of ['smPick', 'smBusy', 'smResult', 'smError'])
+  for (const id of ['smPick', 'smWorlds', 'smBusy', 'smResult', 'smError'])
     document.getElementById(id).hidden = id !== which;
 }
-function openSaveReader() {
+
+// ---------- picking a folder instead of a file ----------
+// A browser cannot be told to open %LOCALAPPDATA%\Pal\... — showDirectoryPicker
+// only accepts a handful of well-known directories or a handle you already
+// hold, and that restriction is the whole point of the API. What it can do is
+// remember: passing a stable `id` makes Chrome reopen where you last were, and
+// keeping the handle means the second visit skips the picker entirely.
+const CAN_PICK_DIR = typeof window.showDirectoryPicker === 'function';
+const SAVE_PATH = '%LOCALAPPDATA%\\Pal\\Saved\\SaveGames';
+let smDirHandle = null, smWorldsFound = [];
+
+// one tiny IndexedDB store, because a directory handle can't go in localStorage
+function idb(fn) {
+  return new Promise((res, rej) => {
+    const rq = indexedDB.open('palarium', 1);
+    rq.onupgradeneeded = () => rq.result.createObjectStore('handles');
+    rq.onerror = () => rej(rq.error);
+    rq.onsuccess = () => {
+      const db = rq.result;
+      let tx, out;
+      // put() throws synchronously on a value it can't clone, and that throw
+      // happens inside this event handler — outside the promise chain, where a
+      // .catch() on the caller can't see it and the browser reports it as an
+      // uncaught error. Storing a handle is a convenience; it must never be
+      // able to put an error on the page.
+      try {
+        tx = db.transaction('handles', 'readwrite');
+        out = fn(tx.objectStore('handles'));
+      } catch (e) { db.close(); rej(e); return; }
+      tx.oncomplete = () => { db.close(); res(out && out.result !== undefined ? out.result : out); };
+      tx.onerror = () => { db.close(); rej(tx.error); };
+      tx.onabort = () => { db.close(); rej(tx.error); };
+    };
+  });
+}
+const rememberDir = h => idb(st => st.put(h, 'saveDir')).catch(() => {});
+const recallDir = () => idb(st => st.get('saveDir')).catch(() => null);
+const forgetDir = () => idb(st => st.delete('saveDir')).catch(() => {});
+
+// Walk a picked folder looking for Level.sav. The user may hand us the
+// SaveGames folder, their Steam-ID folder, or a single world — so search a few
+// levels down rather than insisting on one shape. Bounded, because someone
+// will eventually pick C:\.
+async function findWorlds(dir, onProgress) {
+  const found = [];
+  let queue = [{h: dir, path: dir.name, depth: 0}], scanned = 0;
+  while (queue.length && found.length < 60 && scanned < 400) {
+    const {h, path, depth} = queue.shift();
+    scanned++;
+    onProgress && onProgress(scanned, found.length);
+    let level = null, meta = null;
+    const subs = [];
+    try {
+      for await (const [name, entry] of h.entries()) {
+        if (entry.kind === 'file') {
+          if (name.toLowerCase() === 'level.sav') level = entry;
+          else if (name.toLowerCase() === 'levelmeta.sav') meta = entry;
+        } else if (depth < 3 && name !== 'backup' && name !== 'Players') subs.push({h: entry, path: path + '/' + name, depth: depth + 1});
+      }
+    } catch { continue; }
+    if (level) found.push({dir: h, path, level, meta});
+    else queue = queue.concat(subs);
+  }
+  return found;
+}
+
+async function useDirectory(handle, {remember = true} = {}) {
+  smDirHandle = handle;
+  if (remember) rememberDir(handle);
+  smShow('smBusy');
+  const msg = document.getElementById('smBusyMsg');
+  const bar = document.getElementById('smBar');
+  bar.style.width = '10%';
+  msg.textContent = 'Looking for worlds…';
+  document.getElementById('smCancel').focus();
+  const token = ++smRead;
+  let worlds;
+  try { worlds = await findWorlds(handle, n => { msg.textContent = `Looking for worlds… (${n} folders checked)`; }); }
+  catch { smFail('That folder couldn’t be read. Nothing was changed.'); return; }
+  if (token !== smRead) return;
+  if (!worlds.length) {
+    smFail('No Level.sav anywhere in that folder. Pick the folder that holds your worlds — ' + SAVE_PATH + ' — or use “Choose a single file…”.');
+    return;
+  }
+  bar.style.width = '55%';
+  msg.textContent = `Reading ${worlds.length} world${worlds.length === 1 ? '' : 's'}…`;
+  // LevelMeta.sav is about 2 KB, so naming every world costs almost nothing
+  const items = [];
+  for (let i = 0; i < worlds.length; i++) {
+    if (!worlds[i].meta) continue;
+    try { items.push({id: i, buf: await (await worlds[i].meta.getFile()).arrayBuffer()}); } catch {}
+  }
+  for (let i = 0; i < worlds.length; i++) {
+    try { worlds[i].bytes = (await worlds[i].level.getFile()).size; } catch { worlds[i].bytes = 0; }
+  }
+  if (token !== smRead) return;
+  const metas = items.length ? await readMetaBatch(items) : [];
+  if (token !== smRead) return;
+  for (const m of metas) if (m.meta) worlds[m.id].meta_ = m.meta;
+  smWorldsFound = worlds;
+  renderWorldList();
+  smShow('smWorlds');
+  const first = document.querySelector('#smWorldList button');
+  (first || document.getElementById('smRescan')).focus();
+}
+
+function readMetaBatch(items) {
+  return new Promise(resolve => {
+    let w;
+    try { w = new Worker('js/savparse.js'); } catch { resolve([]); return; }
+    const done = out => { try { w.terminate(); } catch {} resolve(out); };
+    const timer = setTimeout(() => done([]), 20000);
+    w.onmessage = ev => { if (ev.data && ev.data.type === 'metaDone') { clearTimeout(timer); done(ev.data.items); } };
+    w.onerror = () => { clearTimeout(timer); done([]); };
+    w.postMessage({type: 'meta', items}, items.map(i => i.buf));
+  });
+}
+
+const relTime = ms => {
+  if (!ms) return '';
+  const d = Math.floor((Date.now() - ms) / 86400000);
+  if (d < 0) return '';
+  if (d === 0) return 'today';
+  if (d === 1) return 'yesterday';
+  if (d < 30) return d + ' days ago';
+  if (d < 365) return Math.round(d / 30) + ' months ago';
+  return Math.round(d / 365) + ' years ago';
+};
+
+function renderWorldList() {
+  const list = document.getElementById('smWorldList');
+  list.innerHTML = '';
+  const n = smWorldsFound.length;
+  document.getElementById('smWorldsSum').textContent =
+    `${n} world${n === 1 ? '' : 's'} in that folder. Pick the one to read — nothing is read until you do.`;
+  // most recently played first: it is nearly always the one they want
+  const rows = smWorldsFound.slice().sort((a, b) => (b.meta_ ? b.meta_.savedAt || 0 : 0) - (a.meta_ ? a.meta_.savedAt || 0 : 0));
+  for (const wd of rows) {
+    const m = wd.meta_;
+    const row = document.createElement('div'); row.className = 'worldrow'; row.setAttribute('role', 'listitem');
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'worldbtn';
+    const t = document.createElement('span'); t.className = 'wname';
+    t.textContent = m && m.worldName ? m.worldName : wd.dir.name;
+    b.appendChild(t);
+    const sub = document.createElement('span'); sub.className = 'wsub';
+    const bits = [];
+    if (m && m.hostName) bits.push(m.hostName + (m.hostLevel ? ' · Lv ' + m.hostLevel : ''));
+    if (m && m.inGameDay) bits.push('day ' + m.inGameDay);
+    if (m && m.savedAt) bits.push('saved ' + relTime(m.savedAt));
+    if (wd.bytes) bits.push((wd.bytes / 1048576).toFixed(1) + ' MB');
+    if (!m) bits.push('no LevelMeta.sav — name unknown');
+    sub.textContent = bits.join(' · ');
+    b.appendChild(sub);
+    // The folder path disambiguates two worlds with the same name, but one of
+    // its segments is the Steam account id. Nothing here ever leaves the
+    // machine, but it costs nothing to keep an account id off a screen someone
+    // might screenshot for a bug report.
+    const pth = document.createElement('span'); pth.className = 'wpath';
+    pth.textContent = wd.path.replace(/\b\d{17}\b/g, '…');
+    b.appendChild(pth);
+    b.setAttribute('aria-label', 'Read ' + t.textContent + (bits.length ? ', ' + bits.join(', ') : ''));
+    b.addEventListener('click', async () => {
+      try { readSaveFile(await wd.level.getFile()); }
+      catch { smFail('That world’s Level.sav couldn’t be opened. Nothing was changed.'); }
+    });
+    row.appendChild(b);
+    list.appendChild(row);
+  }
+}
+
+async function pickDirectory() {
+  try {
+    const opts = {id: 'palarium-saves', mode: 'read'};
+    if (smDirHandle) opts.startIn = smDirHandle;
+    const h = await window.showDirectoryPicker(opts);
+    await useDirectory(h);
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;   // they closed the picker
+    smFail('That folder couldn’t be opened. Nothing was changed.');
+  }
+}
+async function openSaveReader() {
   smCancelRead();
-  smParsed = null; smPlan = null; smScope = 'all';
+  smParsed = null; smPlan = null; smScope = 'all'; smWorldsFound = [];
   setSeg(document.getElementById('smScope'), 'all', 's');
   smShow('smPick');
   smLastFocus = document.activeElement;
   sov.classList.add('open'); sov.scrollTop = 0;
   document.body.style.overflow = 'hidden';
   document.getElementById('smChoose').focus();
+  if (!CAN_PICK_DIR) return;
+  // A folder we were already given access to: go straight to the world list.
+  // If the permission has lapsed the browser needs a fresh gesture, so leave
+  // the picker up rather than firing a prompt nobody asked for.
+  try {
+    const h = await recallDir();
+    if (!h) return;
+    if ((await h.queryPermission({mode: 'read'})) !== 'granted') { smDirHandle = h; return; }
+    if (sov.classList.contains('open') && !document.getElementById('smPick').hidden) {
+      document.getElementById('smForget').hidden = false;
+      await useDirectory(h, {remember: false});
+    }
+  } catch {}
 }
 function closeSaveReader() {
   smCancelRead();
@@ -1941,14 +2135,13 @@ function setSeg(row, val, attr) {
 document.getElementById('savereadBtn').addEventListener('click', openSaveReader);
 document.getElementById('smClose').addEventListener('click', closeSaveReader);
 document.getElementById('smAbort').addEventListener('click', closeSaveReader);
-document.getElementById('smCancel').addEventListener('click', () => {
+function smBack() {
   smCancelRead();
-  smShow('smPick');
-  document.getElementById('smChoose').focus();
-});
-document.getElementById('smRetry').addEventListener('click', () => {
-  smShow('smPick'); document.getElementById('smChoose').focus();
-});
+  if (smWorldsFound.length) { smShow('smWorlds'); (document.querySelector('#smWorldList button') || document.getElementById('smRescan')).focus(); }
+  else { smShow('smPick'); document.getElementById('smChoose').focus(); }
+}
+document.getElementById('smCancel').addEventListener('click', smBack);
+document.getElementById('smRetry').addEventListener('click', smBack);
 sov.addEventListener('click', e => { if (e.target === sov) closeSaveReader(); });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && sov.classList.contains('open')) closeSaveReader();
@@ -1956,12 +2149,31 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keydown', e => { if (sov.classList.contains('open')) trapTab(e, sov); });
 
 document.getElementById('smChoose').addEventListener('click', () => document.getElementById('saveFile').click());
+if (CAN_PICK_DIR) {
+  document.getElementById('smChooseDir').hidden = false;
+  document.getElementById('smDirHint').hidden = false;
+  document.getElementById('smChooseDir').addEventListener('click', pickDirectory);
+}
+document.getElementById('smPath').textContent = SAVE_PATH;
+document.getElementById('smCopyPath').addEventListener('click', async e => {
+  try { await navigator.clipboard.writeText(SAVE_PATH); e.target.textContent = 'Copied'; }
+  catch { e.target.textContent = 'Press Ctrl+C'; getSelection().selectAllChildren(document.getElementById('smPath')); }
+  setTimeout(() => { e.target.textContent = 'Copy'; }, 2000);
+});
+document.getElementById('smRescan').addEventListener('click', pickDirectory);
+document.getElementById('smForget').addEventListener('click', async () => {
+  await forgetDir(); smDirHandle = null;
+  document.getElementById('smForget').hidden = true;
+  smShow('smPick');
+  document.getElementById('smChooseDir').focus();
+  toast('Forgot that folder — you’ll be asked for it next time.');
+});
 document.getElementById('saveFile').addEventListener('change', e => {
   const f = e.target.files[0];
   e.target.value = '';
   if (f) readSaveFile(f);
 });
-document.getElementById('smRetry').addEventListener('click', smCancelRead);
+
 
 function smFail(msg) { smShow('smError'); document.getElementById('smErrMsg').textContent = msg; document.getElementById('smRetry').focus(); }
 

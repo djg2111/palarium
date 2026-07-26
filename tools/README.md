@@ -379,7 +379,8 @@ node e2e/b3-b4-merge.js               # benchmarks 3-4: collisions, and nick/not
 node e2e/b5-b6-rest.js [Level.sav]    # benchmarks 5-6: planner, and the failure cases
 node e2e/b6-scale.js 400 3000         # time and peak memory on a 400 MB save
 node e2e/cancel-test.js               # cancelling a big read must not clobber the next one
-node e2e/a11y.js                      # axe, keyboard and overflow across seven states
+node e2e/b7-folder.js [SaveGames dir] # the folder picker and the world list
+node e2e/a11y.js                      # axe, keyboard and overflow across nine states
 ```
 
 `sav-check.js` is the one to run after touching the reader. It diffs our
