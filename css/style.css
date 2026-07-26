@@ -943,6 +943,49 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 .pvfx li:not(.up):not(.dn)::before{content:'•';color:var(--muted);margin-right:6px}
 .pvfoot{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
 
+
+/* ===================== read a save file =====================
+   Sits beside Export/Import data but must not read as the same thing: one
+   restores a Palarium backup, this one reads a game file. Hence its own icon
+   and wording, and a preview before anything is written. */
+.savebtn{gap:6px}
+.savebtn .sicon{font-size:var(--fs-md);line-height:1}
+.smodal{width:min(680px,100%)}
+/* the promise the whole feature rests on, said where the file is picked */
+.privacy{background:var(--raised);border:1px solid var(--border);border-left:3px solid var(--accent);
+  border-radius:0 10px 10px 0;padding:12px 15px;font-size:var(--fs-sm);line-height:1.55;
+  color:var(--text-2);margin:-4px 0 18px}
+.privacy b{color:var(--text)}
+.alink.big{padding:12px 20px;font-size:var(--fs-md)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:var(--fs-xs);
+  background:var(--raised);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:8px 10px;overflow-x:auto;white-space:nowrap;color:var(--text-2)}
+.pbar{height:8px;background:var(--raised);border:1px solid var(--border);border-radius:999px;
+  overflow:hidden;margin:12px 0 14px}
+.pbarfill{height:100%;width:4%;background:var(--accent);border-radius:999px;transition:width .18s linear}
+.smsum{font-size:var(--fs-md);color:var(--text-2);line-height:1.55;margin:-4px 0 14px}
+.smfilter{margin-bottom:14px}
+.smh3{font-size:var(--fs-md);margin:18px 0 6px}
+.smconf{display:flex;flex-direction:column;gap:12px;margin-top:10px}
+.confrow{border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 14px;background:var(--raised)}
+.confmine,.confsave{font-size:var(--fs-sm);color:var(--text-2);line-height:1.5;margin-bottom:4px;overflow-wrap:anywhere}
+.confsave.amb{color:var(--muted);font-style:italic}
+.conflab{display:block;font-size:var(--fs-xs);color:var(--muted);margin:8px 0 4px}
+.confseg{margin-top:8px}
+.smprev{margin-top:4px}
+.smlist{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto;
+  border:1px solid var(--border);border-radius:var(--r-lg);padding:8px 10px;background:var(--raised)}
+.smitem{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--text-2);
+  overflow-wrap:anywhere;line-height:1.4}
+.smacts{display:flex;gap:10px;margin-top:20px}
+.smerr{background:var(--danger-tint);border-left:3px solid var(--danger);border-radius:0 10px 10px 0;
+  padding:12px 15px;font-size:var(--fs-sm);line-height:1.55;color:var(--text-2);margin:0 0 16px}
+/* the level and the in-game name, both from the save. The in-game name is
+   muted and separate because it is not the nickname you typed. */
+.lvchip{font-size:var(--fs-xs);color:var(--muted);background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:1px 7px;margin-left:6px;white-space:nowrap;display:inline-block}
+.gname{color:var(--muted);font-style:italic}
+
 /* ===================== phones (≤640px) =====================
    Desktop lays these views out as wrap-when-needed flex rows. At phone width
    almost every one of them wraps into a ragged stack of differently-sized
@@ -1059,4 +1102,13 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .mk-alpha .g{width:22px;height:22px}
   .mk-fastTravel .g{width:10px;height:10px}
   .mk-tower .g,.mk-middleBoss .g{width:18px;height:18px;font-size:11px}
+
+  /* --- read-a-save dialog: the segmented choice per collision and the
+         action row both need one full-width column here --- */
+  .confseg{flex-direction:column}
+  .confseg button{width:100%}
+  .smacts{flex-direction:column}
+  .smacts .alink{width:100%;justify-content:center}
+  .smlist{max-height:200px}
+  .mono{font-size:10px}
 }

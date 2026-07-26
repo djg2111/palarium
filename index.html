@@ -93,7 +93,9 @@
           <button class="alink primary" id="rosterOpenAdd">+ Add pal</button>
           <button class="alink" id="exportBtn" title="Download your roster, saved plans and owned list as JSON. Settings — map filters, Paldex filters, toggles — are not included.">Export data</button>
           <button class="alink" id="importBtn" title="Restore a roster, saved plans and owned list from an exported JSON file. Your settings are left alone.">Import data</button>
+          <button class="alink savebtn" id="savereadBtn" title="Fill your roster from your Palworld save file. Read on this device only — nothing is uploaded."><span class="sicon" aria-hidden="true">🎮</span>Read my save</button>
           <input type="file" id="importFile" accept="application/json" style="display:none">
+          <input type="file" id="saveFile" accept=".sav" style="display:none">
         </div>
       </div>
       <div class="sub">Your roster tracks <b>individual pals</b> — passives, gender, IVs. Adding one automatically stars ★ its species as owned; the Planner and the Breedable now tab use both.</div>
@@ -425,6 +427,54 @@
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <div class="overlay" id="overlay"><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
+
+<div class="overlay" id="soverlay"><div class="modal smodal" role="dialog" aria-modal="true" aria-labelledby="smTitle">
+  <button class="close" id="smClose" title="Close" aria-label="Close dialog">✕</button>
+  <h2 class="rmtitle" id="smTitle">Read my Palworld save</h2>
+
+  <section id="smPick">
+    <p class="privacy"><b>Your save is read on this device and never leaves it.</b> Palarium is a static site with no server: the file is opened in your browser, the pals are read out of it, and nothing is uploaded, sent or stored anywhere else. Your save file is never modified — this only reads it.</p>
+    <div class="fld"><button type="button" class="alink primary big" id="smChoose">Choose a save file…</button></div>
+    <details class="moredet"><summary>Where is my save file?</summary>
+      <div>
+        <p>Look for <b>Level.sav</b> inside your world's folder:</p>
+        <p class="mono">%LOCALAPPDATA%\Pal\Saved\SaveGames\&lt;your Steam ID&gt;\&lt;world&gt;\Level.sav</p>
+        <p>Paste that path into the address bar of File Explorer. If there are several world folders, the one you want is the most recently changed. Close the game first, or save and return to the title screen — a save being written to is incomplete.</p>
+      </div>
+    </details>
+  </section>
+
+  <section id="smBusy" hidden>
+    <p id="smBusyMsg" aria-live="polite">Reading your save…</p>
+    <div class="pbar"><div class="pbarfill" id="smBar"></div></div>
+    <button type="button" class="alink" id="smCancel">Cancel</button>
+  </section>
+
+  <section id="smResult" hidden>
+    <p id="smSummary" class="smsum" aria-live="polite"></p>
+    <div class="dex-controls smfilter">
+      <div class="segrow" id="smScope" role="group" aria-label="Which pals to import">
+        <button type="button" data-s="all" class="on" aria-pressed="true">Every pal</button>
+        <button type="button" data-s="ps" aria-pressed="false">Only ones with passives</button>
+      </div>
+    </div>
+    <div id="smConflictWrap" hidden>
+      <h3 class="smh3">Pals you already typed in</h3>
+      <p class="sub" id="smConflictNote"></p>
+      <div class="smconf" id="smConflicts"></div>
+    </div>
+    <div id="smPreview" class="smprev"></div>
+    <div class="smacts">
+      <button type="button" class="alink primary" id="smApply">Import</button>
+      <button type="button" class="alink" id="smAbort">Cancel</button>
+    </div>
+  </section>
+
+  <section id="smError" hidden>
+    <p class="smerr" id="smErrMsg" role="alert"></p>
+    <button type="button" class="alink" id="smRetry">Choose a different file</button>
+  </section>
+</div></div>
 
 <div class="overlay" id="roverlay"><div class="modal rmodal" role="dialog" aria-modal="true" aria-labelledby="rmTitle">
   <button class="close" id="rmClose" title="Close" aria-label="Close dialog">✕</button>

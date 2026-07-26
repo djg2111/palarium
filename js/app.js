@@ -1742,6 +1742,14 @@ function renderRoster() {
     const nm = document.createElement('div'); nm.className = 'nm';
     if (r.g) { nm.appendChild(gEl(gsymR(r.g))); nm.append(' '); }
     if (r.nick) { const nk = document.createElement('span'); nk.textContent = '“' + r.nick + '” '; nm.appendChild(nk); }
+    // The save has a nickname field of its own. It is shown here rather than in
+    // the nick field, because a pal renamed in-game must not overwrite the name
+    // you typed — and hiding the disagreement would be worse than showing it.
+    else if (r.gname) { const gn = document.createElement('span'); gn.className = 'gname'; gn.textContent = '“' + r.gname + '” '; gn.title = 'Name from your save file'; nm.appendChild(gn); }
+    if (r.lv) {
+      const lc = document.createElement('span'); lc.className = 'lvchip';
+      lc.textContent = 'Lv ' + r.lv; lc.title = 'Level, from your save file'; nm.appendChild(lc);
+    }
     if (r.iv) {
       const ivc = document.createElement('span'); ivc.className = 'ivchip';
       ivc.textContent = 'IV ' + r.iv.map(v => v === null ? '–' : v).join('·');
@@ -1869,6 +1877,372 @@ document.getElementById('importFile').addEventListener('change', e => {
     e.target.value = '';
   };
   rd.readAsText(f);
+});
+
+// ---------- read a Palworld save ----------
+// Deliberately not "Import data". That one restores a Palarium backup and
+// replaces the roster wholesale; this reads a game file and merges. Different
+// words, different button, and a preview before anything is written.
+//
+// MERGE, field by field:
+//   game-authored  species, gender, IVs, passives, level — the save is the
+//                  truth and a re-import updates them
+//   human-authored nick, note — an import fills one that is empty and never
+//                  replaces one that isn't
+// Identity is the save's per-instance GUID, stored as the additive `sid`. An
+// entry without one is a hand entry and still perfectly valid; normRoster has
+// never required it.
+const PASSIVE_NAME_BY_KEY = new Map(PASSIVES.filter(p => p.k).map(p => [p.k.toLowerCase(), p.n]));
+// The game's own tables disagree on casing (WindChimes vs Windchimes), so every
+// species lookup here is case-insensitive — an exact match drops real pals.
+const palByLowerKey = new Map(PALS.map(p => [p.k.toLowerCase(), p]));
+function palFromCharacterId(cid) {
+  let s = String(cid || '');
+  if (/^BOSS_/i.test(s)) s = s.slice(5);
+  return palByLowerKey.get(s.toLowerCase()) || null;
+}
+const passiveDisplay = key => PASSIVE_NAME_BY_KEY.get(String(key).toLowerCase()) || String(key);
+
+const sov = document.getElementById('soverlay');
+let smWorker = null, smParsed = null, smPlan = null, smScope = 'all', smLastFocus = null;
+
+function smShow(which) {
+  for (const id of ['smPick', 'smBusy', 'smResult', 'smError'])
+    document.getElementById(id).hidden = id !== which;
+}
+function openSaveReader() {
+  smParsed = null; smPlan = null; smScope = 'all';
+  setSeg(document.getElementById('smScope'), 'all', 's');
+  smShow('smPick');
+  smLastFocus = document.activeElement;
+  sov.classList.add('open'); sov.scrollTop = 0;
+  document.body.style.overflow = 'hidden';
+  document.getElementById('smChoose').focus();
+}
+function closeSaveReader() {
+  if (smWorker) { smWorker.terminate(); smWorker = null; }
+  sov.classList.remove('open');
+  document.body.style.overflow = '';
+  if (smLastFocus && document.contains(smLastFocus)) smLastFocus.focus();
+  smLastFocus = null;
+}
+function setSeg(row, val, attr) {
+  for (const b of row.querySelectorAll('button')) {
+    const on = b.dataset[attr] === val;
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+  }
+}
+document.getElementById('savereadBtn').addEventListener('click', openSaveReader);
+document.getElementById('smClose').addEventListener('click', closeSaveReader);
+document.getElementById('smAbort').addEventListener('click', closeSaveReader);
+document.getElementById('smCancel').addEventListener('click', () => {
+  if (smWorker) { smWorker.terminate(); smWorker = null; }
+  smShow('smPick');
+  document.getElementById('smChoose').focus();
+});
+document.getElementById('smRetry').addEventListener('click', () => {
+  smShow('smPick'); document.getElementById('smChoose').focus();
+});
+sov.addEventListener('click', e => { if (e.target === sov) closeSaveReader(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && sov.classList.contains('open')) closeSaveReader();
+});
+document.addEventListener('keydown', e => { if (sov.classList.contains('open')) trapTab(e, sov); });
+
+document.getElementById('smChoose').addEventListener('click', () => document.getElementById('saveFile').click());
+document.getElementById('saveFile').addEventListener('change', e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (f) readSaveFile(f);
+});
+
+function smFail(msg) { smShow('smError'); document.getElementById('smErrMsg').textContent = msg; document.getElementById('smRetry').focus(); }
+
+function readSaveFile(file) {
+  smShow('smBusy');
+  const bar = document.getElementById('smBar');
+  const msg = document.getElementById('smBusyMsg');
+  bar.style.width = '4%';
+  msg.textContent = `Reading ${file.name} (${(file.size / 1048576).toFixed(1)} MB)…`;
+  document.getElementById('smCancel').focus();
+  file.arrayBuffer().then(buf => {
+    if (!sov.classList.contains('open')) return;
+    // The parse happens in a worker so a several-hundred-megabyte save can't
+    // freeze the tab. A frozen tab with no feedback reads as a crash.
+    try { smWorker = new Worker('js/savparse.js'); }
+    catch (err) { smFail('Your browser blocked the background reader this needs. Nothing was changed.'); return; }
+    smWorker.onmessage = ev => {
+      const d = ev.data;
+      if (d.type === 'progress') { bar.style.width = Math.round(6 + d.pct * 88) + '%'; return; }
+      if (d.type === 'error') { smWorker.terminate(); smWorker = null; smFail(d.message); return; }
+      if (d.type === 'done') {
+        smWorker.terminate(); smWorker = null;
+        bar.style.width = '100%';
+        smParsed = d.res;
+        showSavePreview();
+      }
+    };
+    smWorker.onerror = () => { if (smWorker) { smWorker.terminate(); smWorker = null; } smFail('The background reader stopped unexpectedly. Nothing was changed.'); };
+    smWorker.postMessage({buf}, [buf]);
+  }).catch(() => smFail('That file could not be opened. Nothing was changed.'));
+}
+
+// Does everything this hand-typed entry actually records agree with this pal
+// from the save? Not field equality — the roster's own Duplicate button mints
+// entries carrying only species, passives, gender and note, so a sparse entry
+// is normal and must be allowed to match a fully-specified pal.
+function handEntryMatches(r, sp) {
+  if (r.k !== sp.palKey) return false;
+  if (r.g && sp.gender && r.g !== sp.gender) return false;
+  if (r.g && !sp.gender) return false;
+  if (r.iv) for (let i = 0; i < 3; i++) if (r.iv[i] !== null && r.iv[i] !== sp.iv[i]) return false;
+  for (const p of r.ps) if (!sp.ps.includes(p)) return false;
+  return true;
+}
+
+function buildPlan() {
+  const all = (smParsed.pals || []).map(p => {
+    const pal = palFromCharacterId(p.cid);
+    return pal ? {
+      guid: p.guid, palKey: pal.k, palName: pal.n, cid: p.cid, boss: p.boss,
+      gender: p.gender, lv: p.level, iv: p.iv.slice(),
+      ps: p.passives.map(passiveDisplay), gname: p.nickname,
+    } : null;
+  });
+  const unrecognised = all.filter(x => !x).length;
+  let pals = all.filter(Boolean);
+  if (smScope === 'ps') pals = pals.filter(p => p.ps.length);
+
+  const bySid = new Map();
+  for (const r of roster) if (r.sid) bySid.set(r.sid, r);
+
+  const linked = [], fresh = [];
+  for (const sp of pals) (bySid.has(sp.guid) ? linked : fresh).push(sp);
+
+  // Hand entries — never had a GUID, so nothing can match automatically.
+  const hand = roster.filter(r => !r.sid);
+  const conflicts = [];
+  const claimed = new Set();
+  for (const r of hand) {
+    const cands = fresh.filter(sp => handEntryMatches(r, sp));
+    if (cands.length) conflicts.push({entry: r, cands, choice: cands.length === 1 ? 'combine' : 'separate', pick: cands.length === 1 ? 0 : -1});
+  }
+  for (const c of conflicts) if (c.choice === 'combine' && c.pick >= 0) claimed.add(c.cands[c.pick].guid);
+  const added = fresh.filter(sp => !claimed.has(sp.guid));
+  return {pals, allPals: all.filter(Boolean), linked, fresh, conflicts, added, unrecognised, total: all.length};
+}
+
+function showSavePreview() {
+  smPlan = buildPlan();
+  smShow('smResult');
+  renderSavePreview();
+  document.getElementById('smApply').focus();
+}
+
+function recomputePlan() {
+  // keep the user's answers while the numbers move under them
+  const prev = smPlan ? smPlan.conflicts : [];
+  smPlan = buildPlan();
+  for (const c of smPlan.conflicts) {
+    const old = prev.find(x => x.entry.id === c.entry.id);
+    if (old && old.cands.length === c.cands.length) { c.choice = old.choice; c.pick = old.pick; }
+  }
+  const claimed = new Set();
+  for (const c of smPlan.conflicts) if (c.choice === 'combine' && c.pick >= 0) claimed.add(c.cands[c.pick].guid);
+  const skipped = new Set();
+  for (const c of smPlan.conflicts) if (c.choice === 'mine' && c.pick >= 0) skipped.add(c.cands[c.pick].guid);
+  smPlan.added = smPlan.fresh.filter(sp => !claimed.has(sp.guid) && !skipped.has(sp.guid));
+  renderSavePreview();
+}
+
+function describeSavePal(sp) {
+  const bits = [sp.palName];
+  if (sp.boss) bits.push('α');
+  if (sp.gender) bits.push(sp.gender === 'M' ? '♂' : '♀');
+  bits.push('Lv ' + sp.lv);
+  bits.push('IV ' + sp.iv.join('·'));
+  if (sp.ps.length) bits.push(sp.ps.join(', '));
+  if (sp.gname) bits.push('“' + sp.gname + '”');
+  return bits.join(' · ');
+}
+
+function renderSavePreview() {
+  const P = smPlan;
+  const sum = document.getElementById('smSummary');
+  const parts = [];
+  parts.push(`${P.added.length} new pal${P.added.length === 1 ? '' : 's'} to add`);
+  if (P.linked.length) parts.push(`${P.linked.length} already imported (stats refreshed, your nicknames and notes kept)`);
+  if (P.conflicts.length) parts.push(`${P.conflicts.length} to decide on below`);
+  sum.textContent = `Found ${smParsed.pals.length} pals in your save. ` + parts.join(' · ') + '.';
+
+  const note = [];
+  if (P.unrecognised) note.push(`${P.unrecognised} entr${P.unrecognised === 1 ? 'y' : 'ies'} skipped — raid, tower or unreleased pals the Paldex doesn’t list.`);
+  if (smParsed.players) note.push(`${smParsed.players} player character${smParsed.players === 1 ? '' : 's'} skipped.`);
+
+  const wrap = document.getElementById('smConflictWrap');
+  wrap.hidden = !P.conflicts.length;
+  document.getElementById('smConflictNote').textContent = P.conflicts.length
+    ? 'These roster entries look like pals in your save. A hand-typed entry has never carried a save id, so this is asked once — after that they stay linked and update quietly.'
+    : '';
+  const cw = document.getElementById('smConflicts');
+  cw.innerHTML = '';
+  P.conflicts.forEach((c, ci) => {
+    const p = byKey.get(c.entry.k);
+    const row = document.createElement('div'); row.className = 'confrow';
+    const mine = document.createElement('div'); mine.className = 'confmine';
+    const mt = document.createElement('b'); mt.textContent = 'Your entry: ';
+    mine.appendChild(mt);
+    const bits = [p.n];
+    if (c.entry.g) bits.push(c.entry.g === 'M' ? '♂' : '♀');
+    if (c.entry.iv) bits.push('IV ' + c.entry.iv.map(v => v === null ? '–' : v).join('·'));
+    if (c.entry.ps.length) bits.push(c.entry.ps.join(', '));
+    if (c.entry.nick) bits.push('“' + c.entry.nick + '”');
+    if (c.entry.note) bits.push('note: ' + c.entry.note);
+    mine.append(bits.join(' · '));
+    row.appendChild(mine);
+
+    if (c.cands.length === 1) {
+      const sp = document.createElement('div'); sp.className = 'confsave';
+      const st = document.createElement('b'); st.textContent = 'In your save: '; sp.appendChild(st);
+      sp.append(describeSavePal(c.cands[0]));
+      row.appendChild(sp);
+      const seg = document.createElement('div'); seg.className = 'segrow confseg';
+      seg.setAttribute('role', 'group');
+      seg.setAttribute('aria-label', 'What to do with your ' + p.n + ' entry');
+      for (const [val, label, title] of [
+        ['combine', 'Combine', 'One entry: the save’s stats with the nickname and note you typed. Nothing is lost.'],
+        ['mine', 'Keep mine', 'Leave your entry exactly as it is and don’t import the save’s copy.'],
+        ['save', 'Use the save’s', 'Replace your entry with the save’s — your nickname and note on it are discarded.'],
+      ]) {
+        const b = document.createElement('button'); b.type = 'button';
+        b.textContent = label; b.title = title;
+        b.dataset.v = val;
+        const on = c.choice === val;
+        b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+        b.addEventListener('click', () => { c.choice = val; c.pick = 0; recomputePlan(); });
+        seg.appendChild(b);
+      }
+      row.appendChild(seg);
+    } else {
+      // More than one pal in the save fits. Never auto-pick one of N.
+      const sp = document.createElement('div'); sp.className = 'confsave amb';
+      sp.textContent = `${c.cands.length} pals in your save fit this entry — Palarium can’t tell which, so it will keep them separate unless you say.`;
+      row.appendChild(sp);
+      const lab = document.createElement('label'); lab.className = 'conflab';
+      lab.htmlFor = 'confsel' + ci;
+      lab.textContent = 'Which one is this?';
+      row.appendChild(lab);
+      const sel = document.createElement('select'); sel.id = 'confsel' + ci; sel.className = 'search-inp';
+      const o0 = document.createElement('option'); o0.value = '-1';
+      o0.textContent = 'Keep them separate — leave my entry alone, import all ' + c.cands.length;
+      sel.appendChild(o0);
+      c.cands.forEach((sp2, i) => {
+        const o = document.createElement('option'); o.value = String(i);
+        o.textContent = 'Combine with: ' + describeSavePal(sp2);
+        sel.appendChild(o);
+      });
+      sel.value = String(c.choice === 'combine' ? c.pick : -1);
+      sel.addEventListener('change', () => {
+        const v = +sel.value;
+        if (v < 0) { c.choice = 'separate'; c.pick = -1; } else { c.choice = 'combine'; c.pick = v; }
+        recomputePlan();
+      });
+      row.appendChild(sel);
+    }
+    cw.appendChild(row);
+  });
+
+  const prev = document.getElementById('smPreview');
+  prev.innerHTML = '';
+  if (note.length) { const n = document.createElement('p'); n.className = 'sub'; n.textContent = note.join(' '); prev.appendChild(n); }
+  const h = document.createElement('h3'); h.className = 'smh3';
+  h.textContent = P.added.length ? `Will be added (${P.added.length})` : 'Nothing new to add';
+  prev.appendChild(h);
+  if (P.added.length) {
+    const ul = document.createElement('div'); ul.className = 'smlist';
+    for (const sp of P.added.slice(0, 60)) {
+      const d = document.createElement('div'); d.className = 'smitem';
+      d.appendChild(icon(byKey.get(sp.palKey), 22));
+      const t = document.createElement('span'); t.textContent = describeSavePal(sp);
+      d.appendChild(t);
+      ul.appendChild(d);
+    }
+    prev.appendChild(ul);
+    if (P.added.length > 60) {
+      const m = document.createElement('p'); m.className = 'sub';
+      m.textContent = `…and ${P.added.length - 60} more. All ${P.added.length} will be added.`;
+      prev.appendChild(m);
+    }
+  }
+  const apply = document.getElementById('smApply');
+  const willWrite = P.added.length + P.linked.length + P.conflicts.filter(c => c.choice !== 'mine' && c.choice !== 'separate').length;
+  apply.disabled = !willWrite;
+  apply.textContent = P.added.length ? `Import ${P.added.length} pal${P.added.length === 1 ? '' : 's'}` : (willWrite ? 'Update my roster' : 'Nothing to import');
+}
+
+for (const b of document.getElementById('smScope').querySelectorAll('button')) {
+  b.addEventListener('click', () => { smScope = b.dataset.s; setSeg(document.getElementById('smScope'), smScope, 's'); recomputePlan(); });
+}
+
+// game-authored fields only; nick and note are never touched here
+function applyGameFields(r, sp) {
+  r.k = sp.palKey; r.sid = sp.guid;
+  r.g = sp.gender || null;
+  r.iv = sp.iv.slice();
+  r.ps = sp.ps.slice(0, 4);
+  r.lv = sp.lv;
+  r.gname = sp.gname || '';
+}
+function entryFromSavePal(sp) {
+  const r = {id: newEntryId(), k: sp.palKey, ps: [], g: null, nick: '', note: '', iv: null};
+  applyGameFields(r, sp);
+  return r;
+}
+
+document.getElementById('smApply').addEventListener('click', () => {
+  const P = smPlan;
+  const before = JSON.stringify(roster), beforeOwned = [...owned];
+  let updated = 0, addedN = 0, combined = 0, replaced = 0;
+
+  const bySid = new Map();
+  for (const r of roster) if (r.sid) bySid.set(r.sid, r);
+  for (const sp of P.linked) {
+    const r = bySid.get(sp.guid);
+    if (r) { applyGameFields(r, sp); updated++; }   // nick and note deliberately untouched
+  }
+  for (const c of P.conflicts) {
+    if (c.choice === 'combine' && c.pick >= 0) {
+      const sp = c.cands[c.pick];
+      const r = roster.find(x => x.id === c.entry.id);
+      if (r) { applyGameFields(r, sp); combined++; }   // nick and note deliberately untouched
+    } else if (c.choice === 'save' && c.pick >= 0) {
+      const sp = c.cands[c.pick];
+      const i = roster.findIndex(x => x.id === c.entry.id);
+      if (i >= 0) { roster[i] = entryFromSavePal(sp); replaced++; }
+    }
+  }
+  for (const sp of P.added) { roster.push(entryFromSavePal(sp)); addedN++; }
+
+  // every species in the save is owned by definition
+  let starred = 0;
+  for (const sp of P.allPals) if (!owned.has(sp.palKey)) { owned.add(sp.palKey); starred++; }
+  localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
+
+  saveRoster(); renderRoster(); renderDex(); renderReverse(); renderPlans();
+  closeSaveReader();
+
+  const bits = [];
+  if (addedN) bits.push(`added ${addedN}`);
+  if (updated) bits.push(`refreshed ${updated}`);
+  if (combined) bits.push(`combined ${combined}`);
+  if (replaced) bits.push(`replaced ${replaced}`);
+  if (starred) bits.push(`starred ${starred} new species`);
+  toast('Save read — ' + (bits.join(', ') || 'nothing changed') + '.', () => {
+    roster = normRoster(JSON.parse(before));
+    owned.clear(); for (const k of beforeOwned) owned.add(k);
+    localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
+    saveRoster(); renderRoster(); renderDex(); renderReverse(); renderPlans();
+  });
 });
 
 // ---------- planner: route ----------

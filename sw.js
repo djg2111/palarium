@@ -17,9 +17,16 @@
 // client would otherwise keep serving a map that says Necromus doesn't exist.
 // v18: mapdata.js again — the two Dualith alphas shared one SpawnerID, so one
 // of them had no working #/map/ link. Same reasoning as v17.
-const VERSION = 'palarium-v18';
+// v19: js/savparse.js, the save reader, joins the shell. It's a new top-level
+// file so it needed a decision: precache it and bump, or leave it on-demand.
+// It's precached, for two reasons. A Worker script is fetched by the browser at
+// new Worker() time, and on a cold offline start an un-precached one fails with
+// nothing useful to say — "read my save" would be a button that breaks with the
+// tab offline, which is exactly the state someone reading a local game file is
+// likely to be in. And it is 43 KB, against the 45 KB of mapdata.js already here.
+const VERSION = 'palarium-v19';
 const SHELL = ['.', 'index.html', 'css/style.css', 'js/app.js', 'js/data.js',
-  'js/mapdata.js', 'assets/favicon.svg', 'assets/lockup.svg', 'manifest.webmanifest'];
+  'js/mapdata.js', 'js/savparse.js', 'assets/favicon.svg', 'assets/lockup.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
