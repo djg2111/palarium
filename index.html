@@ -373,6 +373,8 @@
 <div class="overlay" id="roverlay"><div class="modal rmodal" role="dialog" aria-modal="true" aria-labelledby="rmTitle">
   <button class="close" id="rmClose" title="Close" aria-label="Close dialog">✕</button>
   <h2 class="rmtitle" id="rmTitle">Add a pal</h2>
+  <p class="dlgwhy" id="rosterWhy" hidden>Only need it marked as owned? A ★ in the Paldex already covers every “owned” filter. An entry here earns its keep when you care about <b>this pal’s</b> passives, gender or IVs.</p>
+  <div class="carrynote" id="carryNote" hidden><span id="carryText"></span><button class="alink" type="button" id="carryClear">Start fresh</button></div>
   <div class="vform">
     <div class="fld"><label>Species</label><div id="pickR"></div></div>
     <div class="fld"><label id="genderLbl">Gender <span class="opt">· optional</span></label>
@@ -382,7 +384,9 @@
         <button type="button" data-g="F" aria-pressed="false"><span class="g gf" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.8" r="4.3"/><path d="M8 10.1v4.4M5.6 12.4h4.8"/></svg></span>Female</button>
       </div>
     </div>
-    <div class="fld"><label>Passives <span class="opt">· optional, up to 4</span></label><div class="ptag" id="passivePick"></div></div>
+    <div class="fld"><label>Passives <span class="opt">· optional, up to 4</span></label>
+      <div class="psets" id="psetRow" hidden></div>
+      <div class="ptag" id="passivePick"></div></div>
     <div class="fld"><label for="nickInp">Nickname <span class="opt">· optional</span></label><input class="search-inp" id="nickInp"></div>
     <details class="moredet" id="moreDetails">
       <summary>More details — IVs &amp; notes</summary>

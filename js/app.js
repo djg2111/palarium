@@ -1282,9 +1282,27 @@ function makePassivePicker(mount, max = 4, onChange) {
       chips.appendChild(c);
     }
   }
+  // one row is always highlighted, so typing a prefix and pressing Enter takes
+  // the passive — the tag input is driven far more often from the keyboard
+  // (four passives per pal, over and over) than it is browsed with a mouse
+  let rows = [], hl = 0;
+  function highlight(i, scroll = true) {
+    if (!rows.length) return;
+    hl = Math.max(0, Math.min(rows.length - 1, i));
+    rows.forEach((r, j) => r.el.classList.toggle('hl', j === hl));
+    if (scroll) rows[hl].el.scrollIntoView({block: 'nearest'});
+  }
+  function take(p) {
+    if (selected.length >= max) return;
+    // close after each pick: a lingering full-width list would swallow the
+    // next click on whatever sits beneath it (typing again reopens it)
+    selected.push(p.n); renderChips(); inp.value = '';
+    mount.classList.remove('open'); inp.focus();
+    onChange && onChange();
+  }
   function renderPop() {
     const q = inp.value.trim().toLowerCase();
-    pop.innerHTML = '';
+    pop.innerHTML = ''; rows = [];
     const matches = PASSIVES_SORTED.filter(p => !selected.includes(p.n) && (!q || p.n.toLowerCase().includes(q))).slice(0, 30);
     if (!matches.length) { mount.classList.remove('open'); return; }
     for (const p of matches) {
@@ -1297,23 +1315,26 @@ function makePassivePicker(mount, max = 4, onChange) {
       tier.textContent = (p.r > 0 ? '+'.repeat(Math.min(p.r, 4)) : p.r < 0 ? '−'.repeat(Math.min(-p.r, 4)) : '·') + (p.e ? '  ' + p.e : '') + (p.mt ? '  (mutation-only)' : '');
       r.append(nm, tier);
       r.addEventListener('mousedown', e => e.preventDefault());
-      r.addEventListener('click', () => {
-        if (selected.length >= max) return;
-        // close after each pick: a lingering full-width list would swallow the
-        // next click on whatever sits beneath it (typing again reopens it)
-        selected.push(p.n); renderChips(); inp.value = '';
-        mount.classList.remove('open'); inp.focus();
-        onChange && onChange();
-      });
-      pop.appendChild(r);
+      r.addEventListener('click', () => take(p));
+      pop.appendChild(r); rows.push({el: r, p});
     }
     mount.classList.add('open');
+    highlight(0, false);
     fitPopup(mount, pop, pop, 260); // this popup is its own scroller — no chrome
   }
   inp.addEventListener('input', renderPop);
   inp.addEventListener('focus', renderPop);
   inp.addEventListener('click', () => { if (!mount.classList.contains('open')) renderPop(); });
   inp.addEventListener('blur', () => setTimeout(() => mount.classList.remove('open'), 150));
+  inp.addEventListener('keydown', e => {
+    const open = mount.classList.contains('open');
+    if (e.key === 'ArrowDown') { e.preventDefault(); open ? highlight(hl + 1) : renderPop(); }
+    else if (e.key === 'ArrowUp' && open) { e.preventDefault(); highlight(hl - 1); }
+    else if (e.key === 'Enter' && open && rows.length) { e.preventDefault(); take(rows[hl].p); }
+    // Escape closes the list, not the dialog around it — stop it reaching the
+    // document handler that would dismiss the whole roster editor
+    else if (e.key === 'Escape' && open) { e.stopPropagation(); mount.classList.remove('open'); }
+  });
   return { get: () => [...selected], set(v) { selected = [...v]; renderChips(); }, clear() { selected = []; inp.value = ''; renderChips(); } };
 }
 function passiveChips(names, readonly = true) {
@@ -1372,8 +1393,50 @@ function pairGenderIssue(aK, bK) {
 }
 const pickR = makePicker(document.getElementById('pickR'), {placeholder:'Pick a species…', allowClear:true, ownedToggle:true, onChange: p => {
   if (p) { document.getElementById('rosterErr').hidden = true; pickR.root.querySelector('.picker-btn').classList.remove('invalid'); }
+  if (!editingId) setAddTitle(p);
+  renderPsetRow(); // the offered passive sets depend on which species is picked
 }});
-const rosterPassives = makePassivePicker(document.getElementById('passivePick'));
+const rosterPassives = makePassivePicker(document.getElementById('passivePick'), 4, () => renderPsetRow());
+
+// ---------- reusable passive sets ----------
+// The whole point of a breeding line is that the passives repeat, so the sets
+// you have already typed are offered back as one tap. Two sources, in order:
+// the sets already recorded on the species you just picked ("another one from
+// this line"), then the last few sets you entered on anything. This is a
+// device convenience like the picker's Recent list, so it lives outside the
+// export — the export carries what you typed in, not how you typed it.
+const setKey = ps => [...ps].sort().join('|');
+let recentSets = readStore('palbreed_psets', []).filter(s => Array.isArray(s) && s.length);
+function rememberSet(ps) {
+  if (!ps.length) return;
+  recentSets = [[...ps], ...recentSets.filter(s => setKey(s) !== setKey(ps))].slice(0, 6);
+  localStorage.setItem('palbreed_psets', JSON.stringify(recentSets));
+}
+function renderPsetRow() {
+  const row = document.getElementById('psetRow');
+  row.innerHTML = '';
+  const p = pickR.get();
+  const seen = new Set([setKey(rosterPassives.get())]); // never offer what's already in the field
+  const offers = [];
+  const src = p ? roster.filter(r => r.k === p.k && r.ps.length).map(r => r.ps) : [];
+  for (const s of src.concat(recentSets)) {
+    if (seen.has(setKey(s))) continue;
+    seen.add(setKey(s)); offers.push(s);
+    if (offers.length === 3) break;
+  }
+  row.hidden = !offers.length;
+  if (!offers.length) return;
+  const lb = document.createElement('span'); lb.className = 'psetlb'; lb.textContent = 'Reuse';
+  row.appendChild(lb);
+  for (const s of offers) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'pset';
+    b.textContent = s.join(' · ');
+    b.title = 'Fill the passives with ' + s.join(', ');
+    b.setAttribute('aria-label', 'Use passives ' + s.join(', '));
+    b.addEventListener('click', () => { rosterPassives.set(s); renderPsetRow(); });
+    row.appendChild(b);
+  }
+}
 const nickInp = document.getElementById('nickInp');
 const noteInp = document.getElementById('noteInp');
 const ivEls = ['ivH', 'ivA', 'ivD'].map(id => document.getElementById(id));
@@ -1394,8 +1457,40 @@ const rosterAddBtn = document.getElementById('rosterAdd');
 const rosterCancelBtn = document.getElementById('rosterCancel');
 const gsymR = g => g === 'M' ? '♂' : g === 'F' ? '♀' : '';
 let editingId = null;
+// ---------- add another: carry the batch-level fields forward ----------
+// A breeding line is by definition a run of pals that share their passives, so
+// re-driving the tag input from empty after every save was the tax. What is
+// kept is exactly what stays visible in the dialog and describes the batch —
+// species, gender, passives, note. What is dropped is per-individual: the
+// nickname, and the IVs, which sit inside a collapsed <details> where a stale
+// value would be a silent lie about a pal you actually measured.
+let carried = null;
+function describeCarried() {
+  if (!carried) return '';
+  const bits = [];
+  if (carried.g) bits.push(carried.g === 'M' ? 'male' : 'female');
+  if (carried.ps.length) bits.push(carried.ps.join(', '));
+  if (carried.note) bits.push('“' + carried.note + '”');
+  return bits.join(' · ');
+}
+function renderCarryNote() {
+  const el = document.getElementById('carryNote');
+  const txt = describeCarried();
+  el.hidden = !txt;
+  if (txt) document.getElementById('carryText').textContent = 'Kept from the last one: ' + txt;
+}
+function setAddTitle(p) {
+  rmTitle.textContent = p ? (carried ? 'Add another ' + p.n : 'Add ' + p.n + ' to roster') : 'Add a pal';
+}
+document.getElementById('carryClear').addEventListener('click', () => {
+  setGender(''); rosterPassives.clear(); noteInp.value = '';
+  carried = null; renderCarryNote(); renderPsetRow(); setAddTitle(pickR.get());
+  // the button that was just pressed is now hidden — hand focus somewhere real
+  document.querySelector('#passivePick .taginp').focus();
+});
 function openRosterEditor(entry, presetPal) {
   editingId = entry ? entry.id : null;
+  carried = null;
   if (entry) {
     const p = byKey.get(entry.k);
     pickR.set(p, true); rosterPassives.set(entry.ps); setGender(entry.g);
@@ -1408,12 +1503,16 @@ function openRosterEditor(entry, presetPal) {
     pickR.set(presetPal || null, true); rosterPassives.clear(); setGender('');
     nickInp.value = ''; noteInp.value = ''; ivEls.forEach(e => e.value = '');
     moreDetails.open = false;
-    rmTitle.textContent = presetPal ? 'Add ' + presetPal.n + ' to roster' : 'Add a pal';
+    setAddTitle(presetPal || null);
     rosterAddBtn.textContent = '+ Add to roster';
   }
   pickR.root.querySelector('.picker-btn').classList.remove('invalid');
   document.getElementById('rosterErr').hidden = true;
   document.getElementById('rosterAddAnother').style.display = entry ? 'none' : '';
+  renderCarryNote(); renderPsetRow();
+  // worth saying once, to someone who hasn't decided this is worth the typing;
+  // dead weight in the dialog of anyone already keeping a roster
+  document.getElementById('rosterWhy').hidden = !!entry || roster.length >= 3;
   lastFocusEditor = document.activeElement;
   roverlay.classList.add('open'); roverlay.scrollTop = 0;
   document.body.style.overflow = 'hidden';
@@ -1422,7 +1521,7 @@ function openRosterEditor(entry, presetPal) {
 }
 let lastFocusEditor = null;
 function closeRosterEditor() {
-  editingId = null;
+  editingId = null; carried = null;
   roverlay.classList.remove('open');
   document.body.style.overflow = '';
   renderRoster();
@@ -1468,6 +1567,7 @@ function commitRosterEntry() {
     roster.push({id: newEntryId(), ...entry});
   }
   if (!owned.has(p.k)) toggleOwned(p.k);
+  rememberSet(entry.ps);
   saveRoster(); renderDex(); renderReverse();
   return p;
 }
@@ -1482,11 +1582,17 @@ const rosterAddAnotherBtn = document.getElementById('rosterAddAnother');
 rosterAddAnotherBtn.addEventListener('click', () => {
   const p = commitRosterEntry();
   if (!p) return;
-  toast('Added ' + p.n + ' to roster');
-  // keep the dialog open and the species selected — clear per-pal details for the next entry
-  rosterPassives.clear(); setGender(''); nickInp.value = ''; noteInp.value = '';
-  ivEls.forEach(e => e.value = ''); moreDetails.open = false;
-  renderRoster();
+  // per-individual fields only (see `carried` above); moreDetails is left open
+  // if it was, so a batch you are recording IVs for doesn't reopen every time
+  nickInp.value = ''; ivEls.forEach(e => e.value = '');
+  carried = {g: genderVal, ps: rosterPassives.get(), note: noteInp.value.trim()};
+  const kept = describeCarried();
+  // the toast is the live region, so say what was kept there too — the note
+  // below the title is silent to a screen reader that has moved past it
+  toast('Added ' + p.n + (kept ? ' — kept ' + kept + ' for the next one' : ' to roster'));
+  setAddTitle(p); renderCarryNote(); renderPsetRow(); renderRoster();
+  // land on the field that actually differs between siblings in a line
+  (genderSeg.querySelector('button.on') || genderSeg.children[0]).focus();
 });
 const rosterSearch = document.getElementById('rosterSearch');
 const rosterPassiveFilter = document.getElementById('rosterPassiveFilter');
@@ -1538,6 +1644,16 @@ function renderRoster() {
       b.addEventListener('click', () => openRosterEditor(null));
       h.appendChild(b);
       h.append(' — or use “Add to roster” on any pal card.');
+      // the cheapest improvement for someone about to grind the dialog for
+      // pals they only need marked as owned is telling them not to
+      const w = document.createElement('div'); w.className = 'emptywhy';
+      const wt = document.createElement('span');
+      wt.textContent = 'You don’t need an entry for every pal. Starring a species ★ in the Paldex already satisfies every “owned” filter — a roster entry is for when you care about one individual’s passives, gender or IVs.';
+      w.appendChild(wt);
+      const b2 = document.createElement('button'); b2.className = 'alink'; b2.textContent = 'Open the Paldex';
+      b2.addEventListener('click', () => navTab('dex'));
+      w.appendChild(b2);
+      h.appendChild(w);
     }
     list.appendChild(h);
     renderRosterStrip(); return;
@@ -1548,6 +1664,24 @@ function renderRoster() {
     b1.addEventListener('click', () => setSlotAuto(r));
     const be = document.createElement('button'); be.textContent = '✎'; be.title = 'Edit';
     be.addEventListener('click', () => openRosterEditor(r));
+    // "another one like that" in one click. Passives, gender and the note
+    // describe the line and come along; the nickname and the IVs belong to the
+    // individual you copied and would be wrong on its sibling.
+    const bd = document.createElement('button'); bd.textContent = '⧉';
+    bd.title = 'Duplicate — another with the same passives, gender and note';
+    bd.setAttribute('aria-label', 'Duplicate ' + (r.nick || byKey.get(r.k).n));
+    bd.addEventListener('click', () => {
+      const copy = {id: newEntryId(), k: r.k, ps: [...r.ps], g: r.g || null, nick: '', note: r.note || '', iv: null};
+      const at = roster.findIndex(x => x.id === r.id) + 1;
+      roster.splice(at, 0, copy);
+      if (!owned.has(copy.k)) toggleOwned(copy.k);
+      saveRoster(); renderRoster(); renderDex(); renderReverse();
+      toast('Added another ' + byKey.get(copy.k).n, () => {
+        const i = roster.findIndex(x => x.id === copy.id);
+        if (i >= 0) roster.splice(i, 1);
+        saveRoster(); renderRoster();
+      }, {label: 'Edit it', fn: () => { const e2 = roster.find(x => x.id === copy.id); if (e2) openRosterEditor(e2); }});
+    });
     const bx = document.createElement('button'); bx.textContent = '✕'; bx.title = 'Remove from roster';
     bx.setAttribute('aria-label', 'Remove ' + (r.nick || byKey.get(r.k).n) + ' from roster');
     bx.addEventListener('click', () => {
@@ -1574,7 +1708,7 @@ function renderRoster() {
         toast('Removed ' + name + ' from roster', undo);
       }
     });
-    acts.append(b1, be, bx);
+    acts.append(b1, be, bd, bx);
     return acts;
   };
   const identity = r => {
