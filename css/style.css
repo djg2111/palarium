@@ -446,22 +446,18 @@ tbody tr:hover{background:var(--surface)}
 .pchip.ro{cursor:default}
 .pchip.ro:hover{border-color:var(--success-line);color:var(--success)}
 .pchip.neg.ro:hover{border-color:var(--danger-line);color:var(--danger)}
-/* The species grid. A shut section is a tile; an open one spans every column
-   and gets the full width its rows need for four passive chips on one line —
-   which the old 300px card grid could never manage, because there every *pal*
-   was a tile. Presentation follows open/shut in CSS alone, so <details> keeps
-   its native keyboard and aria-expanded.
-   grid-auto-flow:dense is forbidden — it would backfill tiles around an open
-   section and make visual order disagree with DOM order. */
-.roster{display:grid;gap:10px;margin-top:16px;
-  grid-template-columns:repeat(auto-fill,minmax(min(216px,100%),1fr))}
-/* Between 641 and 1023 a vertical tile only fits two or three narrow columns
-   and comes out taller than the bars it replaces, so the horizontal tile runs
-   all the way up to 1023 (rules below) on a wider track. */
-@media (min-width:641px) and (max-width:1023px){
-  .roster{grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr))}
-}
-.rosgrp[open],.roster>.hint{grid-column:1/-1}
+/* Two views over one grid. Tiles: a board of species. Rows: the full list.
+   In Tiles, the open species' panel is a real sibling placed after the last
+   tile of that tile's visual row and spanning every column, so grid
+   auto-placement puts it on its own row and resumes the board underneath —
+   DOM order stays visual order, and grid-auto-flow:dense stays forbidden
+   (and unnecessary). */
+.roster{display:grid;gap:10px;margin-top:16px}
+.roster.tileview{grid-template-columns:repeat(auto-fill,minmax(min(168px,100%),1fr))}
+.roster.rowview{grid-template-columns:1fr}
+@media (max-width:1023px){.roster.tileview{grid-template-columns:repeat(auto-fill,minmax(min(148px,100%),1fr))}}
+@media (max-width:640px){.roster.tileview{grid-template-columns:repeat(auto-fill,minmax(min(96px,100%),1fr));gap:8px}}
+.rospanel,.roster>.hint{grid-column:1/-1}
 .strip{display:flex;flex-wrap:wrap;gap:8px}
 .spal{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-full);padding:4px 13px 4px 5px;cursor:pointer;font-size:var(--fs-md);font-weight:600}
 .spal:hover{border-color:var(--border-strong)}
@@ -528,100 +524,60 @@ select#genderSel{padding:10px 12px}
 .collhead .viewseg{margin-left:auto;flex:0 0 auto}
 .segrow[hidden]{display:none}
 /* ---- roster: one species section, one pal per row ---- */
-.rosgrp{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:0}
-.rosgrp>summary{display:flex;align-items:center;gap:10px;font-weight:700;font-size:var(--fs-md);
-  padding:9px 15px;cursor:pointer;list-style:none;border-radius:var(--r-lg)}
-.rosgrp>summary::-webkit-details-marker{display:none}
-.rosgrp>summary::before{content:'▸' / '';color:var(--muted);font-size:var(--fs-sm);
-  transition:transform var(--t-fast) var(--ease-out);display:inline-block}
-.rosgrp[open]>summary::before{transform:rotate(90deg)}
-.rosgrp>summary:hover{color:var(--accent)}
-.rosgrp .cntb{background:var(--raised);border:1px solid var(--border-strong);border-radius:var(--r-full);
-  font-size:var(--fs-xs);padding:1px 9px;color:var(--muted);font-weight:600;white-space:nowrap}
-
-.sub{color:var(--muted);font-size:var(--fs-md);line-height:1.5}
-
-/* ---- Paldex gallery ----
-   299 species, every one a distinct art, and 84 of them near-duplicate variant
-   names that only the picture separates. Recognition is the job here, which is
-   what the table is worst at. */
-.dexgrid{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px;
-  grid-template-columns:repeat(auto-fill,minmax(min(88px,100%),1fr))}
-.dexgrid[hidden]{display:none} /* a display: of its own outranks the UA's [hidden] */
-.dextile{position:relative;background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--r-lg);transition:border-color var(--t-fast),background var(--t-fast)}
-.dextile:hover{border-color:var(--border-strong);background:var(--raised)}
-/* owned is a ring and a fill, never a filter on the art: greying out 260 of
-   299 tiles would wreck the recognition this grid exists for (DESIGN.md §7) */
-.dextile.on{border-color:var(--gold-line);background:var(--gold-tint)}
-.dextile-open{display:flex;flex-direction:column;align-items:center;gap:4px;
-  width:100%;background:none;border:0;padding:8px 6px;cursor:pointer;color:var(--text)}
-/* the whole tile is the press target; the star sits above it */
-.dextile-open::after{content:'';position:absolute;inset:0;border-radius:var(--r-lg)}
-.dextile .pico{--ico:52px}
-.dt-name{font-size:var(--fs-sm);font-weight:600;line-height:1.25;text-align:center;
-  overflow-wrap:anywhere;color:var(--text)}
-.dt-meta{font-size:var(--fs-xs);color:var(--muted);text-align:center;line-height:1.3}
-.dt-meta .uq{display:block}
-.dextile .star{position:absolute;top:0;right:0;z-index:1;padding:11px;margin:0;line-height:1;
-  background:none;border:0;font-size:var(--fs-md)}
-/* 36x36, not the 44 §8 prefers for a primary mobile action: at 44 the star's
-   hit box covers a quarter of an 80px tile and overlaps the art, stealing
-   presses from the tile itself. Both are real targets here. */
-/* owned through the roster rather than starred here — same gold, lighter weight */
-.star.viaroster{color:var(--gold);opacity:.75}
-@media (max-width:640px){
-  .dexgrid{grid-template-columns:repeat(auto-fill,minmax(min(72px,100%),1fr));gap:6px}
-  .dextile .pico{--ico:40px}
-  .dextile-open{padding:6px 4px;gap:2px}
-  .dt-name{line-height:1.2}
-}
-
 /* visually hidden but announced. .nativehide is the opposite job — it hides a
    control from AT while leaving it on screen. */
 .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
   clip-path:inset(50%);white-space:nowrap;border:0}
 
-/* ---- a shut section is a tile ---- */
-.rosgrp:not([open]){background:var(--raised);
+/* ---- Rows view: one static section per species ---- */
+.rosgrp{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:0}
+/* the species header band, used by a Rows section and by the panel */
+.rosband{display:flex;align-items:center;gap:10px;font-weight:700;font-size:var(--fs-md);
+  padding:9px 15px;margin:0;color:var(--text)}
+.rosband .cntb{background:var(--raised);border:1px solid var(--border-strong);border-radius:var(--r-full);
+  font-size:var(--fs-xs);padding:1px 9px;color:var(--muted);font-weight:600;white-space:nowrap}
+.rosband .gname2{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rosband .chiprow{display:flex;align-items:center;gap:8px;min-width:0}
+.rosband .pclose{margin-left:auto}
+
+/* ---- Tiles view: one species per tile ---- */
+.rostile{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;
+  background:var(--raised);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:12px 8px 20px;cursor:pointer;color:var(--text);text-align:center;
   transition:border-color var(--t-fast),background var(--t-fast)}
-.rosgrp:not([open]):hover{border-color:var(--border-strong);background:var(--overlay)}
-.rosgrp:not([open]):active{background:var(--raised)}
-.rosgrp:not([open])>summary{position:relative;flex-direction:column;align-items:center;
-  text-align:center;gap:8px;padding:16px 12px}
-.rosgrp:not([open])>summary::before{position:absolute;top:8px;left:12px}
-.rosgrp:not([open]) .pico{--ico:56px}
-.rosgrp:not([open]) .gname2{white-space:normal;overflow:visible;line-height:1.25}
-/* Both wrappers are transparent to layout by default and become real boxes
-   only where a tile needs one. On the vertical tile the body is a centred
-   column and the chips share one wrapping line. On the mobile tile neither
-   applies: everything flows in a single wrapping row, so the name and count
-   sit on one line and only the tally drops below. */
-.tilebody,.chiprow{display:contents}
-@media (min-width:1024px){
-  .rosgrp:not([open]) .tilebody{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
-  .rosgrp:not([open])>summary .chiprow{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+@media (hover:hover){.rostile:hover{border-color:var(--border-strong);background:var(--overlay)}}
+.rostile:active{background:var(--raised);transform:scale(.98)}
+.rostile[aria-expanded="true"]{border-color:var(--accent);background:var(--accent-tint)}
+.rostile[aria-expanded="true"]::after{content:'';position:absolute;left:50%;bottom:-9px;
+  transform:translateX(-50%);width:0;height:0;border:5px solid transparent;border-top-color:var(--accent)}
+.rostile .tart{position:relative;display:block;line-height:0}
+.rostile .pico{--ico:56px}
+/* the count rides the art instead of taking a whole chip line */
+.rostile .cntb{position:absolute;top:-4px;right:-8px;background:var(--bg);
+  border:1px solid var(--muted);border-radius:var(--r-full);
+  font-size:var(--fs-xs);padding:0 6px;color:var(--text);font-weight:700;line-height:1.5}
+.rostile .tname{font-size:var(--fs-sm);font-weight:600;line-height:1.25;overflow-wrap:anywhere}
+.rostile .chiprow{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;min-width:0;max-width:100%}
+.rostile .chiprow .mchip{flex-wrap:wrap;justify-content:center;row-gap:0;max-width:100%}
+/* a persistent, non-hover-gated "this opens" cue */
+.tchev{position:absolute;bottom:4px;right:6px;color:var(--muted);
+  transition:transform var(--t-fast) var(--ease-out)}
+.rostile[aria-expanded="true"] .tchev{transform:rotate(180deg);color:var(--accent)}
+@media (max-width:640px){
+  .rostile{padding:8px 6px 16px;gap:2px}
+  .rostile .pico{--ico:44px}
+  /* the tally drops its chip chrome here; the warning keeps it */
+  .rostile .chiprow .mchip:not(.warn){background:none;border:0;padding:0;
+    font-size:var(--fs-xs);color:var(--muted)}
 }
-/* Below 1024 the tile is horizontal: a vertical one only fits narrow columns
-   here and runs taller than the bar it replaces. Everything flows in one
-   wrapping row, so the name and count share a line and the tally drops below. */
-@media (max-width:1023px){
-  .rosgrp:not([open])>summary{flex-direction:row;text-align:left;align-items:center;
-    padding:8px 12px 8px 24px;gap:8px;min-height:44px}
-  .rosgrp:not([open])>summary::before{top:50%;left:8px;transform:translateY(-50%)}
-  .rosgrp:not([open]) .pico{--ico:44px}
-  .rosgrp:not([open]) .tilebody{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0;flex:1}
-  /* genderize() splits a tally into separate spans, so an inline-flex .mchip
-     can't shrink below their sum — it overflowed its tile onto the neighbour.
-     Let its parts wrap, and let both chips shrink. */
-  .rosgrp:not([open]) .tilebody>*{min-width:0;max-width:100%}
-  .rosgrp:not([open]) .mchip{flex-wrap:wrap;justify-content:center;row-gap:0}
-}
-/* the chip's own --raised fill vanishes against a --raised tile, so it takes
-   the recessed fill and a --muted edge (5.37:1) rather than relying on
-   --border-strong, which is 1.66:1 and decorative-only per §1 */
-.rosgrp:not([open]) .cntb{background:var(--bg);border-color:var(--muted)}
-.rosgrp .gname2{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- the expanding panel ---- */
+.rospanel{background:var(--bg);border:1px solid var(--accent);border-radius:var(--r-lg);
+  overflow:hidden;animation:panelin .15s var(--ease-out)}
+@keyframes panelin{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.rospanel{animation:none}}
+.rospanel .rosband{border-bottom:1px solid var(--border);background:var(--surface)}
+
 .roslist{list-style:none;margin:0;padding:0}
 /* Identical tracks on every row, so columns line up down the whole section.
    The identity track has to be able to give ground: fixed at 240px it starved
@@ -661,17 +617,17 @@ select#genderSel{padding:10px 12px}
 }
 /* a meta chip that carries a warning — never colour alone, it says the words */
 .mchip.warn{color:var(--danger);border-color:var(--danger-line);background:var(--danger-tint)}
-.rosgrp[open] .pico{--ico:28px}
+.rosband .pico{--ico:28px}
 /* compact: the same row, less air. Scoped to open sections — a tile is
    already the dense presentation of a species, which keeps "Compact rows"
    an honest label. */
 .roster.dense .rosrow{padding:3px 15px;gap:10px}
-.roster.dense .rosgrp[open]>summary{padding:8px 15px}
+.roster.dense .rosband{padding:7px 15px}
 /* every action for one entry, named, at comfortable size — see openModal */
 .rentacts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
 /* shared small ghost button: roster actions, plan delete, step-open, chain nav */
-.acts button,.stepopen,.planhead .del,.chainhead .nav button{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:4px 10px;font-size:var(--fs-sm);font-weight:600;color:var(--muted)}
-.acts button:hover,.stepopen:hover,.planhead .del:hover,.chainhead .nav button:hover:not(:disabled){color:var(--text);border-color:var(--border-strong)}
+.acts button,.rospanel .pclose,.stepopen,.planhead .del,.chainhead .nav button{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:4px 10px;font-size:var(--fs-sm);font-weight:600;color:var(--muted)}
+.acts button:hover,.rospanel .pclose:hover,.stepopen:hover,.planhead .del:hover,.chainhead .nav button:hover:not(:disabled){color:var(--text);border-color:var(--border-strong)}
 .planhead .del.danger:hover{color:var(--danger);border-color:var(--danger)}
 /* the stack spans the viewport and centres its toasts, rather than starting at
    the 50% mark — anchored there, a toast could never be wider than half the
@@ -1254,7 +1210,7 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .rosrow .note{grid-area:3/1/4/-1;white-space:normal}
   /* thumb-sized targets without changing how the buttons look */
   .rosrow .acts button{min-width:32px;min-height:32px}
-  .rosgrp[open]>summary{min-height:44px}
+  .rosband{min-height:44px}
   .roster{grid-template-columns:repeat(auto-fill,minmax(min(148px,100%),1fr));gap:8px}
   .roster.dense .rosrow{padding:7px 12px}
 

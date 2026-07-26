@@ -89,6 +89,10 @@
       <div class="collhead">
         <h2>Roster</h2>
         <span class="rstats" id="rosterStats" aria-live="polite"></span>
+        <div class="segrow viewseg" id="rosterView" role="group" aria-label="List style">
+          <button type="button" data-v="tiles" class="on" aria-pressed="true" title="One tile per species — open it to see that species’ pals">Tiles</button>
+          <button type="button" data-v="rows" aria-pressed="false" title="Every pal in your roster, grouped by species">Rows</button>
+        </div>
         <div class="collacts">
           <button class="alink primary" id="rosterOpenAdd">+ Add pal</button>
           <button class="alink savebtn" id="importBtn" title="Fill your roster from your Palworld save file. Your save is never changed."><span class="sicon" aria-hidden="true">🎮</span>Read my save</button>
@@ -112,8 +116,6 @@
             <option value="ps">Most passives</option>
             <option value="iv">Best IVs</option>
           </select></div>
-        <div class="ctl"><label aria-hidden="true">&nbsp;</label>
-          <button type="button" class="alink" id="collapseAll">Collapse all</button></div>
         <div class="ctl"><label aria-hidden="true">&nbsp;</label>
           <button type="button" class="toggle" id="denseToggle" role="switch" aria-checked="false"><span class="kn"></span>Compact rows</button></div>
       </div>

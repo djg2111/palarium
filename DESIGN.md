@@ -154,12 +154,22 @@ siblings, so grouping is the shape of the data, not a preference):
 
 | Class | Role |
 |---|---|
-| `.rosgrp` | One species section. A native `<details>/<summary>` — native keyboard, native `aria-expanded`, no JS. `<summary>` holds no nested interactive elements. Shut, it renders as a tile (art, name, count, gender tally); open, it spans every column and shows its `.roslist`. Both are the same summary, switched by `:not([open])` in CSS — never by JS, so `aria-expanded` and native keyboard stay correct. |
-| `.roster` | The species grid. `display:grid`, auto-fill: 148px track ≤640px, 240px to 1023px, 216px above. Tiles are **horizontal below 1024px** (44px art) and vertical above (56px art) — a vertical tile only fits narrow columns below that and comes out taller than the bar it replaces. Column counts follow from the track, so they are 1 below ~356px and 2–4 above. `.rosgrp[open]` and `.hint` span `1/-1`. `grid-auto-flow:dense` is **forbidden** — it would backfill tiles around an open section and make visual order disagree with DOM order. |
-| `.tilebody` / `.chiprow` | Two layout-transparent wrappers inside a `<summary>`. `display:contents` by default, so an open section's summary is exactly the flex row it always was; each becomes a real box only where a tile needs it (`.tilebody` a centred column ≥1024px, a wrapping row below; `.chiprow` a wrapping chip line ≥1024px). Neither carries a role, so the summary's accessible name is unchanged. |
+| `.rosgrp` | One species section in **Rows** view: a `<section>` with an `<h3 class="rosband">` and its `.roslist`. No disclosure — Rows shows every pal. |
+| `.rostile` | One species in **Tiles** view: a `<button aria-expanded aria-controls="rosPanel">` carrying art, a count badge on the art, the name and the gender tally. The whole tile is the press target. |
+| `.rospanel` | The expanding panel. A `<section role="region" aria-labelledby>` spanning `1/-1`, placed as a real sibling **after the last tile of the open tile's visual row** — so grid auto-placement puts it on its own row, the board resumes underneath, and DOM order stays visual order. `grid-auto-flow:dense` remains **forbidden**, and is not needed. |
+| `.rosband` | The species header band. One implementation, two homes: a Rows section and the panel header. |
+| `.roster` | The grid. `.tileview` auto-fills 168px tracks (148 ≤1023px, 96 ≤640px); `.rowview` is a single column. |
+| `.tilebody` / `.chiprow` | Layout wrappers inside a header band. |
 | `.roslist` / `.rosrow` | The section's `<ul>` and one pal per `<li>`. Fixed grid tracks (identity · passives · note · actions) so columns align down the whole section. Replaces the former `.rospal` **and** `.gentry`. |
 | `.mchip.warn` | A meta chip carrying a warning — `--danger` text, tint fill, `--danger-line` border. Always states the warning in words; colour is never the only signal. |
 | `.rentacts` | The full, named action set for one entry, inside its pal card. Row toolbars stay to three glyphs; everything else lives here at comfortable size. |
+
+**Grid boards are one tab stop.** `.roster.tileview` and `.dexgrid` both use a
+roving `tabindex` over their items. Vertical movement is **geometric** — find the
+adjacent row by `getBoundingClientRect().top`, then the nearest column by centre
+x — never `index ± columns`, which clamps to the last item when a row is short
+and strands you somewhere you were never focused, and cannot see a full-width
+panel splitting the board into rows of unequal length.
 
 **Row action toolbars** use `role="toolbar"` with roving `tabindex` (arrows/Home/End
 move within, Tab leaves), so a row costs **two** tab stops — its name and its
@@ -270,7 +280,14 @@ recoloring/filters).
 - A `<details>` rebuilt by a renderer echoes a `toggle` event for every section
   that opens, and the event is a queued task — a timing flag cannot catch it.
   Distinguish the renderer's own output from a user press by comparing the new
-  state against the state you already hold, never by a timer.
+  state against the state you already hold, never by a timer. A disclosure whose
+  panel cannot be the summary's sibling uses `aria-expanded` + `aria-controls` on
+  a `<button>` instead — which also removes the echo, because there is no
+  browser-fired event to hear. `<summary>`'s whole keyboard contract is Enter and
+  Space, so a button costs nothing to replace it with.
+- A board and a list are **two views**, not two states of one disclosure. Users
+  read them as different things, so give them a `.viewseg`; a control that
+  toggles between them reads as neither.
 - Group controls by proximity, split by what they act on: `.dex-controls` holds
   controls that change how the list is **filtered, ordered or presented** (search,
   filter, sort, collapse, density); `.collacts` holds actions on the **data itself**

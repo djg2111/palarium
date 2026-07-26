@@ -825,6 +825,7 @@ function save() {
     ownedOnly, dshow: typeof dexShow !== 'undefined' ? dexShow : 'all',
     dv: typeof dexView !== 'undefined' ? dexView : 'gallery',
     rdense: typeof denseRows !== 'undefined' && denseRows,
+    rv: typeof rosterView !== 'undefined' ? rosterView : 'tiles',
     pt: pickPT.get()?.k, po: partnerMode, ml: myLevel, ac: avoidCollab, sp: slotPassives, sg: slotGenders,
     dp: desiredPick.get(),
     ro: !!currentRoute, chain: breedChain,
@@ -844,6 +845,7 @@ function save() {
 let currentTab = 'breed';
 const tabsEl = document.getElementById('tabs');
 function showTab(v) {
+  if (v === 'roster') setTimeout(placeRosterPanel, 0);   // tracks resolve once .active lands
   currentTab = v;
   document.querySelectorAll('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
   tabsEl.querySelectorAll('button').forEach(b => {
@@ -1673,22 +1675,110 @@ rosterSort.addEventListener('change', renderRoster);
 // question worth asking is how much of each pal you want to see at once.
 // An older stored state.rgroup is simply ignored; nothing to migrate.
 let denseRows = false;
-let collapsed = new Set();     // species keys, this session only
 let lastSections = [];
+let lastCount = -1;   // section count at the previous render
+// Two views, not one disclosure with two skins. Opening a species used to turn
+// its tile into a full-width block, which broke the board — and made the
+// collapse control unrecognisable, because nobody reads a board and a list as
+// two states of one thing.
+let rosterView = 'tiles';      // 'tiles' | 'rows'
+let openSpecies = null;        // session only; never written to palbreed
+const rosterList = document.getElementById('rosterList');
+const rosterViewEl = document.getElementById('rosterView');
 const denseToggle = document.getElementById('denseToggle');
 denseToggle.addEventListener('click', () => {
   denseRows = !denseRows;
   setSwitch(denseToggle, denseRows);
-  document.getElementById('rosterList').classList.toggle('dense', denseRows);
+  rosterList.classList.toggle('dense', denseRows);
   save();
 });
-const collapseAllBtn = document.getElementById('collapseAll');
-collapseAllBtn.addEventListener('click', () => {
-  const allShut = lastSections.length && lastSections.every(k => collapsed.has(k));
-  if (allShut) for (const k of lastSections) collapsed.delete(k);
-  else for (const k of lastSections) collapsed.add(k);
+rosterViewEl.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  rosterView = b.dataset.v;
+  setSeg(rosterViewEl, rosterView, 'v');
+  save(); renderRoster();
+  b.focus();   // the pressed segment survives its own re-render
+});
+
+// ---------- the expanding panel ----------
+// The panel is a real sibling placed after the last tile of the open tile's
+// visual row, and spans every column. Grid auto-placement then starts it on a
+// fresh row and resumes the following tiles below it — so DOM order equals
+// visual order and Tab order is correct without grid-auto-flow:dense.
+function placeRosterPanel() {
+  const panel = document.getElementById('rosPanel');
+  if (!panel) return;
+  // gridTemplateColumns resolves to the repeat() source, not a track list,
+  // while any ancestor is display:none — which .view is on every inactive tab
+  if (!document.getElementById('view-roster').classList.contains('active')) return;
+  const cols = getComputedStyle(rosterList).gridTemplateColumns.split(' ').length;
+  const tiles = [...rosterList.querySelectorAll('.rostile')];
+  const i = tiles.findIndex(t => t.dataset.k === openSpecies);
+  if (i < 0) return;
+  const anchor = tiles[Math.min(tiles.length - 1, Math.floor(i / cols) * cols + cols - 1)];
+  // Mandatory guard: re-placing unconditionally mutates the DOM, which changes
+  // the list height, which fires the ResizeObserver again — a loop.
+  if (panel.previousElementSibling !== anchor) anchor.after(panel);
+}
+new ResizeObserver(() => placeRosterPanel()).observe(rosterList);
+
+// the board is one tab stop; arrows move within it
+function seedTiles(active) {
+  const tiles = [...rosterList.querySelectorAll('.rostile')];
+  for (const t of tiles) t.tabIndex = -1;
+  (active && tiles.includes(active) ? active : tiles[0] || {}).tabIndex = 0;
+}
+function closePanel(refocus = true) {
+  const k = openSpecies;
+  openSpecies = null;
   renderRoster();
-  collapseAllBtn.focus();
+  if (!refocus || !k) return;
+  const t = rosterList.querySelector(`.rostile[data-k="${CSS.escape(k)}"]`);
+  if (t) { seedTiles(t); t.focus(); }
+}
+// Arrowing across the board never opens or closes anything — this is a set of
+// disclosures, not a menu. Only Enter, Space, click, ✕ and Escape do that.
+rosterList.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && openSpecies && rosterList.contains(e.target)) {
+    e.stopPropagation(); closePanel(); return;
+  }
+  const cur = e.target.closest('.rostile');
+  if (!cur) return;
+  const tiles = [...rosterList.querySelectorAll('.rostile')];
+  const i = tiles.indexOf(cur);
+  const cols = getComputedStyle(rosterList).gridTemplateColumns.split(' ').length;
+  // Vertical moves go by geometry, not by index. Index math clamps to the last
+  // tile when the row below is short — so ArrowUp came back somewhere you had
+  // never been — and it cannot see that the open panel splits the board into
+  // rows of unequal length.
+  const rowOf = el => Math.round(el.getBoundingClientRect().top);
+  const midOf = el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; };
+  const step = dir => {
+    const here = rowOf(cur), x = midOf(cur);
+    const away = tiles.filter(t => dir > 0 ? rowOf(t) > here : rowOf(t) < here);
+    if (!away.length) return null;                    // no row that way: stay put
+    const target = dir > 0 ? Math.min(...away.map(rowOf)) : Math.max(...away.map(rowOf));
+    let best = null;
+    for (const t of away) {
+      if (rowOf(t) !== target) continue;
+      if (!best || Math.abs(midOf(t) - x) < Math.abs(midOf(best) - x)) best = t;
+    }
+    return tiles.indexOf(best);
+  };
+  let j = null;
+  if (e.key === 'ArrowRight') j = Math.min(i + 1, tiles.length - 1);
+  else if (e.key === 'ArrowLeft') j = Math.max(i - 1, 0);
+  else if (e.key === 'ArrowDown') j = step(1);
+  else if (e.key === 'ArrowUp') j = step(-1);
+  else if (e.key === 'Home') j = 0;
+  else if (e.key === 'End') j = tiles.length - 1;
+  else if (e.key === 'PageDown') j = Math.min(i + cols * 4, tiles.length - 1);
+  else if (e.key === 'PageUp') j = Math.max(i - cols * 4, 0);
+  if (j === null) { if (e.key.startsWith('Arrow')) e.preventDefault(); return; }
+  e.preventDefault();
+  seedTiles(tiles[j]); tiles[j].focus();
+  tiles[j].scrollIntoView({block: 'nearest',
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
 });
 // One pal, two places to act on it — the Roster row and the pal card. Both go
 // through these, so a duplicate always stars its species and a removal always
@@ -1769,10 +1859,12 @@ function renderRoster() {
   let restore = null;
   if (ae && list.contains(ae)) {
     const row = ae.closest('.rosrow');
-    const sum = ae.closest('summary');
+    const tile = ae.closest('.rostile');
+    const band = ae.closest('.rosband');
     if (row) restore = {id: row.dataset.id, act: ae.dataset.act || 'name',
       idx: [...list.querySelectorAll('.rosrow')].indexOf(row)};
-    else if (sum) restore = {k: sum.parentElement.dataset.k};
+    else if (tile) restore = {k: tile.dataset.k, idx: [...list.querySelectorAll('.rostile')].indexOf(tile)};
+    else if (band) restore = {k: openSpecies, close: true};
   }
   list.innerHTML = '';
   list.classList.toggle('dense', denseRows);
@@ -1794,10 +1886,15 @@ function renderRoster() {
 
   const controls = document.querySelector('.roscontrols');
   if (controls) controls.hidden = !roster.length;
+  rosterViewEl.hidden = !roster.length;
+  setSeg(rosterViewEl, rosterView, 'v');
+  list.classList.toggle('tileview', rosterView === 'tiles');
+  list.classList.toggle('rowview', rosterView !== 'tiles');
 
   if (!rows.length) {
     lastSections = [];
-    syncCollapseBtn();   // nothing to collapse: the button must say so, not go stale
+    lastCount = 0;
+    openSpecies = null;
     const h = document.createElement('div'); h.className = 'hint';
     if (roster.length) {
       // an empty state without a way out is a dead end (DESIGN.md §4).
@@ -1930,6 +2027,47 @@ function renderRoster() {
     return li;
   };
 
+  // ---- shared bits of a species header ----
+  const chipsFor = (k, entries, total, tile) => {
+    const wrap = document.createElement('span'); wrap.className = 'chiprow';
+    if (!tile) {
+      const cnt = document.createElement('span'); cnt.className = 'cntb';
+      const x = document.createElement('span'); x.setAttribute('aria-hidden', 'true'); x.textContent = '×';
+      cnt.appendChild(x); cnt.append(String(entries.length));
+      const sr = document.createElement('span'); sr.className = 'sr-only';
+      sr.textContent = ' pal' + (entries.length === 1 ? '' : 's') + (entries.length < total ? ' of ' + total : '');
+      cnt.appendChild(sr);
+      wrap.appendChild(cnt);
+    }
+    // The breeding question. The tally always counts the whole species, so
+    // while a filter is on it says so — two numbers in one header must not
+    // describe two different populations.
+    const gi = speciesGenderInfo(k);
+    if (gi) {
+      const oneSided = gi.n >= 2 && !gi.U && (!gi.M || !gi.F);
+      const chip = document.createElement('span');
+      chip.className = 'mchip' + (oneSided ? ' warn' : '');
+      const tally = [gi.M ? gi.M + '♂' : '', gi.F ? gi.F + '♀' : '', gi.U ? gi.U + ' ?' : ''].filter(Boolean).join(' · ');
+      chip.appendChild(genderize(oneSided
+        ? `No ${gi.M ? '♀' : '♂'} to breed with`
+        : entries.length < total ? `of all ${total}: ${tally}` : tally));
+      wrap.appendChild(chip);
+    }
+    return wrap;
+  };
+  const chev = () => {
+    const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('class', 'tchev'); s.setAttribute('viewBox', '0 0 24 24');
+    s.setAttribute('width', '16'); s.setAttribute('height', '16');
+    s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor');
+    s.setAttribute('stroke-width', '2'); s.setAttribute('stroke-linecap', 'round');
+    s.setAttribute('stroke-linejoin', 'round'); s.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'm6 9 6 6 6-6');
+    s.appendChild(path);
+    return s;
+  };
+
   // ---- sections, ordered by the active sort ----
   const groups = new Map();
   for (const r of rows) (groups.get(r.k) || groups.set(r.k, []).get(r.k)).push(r);
@@ -1941,84 +2079,114 @@ function renderRoster() {
   });
   lastSections = sections.map(([k]) => k);
 
-  for (const [k, entries] of sections) {
-    const p = byKey.get(k);
-    entries.sort(ROW_SORTS[sortKey]);
-    const total = roster.filter(r => r.k === k).length;
+  // A filter that leaves one species has nothing to choose between, so open it.
+  // Only at the render where that becomes true — reopening it every render
+  // would fight a user who then closed it.
+  if (sections.length === 1 && filtering && lastCount !== 1) openSpecies = sections[0][0];
+  lastCount = sections.length;
+  // the open species may have just been filtered or removed away
+  if (openSpecies && !lastSections.includes(openSpecies)) openSpecies = null;
 
-    const det = document.createElement('details');
-    det.className = 'moredet rosgrp';
-    det.dataset.k = k;
-    // A filter that leaves one species makes a one-tile overview pure cost, so
-    // it opens — but only when a filter caused it, and never over a collapse
-    // the user chose. `collapsed` is theirs; a search must not rewrite it.
-    const forced = collapsed.has(k) && sections.length === 1 && filtering;
-    det.open = !collapsed.has(k) || forced;
-    // Setting det.open on a freshly built <details> queues a toggle event, so
-    // every open section echoes one back on every render. A timing flag can't
-    // catch them — the event is a queued task and may land after any timeout.
-    // Compare against what `collapsed` already says instead: if they agree,
-    // nothing changed and this is the renderer hearing itself.
-    det.addEventListener('toggle', () => {
-      if (det.open === (!collapsed.has(k) || forced)) return;
-      if (det.open) collapsed.delete(k); else collapsed.add(k);
-      syncCollapseBtn();
-      // opening a tile moves it down to start its own full-width row
-      if (det.open) sum.scrollIntoView({block: 'nearest',
-        behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
-    });
-
-    const sum = document.createElement('summary');
-    // decorative: the species name is the very next node, so the image must
-    // not repeat it — every header used to announce "Lamball Lamball ×5".
-    // The inline --ico is dropped so a rule can size the art per presentation.
+  const band = (p, entries, total) => {
+    const h = document.createElement('h3');
+    h.className = 'rosband';
     const ic = icon(p, 28, false, true);
     ic.style.removeProperty('--ico');
-    sum.appendChild(ic);
-    // display:contents everywhere except the mobile tile, where the name and
-    // chips have to stack in a column beside the art instead of beside it
-    const body = document.createElement('span'); body.className = 'tilebody';
-    sum.appendChild(body);
-    const nm = document.createElement('span'); nm.className = 'gname2'; nm.textContent = p.n; body.appendChild(nm);
-    // the chips share one wrapping line on a tile rather than taking one each
-    const chips = document.createElement('span'); chips.className = 'chiprow';
-    body.appendChild(chips);
-    const cnt = document.createElement('span'); cnt.className = 'cntb';
-    cnt.textContent = entries.length < total ? `${entries.length} of ${total}` : '×' + entries.length;
-    chips.appendChild(cnt);
-    // The breeding question, answered on a closed section. The tally always
-    // counts the whole species, so while a filter is on it says so — two
-    // numbers in one summary must not describe two different populations.
-    const gi = speciesGenderInfo(k);
-    if (gi) {
-      const oneSided = gi.n >= 2 && !gi.U && (!gi.M || !gi.F);
-      const chip = document.createElement('span');
-      chip.className = 'mchip' + (oneSided ? ' warn' : '');
-      const tally = [gi.M ? gi.M + '♂' : '', gi.F ? gi.F + '♀' : '', gi.U ? gi.U + ' ?' : ''].filter(Boolean).join(' · ');
-      const filtered = entries.length < total;
-      chip.appendChild(genderize(oneSided
-        ? `No ${gi.M ? '♀' : '♂'} to breed with`
-        : filtered ? `of all ${total}: ${tally}` : tally));
-      chips.appendChild(chip);
+    h.appendChild(ic);
+    const nm = document.createElement('span'); nm.className = 'gname2'; nm.textContent = p.n;
+    h.appendChild(nm);
+    h.appendChild(chipsFor(p.k, entries, total));
+    return {h, nm};
+  };
+
+  if (rosterView === 'rows') {
+    for (const [k, entries] of sections) {
+      const p = byKey.get(k);
+      entries.sort(ROW_SORTS[sortKey]);
+      const total = roster.filter(r => r.k === k).length;
+      const sec = document.createElement('section');
+      sec.className = 'rosgrp'; sec.dataset.k = k;
+      sec.appendChild(band(p, entries, total).h);
+      const ul = document.createElement('ul');
+      ul.className = 'roslist';
+      ul.setAttribute('aria-label', `${p.n} — ${entries.length} pal${entries.length === 1 ? '' : 's'}`);
+      for (const r of entries) ul.appendChild(mkRow(r));
+      sec.appendChild(ul);
+      list.appendChild(sec);
     }
-    det.appendChild(sum);
+  } else {
+    let panel = null;
+    for (const [k, entries] of sections) {
+      const p = byKey.get(k);
+      entries.sort(ROW_SORTS[sortKey]);
+      const total = roster.filter(r => r.k === k).length;
 
-    const ul = document.createElement('ul');
-    ul.className = 'roslist';
-    ul.setAttribute('aria-label', `${p.n} — ${entries.length} pal${entries.length === 1 ? '' : 's'}`);
-    for (const r of entries) ul.appendChild(mkRow(r));
-    det.appendChild(ul);
-    list.appendChild(det);
+      const tile = document.createElement('button');
+      tile.type = 'button'; tile.className = 'rostile'; tile.dataset.k = k;
+      tile.tabIndex = -1;
+      tile.setAttribute('aria-controls', 'rosPanel');
+      tile.setAttribute('aria-expanded', String(openSpecies === k));
+      const art = document.createElement('span'); art.className = 'tart';
+      const ic = icon(p, 44, false, true); ic.style.removeProperty('--ico');
+      art.appendChild(ic);
+      const cnt = document.createElement('span'); cnt.className = 'cntb';
+      const x = document.createElement('span'); x.setAttribute('aria-hidden', 'true'); x.textContent = '×';
+      cnt.appendChild(x); cnt.append(String(entries.length));
+      const sr = document.createElement('span'); sr.className = 'sr-only';
+      sr.textContent = ' pal' + (entries.length === 1 ? '' : 's') + (entries.length < total ? ' of ' + total : '');
+      cnt.appendChild(sr);
+      art.appendChild(cnt);
+      tile.appendChild(art);
+      const nm = document.createElement('span'); nm.className = 'tname'; nm.textContent = p.n;
+      tile.appendChild(nm);
+      tile.appendChild(chipsFor(k, entries, total, true));
+      tile.appendChild(chev());
+      tile.addEventListener('click', () => {
+        openSpecies = openSpecies === k ? null : k;
+        renderRoster();
+        const t = list.querySelector(`.rostile[data-k="${CSS.escape(k)}"]`);
+        if (t) { seedTiles(t); t.focus(); }
+        const pn = document.getElementById('rosPanel');
+        // scroll the panel, never the tile — the tile is already under the finger
+        if (pn && pn.getBoundingClientRect().top > innerHeight - 80) {
+          pn.scrollIntoView({block: 'nearest',
+            behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+        }
+      });
+      list.appendChild(tile);
+
+      if (openSpecies === k) {
+        panel = document.createElement('section');
+        panel.className = 'rospanel'; panel.id = 'rosPanel';
+        panel.setAttribute('role', 'region');
+        panel.setAttribute('aria-labelledby', 'rosPanelName');
+        const b = band(p, entries, total);
+        b.nm.id = 'rosPanelName';
+        const close = document.createElement('button');
+        close.type = 'button'; close.className = 'pclose'; close.textContent = '✕';
+        close.setAttribute('aria-label', 'Close ' + p.n);
+        close.addEventListener('click', () => closePanel());
+        b.h.appendChild(close);
+        panel.appendChild(b.h);
+        const ul = document.createElement('ul'); ul.className = 'roslist';
+        for (const r of entries) ul.appendChild(mkRow(r));
+        panel.appendChild(ul);
+      }
+    }
+    if (panel) { list.appendChild(panel); placeRosterPanel(); }
+    seedTiles(list.querySelector('.rostile'));
   }
-
-  syncCollapseBtn();
 
   // ---- hand focus back ----
   if (restore) {
     let target = null;
     if (restore.k) {
-      const d = list.querySelector(`details[data-k="${CSS.escape(restore.k)}"]`);
-      target = d && d.querySelector('summary');
+      target = list.querySelector(`.rostile[data-k="${CSS.escape(restore.k)}"]`);
+      if (!target) {
+        const all = [...list.querySelectorAll('.rostile')];
+        target = all[Math.min(restore.idx || 0, all.length - 1)] || null;
+      }
+      if (target) seedTiles(target);
     } else if (restore.id) {
       const row = list.querySelector(`.rosrow[data-id="${CSS.escape(restore.id)}"]`);
       if (row) target = row.querySelector(`[data-act="${restore.act}"]`) || row.querySelector('.nm');
@@ -2027,7 +2195,7 @@ function renderRoster() {
         // then the previous, then the section, and never <body>
         const all = [...list.querySelectorAll('.rosrow')];
         const near = all[Math.min(restore.idx, all.length - 1)];
-        target = near ? near.querySelector('.nm') : list.querySelector('summary');
+        target = near ? near.querySelector('.nm') : list.querySelector('.rostile, .rosband');
       }
     }
     // A fresh toolbar always seeds tabIndex=0 on its first button. If focus
@@ -2040,16 +2208,6 @@ function renderRoster() {
   }
 
   renderRosterStrip();
-}
-// The button switches between two presentations, so it names the one you get
-// next rather than the <details> mechanism underneath (DESIGN.md §6).
-function syncCollapseBtn() {
-  const allShut = lastSections.length && lastSections.every(k => collapsed.has(k));
-  collapseAllBtn.textContent = allShut ? 'Show every pal' : 'Show species only';
-  // One species is already its own overview, so there is nothing to collapse —
-  // but once it IS collapsed this button is the only way back, so it stays live.
-  collapseAllBtn.disabled = !lastSections.length ||
-    (lastSections.length < 2 && !collapsed.has(lastSections[0]));
 }
 function renderRosterStrip() {
   const strip = document.getElementById('rosterStrip');
@@ -5357,7 +5515,8 @@ if (state.ownedOnly) { ownedOnly = true; setSwitch(ownedToggle, true); }
 // release so a persisted "owned only" survives the change.
 dexShow = state.dshow || (state.dexOwnedOnly ? 'owned' : 'all');
 if (state.dv === 'table' || state.dv === 'gallery') dexView = state.dv;
-if (state.rdense) { denseRows = true; setSwitch(denseToggle, true); document.getElementById('rosterList').classList.add('dense'); }
+if (state.rdense) { denseRows = true; setSwitch(denseToggle, true); rosterList.classList.add('dense'); }
+if (state.rv === 'rows' || state.rv === 'tiles') rosterView = state.rv;
 // planner, chain, and filter state
 for (const n of SLOTS) {
   const k = state['s' + n];
