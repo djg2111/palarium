@@ -2,7 +2,7 @@
  *
  * The site was clean across fifteen states before this; these are the new ones
  * and they must not regress it.
- *   0 the picker with the folder button and the world list a folder produces
+ *   0 the import dialog, the world list, the backup confirm
  *   1 the picker           2 reading (progress + cancel)
  *   3 the preview, no collisions            4 the preview with collisions
  *   5 the ambiguous-match preview           6 the error state
@@ -62,43 +62,48 @@ async function focusSane(page, label) {
   await page.evaluate(() => location.hash = '#/roster');
   await page.waitForTimeout(300);
 
-  console.log('\nSTATE 0 — the folder button, and the world list a folder produces');
-  // showDirectoryPicker is a real OS dialog, so a stub handle over the
-  // fixtures stands in for it. Everything downstream is the code we wrote.
-  const fakeTree = {name: 'SaveGames', kind: 'directory', children: [
-    {name: 'MyWorld', kind: 'directory', children: [
-      {name: 'Level.sav', kind: 'file', data: [...fs.readFileSync(path.join(TESTS, 'fixture-before.sav'))]},
-      {name: 'LevelMeta.sav', kind: 'file', data: [...fs.readFileSync(path.join(TESTS, 'fixture-before.sav'))]},
-    ]},
-  ]};
-  await page.evaluate(tree => {
-    function mk(node) {
-      if (node.kind === 'file') return {kind: 'file', name: node.name,
-        getFile: async () => new File([new Uint8Array(node.data)], node.name)};
-      return {kind: 'directory', name: node.name, queryPermission: async () => 'granted',
-        entries: async function* () { for (const c of node.children) yield [c.name, mk(c)]; }};
-    }
-    window.showDirectoryPicker = async () => mk(tree);
-  }, fakeTree);
-  await page.click('#savereadBtn');
+  console.log('\nSTATE 0 — the import dialog, the world list, and the backup stage');
+  // A real folder on disk: Playwright can drive <input webkitdirectory> with a
+  // directory path, so this is the actual mechanism rather than a stand-in.
+  const fakeRoot = path.join(require('os').tmpdir(), 'palarium-a11y-saves');
+  const worldDir = path.join(fakeRoot, 'AWorld');
+  fs.mkdirSync(worldDir, {recursive: true});
+  for (const n of ['Level.sav', 'LevelMeta.sav'])
+    fs.copyFileSync(path.join(TESTS, 'fixture-before.sav'), path.join(worldDir, n));
+
+  await page.click('#importBtn');
   await page.waitForSelector('#smPick:not([hidden])');
-  await audit(page, 'picker offering both a folder and a file');
-  await overflow(page, 'picker offering both');
-  await page.click('#smChooseDir');
+  await audit(page, 'import dialog offering both sources');
+  await overflow(page, 'import dialog');
+  await page.setInputFiles('#saveDir', fakeRoot);
   await page.waitForSelector('#smWorlds:not([hidden])', {timeout: 20000});
   await focusSane(page, 'the world list takes focus');
   await audit(page, 'world list');
   await overflow(page, 'world list');
   await page.click('#smClose');
   await page.waitForTimeout(200);
-  await page.evaluate(() => { delete window.showDirectoryPicker; });
+
+  // the backup confirm stage
+  const bk = path.join(require('os').tmpdir(), 'palarium-a11y-backup.json');
+  fs.writeFileSync(bk, JSON.stringify({app: 'palarium', savedAt: new Date().toISOString(),
+    roster: [{id: 'x', k: 'SheepBall', ps: [], g: 'M', nick: '', note: '', iv: null}], plans: [], owned: ['SheepBall']}));
+  await page.click('#importBtn');
+  await page.waitForSelector('#smPick:not([hidden])');
+  await page.setInputFiles('#importFile', bk);
+  await page.waitForSelector('#smBackup:not([hidden])', {timeout: 15000});
+  await focusSane(page, 'the backup confirm takes focus');
+  await audit(page, 'backup confirm');
+  await overflow(page, 'backup confirm');
+  await page.click('#smClose');
+  await page.waitForTimeout(200);
+  await page.evaluate(() => localStorage.clear());
   await page.reload({waitUntil: 'load'});
   await page.waitForTimeout(400);
   await page.evaluate(() => location.hash = '#/roster');
   await page.waitForTimeout(250);
 
   console.log('\nSTATE 1 — the picker');
-  await page.click('#savereadBtn');
+  await page.click('#importBtn');
   await page.waitForSelector('#smPick:not([hidden])');
   await focusSane(page, 'opening the dialog moves focus into it');
   await audit(page, 'picker');
@@ -106,7 +111,7 @@ async function focusSane(page, label) {
   // the "where is my save" disclosure must open from the keyboard
   await page.keyboard.press('Tab');
   const onSummary = await page.evaluate(() => document.activeElement.tagName);
-  console.log('  tab from the choose button lands on:', onSummary);
+  console.log('  tab from the folder button lands on:', onSummary);
   await page.click('#soverlay .moredet summary');
   await page.waitForTimeout(150);
   await audit(page, 'picker with the save-location disclosure open');
@@ -153,7 +158,7 @@ async function focusSane(page, label) {
   await page.waitForTimeout(400);
   await page.evaluate(() => location.hash = '#/roster');
   await page.waitForTimeout(250);
-  await page.click('#savereadBtn');
+  await page.click('#importBtn');
   await page.setInputFiles('#saveFile', path.join(TESTS, 'fixture-before.sav'));
   await page.waitForSelector('#smResult:not([hidden])');
   await audit(page, 'preview with collisions and an ambiguous match');
@@ -173,7 +178,7 @@ async function focusSane(page, label) {
 
   console.log('\nSTATE 6 — the error state');
   await page.click('#smClose'); await page.waitForTimeout(150);
-  await page.click('#savereadBtn');
+  await page.click('#importBtn');
   await page.setInputFiles('#saveFile', path.join(TESTS, 'fixture-notasave.sav'));
   await page.waitForSelector('#smError:not([hidden])');
   await focusSane(page, 'error moves focus to the way out');
@@ -188,7 +193,7 @@ async function focusSane(page, label) {
     await page.waitForTimeout(400);
     await page.evaluate(() => location.hash = '#/roster');
     await page.waitForTimeout(250);
-    await page.click('#savereadBtn');
+    await page.click('#importBtn');
     await page.setInputFiles('#saveFile', REAL);
     await page.waitForSelector('#smResult:not([hidden])', {timeout: 60000});
     await page.click('#smApply');

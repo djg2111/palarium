@@ -34,7 +34,7 @@ function check(label, got, want) {
   await page.waitForTimeout(300);
   const stripBefore = await page.$$eval('#rosterStrip .spal, #rosterStrip button', e => e.length).catch(() => 0);
 
-  await page.click('#savereadBtn');
+  await page.click('#importBtn');
   await page.setInputFiles('#saveFile', SAVE);
   await page.waitForSelector('#smResult:not([hidden])', {timeout: 60000});
   await page.click('#smApply');
@@ -71,7 +71,7 @@ function check(label, got, want) {
     ['fixture-notasave.sav', 'a file that is not a save at all'],
     ['fixture-truncated.sav', 'a truncated save'],
   ]) {
-    await page.click('#savereadBtn');
+    await page.click('#importBtn');
     await page.setInputFiles('#saveFile', path.join(TESTS, file));
     await page.waitForSelector('#smError:not([hidden])', {timeout: 20000});
     const msg = (await page.textContent('#smErrMsg')).trim();
@@ -98,7 +98,7 @@ function check(label, got, want) {
     fs.closeSync(fd);
   }
   console.log(`  built a ${(fs.statSync(bigPath).size / 1048576).toFixed(0)} MB save claiming 4 GB decompressed`);
-  await page.click('#savereadBtn');
+  await page.click('#importBtn');
   const t0 = Date.now();
   await page.setInputFiles('#saveFile', bigPath);
   await page.waitForSelector('#smError:not([hidden])', {timeout: 120000});

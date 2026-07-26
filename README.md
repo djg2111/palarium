@@ -44,7 +44,11 @@ All user data (roster, plans, owned list) lives in the browser's localStorage �
 
 ### Reading your save file
 
-Roster → **Read my save** fills the roster from `Level.sav`. The save is parsed **in your browser and nowhere else** — the site is static, has no backend, and never uploads or transmits the file. It is read-only; your save is never modified.
+Roster → **Import** does both jobs from one place: fill the roster from your Palworld save, or restore a Palarium backup. Point it at your save folder and it lists your worlds by name — world, host character, level, in-game day — so you pick the right one rather than guessing at a folder GUID.
+
+Everything is parsed **in your browser and nowhere else** — the site is static, has no backend, and never uploads or transmits anything. Save reading is read-only; your save is never modified.
+
+One platform note: the folder is chosen with `<input webkitdirectory>`, not the newer File System Access API. Palworld saves live under `%LOCALAPPDATA%`, and Chrome blocklists the whole AppData tree as "system files", so `showDirectoryPicker` refuses the one folder anybody needs.
 
 Palworld 1.0 saves are **Oodle**-compressed (magic `PlM`), not zlib (`PlZ`) as they were before 0.6, which is why older community tooling can't open them. The format, and what is and isn't mapped so far, is written down in [`docs/save-format.md`](docs/save-format.md); [`docs/save-reverse-engineering.md`](docs/save-reverse-engineering.md) is the playbook for mapping the rest.
 - Palworld and all pal names/images © Pocketpair, Inc. This is an unaffiliated fan tool.

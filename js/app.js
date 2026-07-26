@@ -1852,30 +1852,40 @@ document.getElementById('exportBtn').addEventListener('click', () => {
   a.download = 'palarium-data.json';
   a.click(); URL.revokeObjectURL(a.href);
 });
-document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+// Restoring a backup used to fire the file picker straight off the button,
+// with the explanation arriving afterwards in a toast — by which point you had
+// already chosen a file. It now lives in the same dialog as the save reader,
+// where both options can say what they do before anything happens, and where
+// "this replaces your roster" is a stage you have to read past rather than a
+// notification you can miss.
+let smBackupData = null;
 document.getElementById('importFile').addEventListener('change', e => {
-  const f = e.target.files[0]; if (!f) return;
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
   const rd = new FileReader();
   rd.onload = () => {
+    let d;
     try {
-      const d = JSON.parse(rd.result);
-      if (d.app !== 'palarium' && d.app !== 'palbreed') throw new Error('not a Palarium export');
-      const nr = (d.roster || []).length, np = (d.plans || []).length;
-      toast(`Import ${nr} pal${nr === 1 ? '' : 's'} and ${np} plan${np === 1 ? '' : 's'}? This replaces your current roster, plans and owned list. Your settings aren’t touched.`, null, {
-        label: 'Import',
-        fn: () => {
-          roster = normRoster(Array.isArray(d.roster) ? d.roster : []);
-          plans = normPlans(Array.isArray(d.plans) ? d.plans : []);
-          owned.clear();
-          for (const k of Array.isArray(d.owned) ? d.owned : []) if (byKey.has(k)) owned.add(k);
-          saveRoster(); savePlans(); localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
-          renderRoster(); renderPlans(); renderDex(); renderReverse();
-          toast('Imported ' + roster.length + ' pals and ' + plans.length + ' plans');
-        },
-      });
-    } catch (err) { toast('Import failed: ' + err.message); }
-    e.target.value = '';
+      d = JSON.parse(rd.result);
+      if (d.app !== 'palarium' && d.app !== 'palbreed') throw new Error('that JSON file isn’t a Palarium backup');
+    } catch (err) {
+      smFail('That file isn’t a Palarium backup — it should be the JSON file “Export data” writes. Nothing was changed.');
+      return;
+    }
+    smBackupData = d;
+    const nr = (d.roster || []).length, np = (d.plans || []).length, no = (d.owned || []).length;
+    const when = d.savedAt ? new Date(d.savedAt) : null;
+    document.getElementById('smBackupSum').textContent =
+      `This backup holds ${nr} pal${nr === 1 ? '' : 's'}, ${np} saved plan${np === 1 ? '' : 's'} and ${no} starred species` +
+      (when && !isNaN(when) ? `, exported ${relTime(when.getTime()) || 'just now'}.` : '.');
+    document.getElementById('smBackupWarn').textContent =
+      `Restoring replaces your current roster (${roster.length}), saved plans (${plans.length}) and owned list (${owned.size}) with the ones above. ` +
+      'Your settings — filters, toggles, map preferences — are left alone. This can be undone.';
+    smShow('smBackup');
+    document.getElementById('smBackupApply').focus();
   };
+  rd.onerror = () => smFail('That file couldn’t be read. Nothing was changed.');
   rd.readAsText(f);
 });
 
@@ -1912,91 +1922,54 @@ let smRead = 0;
 
 function smCancelRead() { smRead++; if (smWorker) { smWorker.terminate(); smWorker = null; } }
 function smShow(which) {
-  for (const id of ['smPick', 'smWorlds', 'smBusy', 'smResult', 'smError'])
+  for (const id of ['smPick', 'smWorlds', 'smBackup', 'smBusy', 'smResult', 'smError'])
     document.getElementById(id).hidden = id !== which;
 }
 
-// ---------- picking a folder instead of a file ----------
-// A browser cannot be told to open %LOCALAPPDATA%\Pal\... — showDirectoryPicker
-// only accepts a handful of well-known directories or a handle you already
-// hold, and that restriction is the whole point of the API. What it can do is
-// remember: passing a stable `id` makes Chrome reopen where you last were, and
-// keeping the handle means the second visit skips the picker entirely.
-const CAN_PICK_DIR = typeof window.showDirectoryPicker === 'function';
-const SAVE_PATH = '%LOCALAPPDATA%\\Pal\\Saved\\SaveGames';
-let smDirHandle = null, smWorldsFound = [];
+// ---------- picking a folder ----------
+// Not showDirectoryPicker. That API refuses the one folder that matters:
+// Palworld saves live under %LOCALAPPDATA%, and Chrome blocklists the whole
+// AppData tree as "system files", so the picker rejects it outright. The older
+// <input webkitdirectory> is not on that blocklist, works in every browser
+// here, and hands back a flat FileList with webkitRelativePath — which is all
+// this needs. The cost is that there is no handle to keep, so the folder can't
+// be remembered between visits.
+const SAVE_PATH = '%LOCALAPPDATA%\Pal\Saved\SaveGames';
+let smWorldsFound = [];
 
-// one tiny IndexedDB store, because a directory handle can't go in localStorage
-function idb(fn) {
-  return new Promise((res, rej) => {
-    const rq = indexedDB.open('palarium', 1);
-    rq.onupgradeneeded = () => rq.result.createObjectStore('handles');
-    rq.onerror = () => rej(rq.error);
-    rq.onsuccess = () => {
-      const db = rq.result;
-      let tx, out;
-      // put() throws synchronously on a value it can't clone, and that throw
-      // happens inside this event handler — outside the promise chain, where a
-      // .catch() on the caller can't see it and the browser reports it as an
-      // uncaught error. Storing a handle is a convenience; it must never be
-      // able to put an error on the page.
-      try {
-        tx = db.transaction('handles', 'readwrite');
-        out = fn(tx.objectStore('handles'));
-      } catch (e) { db.close(); rej(e); return; }
-      tx.oncomplete = () => { db.close(); res(out && out.result !== undefined ? out.result : out); };
-      tx.onerror = () => { db.close(); rej(tx.error); };
-      tx.onabort = () => { db.close(); rej(tx.error); };
-    };
-  });
-}
-const rememberDir = h => idb(st => st.put(h, 'saveDir')).catch(() => {});
-const recallDir = () => idb(st => st.get('saveDir')).catch(() => null);
-const forgetDir = () => idb(st => st.delete('saveDir')).catch(() => {});
-
-// Walk a picked folder looking for Level.sav. The user may hand us the
-// SaveGames folder, their Steam-ID folder, or a single world — so search a few
-// levels down rather than insisting on one shape. Bounded, because someone
-// will eventually pick C:\.
-async function findWorlds(dir, onProgress) {
-  const found = [];
-  let queue = [{h: dir, path: dir.name, depth: 0}], scanned = 0;
-  while (queue.length && found.length < 60 && scanned < 400) {
-    const {h, path, depth} = queue.shift();
-    scanned++;
-    onProgress && onProgress(scanned, found.length);
-    let level = null, meta = null;
-    const subs = [];
-    try {
-      for await (const [name, entry] of h.entries()) {
-        if (entry.kind === 'file') {
-          if (name.toLowerCase() === 'level.sav') level = entry;
-          else if (name.toLowerCase() === 'levelmeta.sav') meta = entry;
-        } else if (depth < 3 && name !== 'backup' && name !== 'Players') subs.push({h: entry, path: path + '/' + name, depth: depth + 1});
-      }
-    } catch { continue; }
-    if (level) found.push({dir: h, path, level, meta});
-    else queue = queue.concat(subs);
+// Group a FileList into worlds: any directory holding a Level.sav is one.
+// Backups are skipped — Palworld keeps timestamped copies under backup/, and
+// they are not worlds you are playing. Pick one with the single-file button if
+// you ever need to.
+function worldsFromFiles(files) {
+  const byDir = new Map();
+  for (const f of files) {
+    const rel = f.webkitRelativePath || f.name;
+    const cut = rel.lastIndexOf('/');
+    const dir = cut < 0 ? '' : rel.slice(0, cut);
+    const base = rel.slice(cut + 1).toLowerCase();
+    if (base !== 'level.sav' && base !== 'levelmeta.sav') continue;
+    if (/(^|\/)backup(\/|$)/i.test(dir)) continue;
+    if (!byDir.has(dir)) byDir.set(dir, {path: dir, name: dir.slice(dir.lastIndexOf('/') + 1)});
+    const w = byDir.get(dir);
+    if (base === 'level.sav') w.level = f; else w.meta = f;
   }
-  return found;
+  return [...byDir.values()].filter(w => w.level);
 }
 
-async function useDirectory(handle, {remember = true} = {}) {
-  smDirHandle = handle;
-  if (remember) rememberDir(handle);
+async function useFolder(files) {
+  const token = ++smRead;
   smShow('smBusy');
   const msg = document.getElementById('smBusyMsg');
   const bar = document.getElementById('smBar');
-  bar.style.width = '10%';
+  bar.style.width = '15%';
   msg.textContent = 'Looking for worlds…';
   document.getElementById('smCancel').focus();
-  const token = ++smRead;
-  let worlds;
-  try { worlds = await findWorlds(handle, n => { msg.textContent = `Looking for worlds… (${n} folders checked)`; }); }
-  catch { smFail('That folder couldn’t be read. Nothing was changed.'); return; }
-  if (token !== smRead) return;
+
+  const worlds = worldsFromFiles(files);
   if (!worlds.length) {
-    smFail('No Level.sav anywhere in that folder. Pick the folder that holds your worlds — ' + SAVE_PATH + ' — or use “Choose a single file…”.');
+    smFail('No Level.sav in that folder. Pick the folder your worlds live in — ' + SAVE_PATH +
+      ' — or use “Pick one Level.sav instead…”. Nothing was changed.');
     return;
   }
   bar.style.width = '55%';
@@ -2004,11 +1977,9 @@ async function useDirectory(handle, {remember = true} = {}) {
   // LevelMeta.sav is about 2 KB, so naming every world costs almost nothing
   const items = [];
   for (let i = 0; i < worlds.length; i++) {
+    worlds[i].bytes = worlds[i].level.size;
     if (!worlds[i].meta) continue;
-    try { items.push({id: i, buf: await (await worlds[i].meta.getFile()).arrayBuffer()}); } catch {}
-  }
-  for (let i = 0; i < worlds.length; i++) {
-    try { worlds[i].bytes = (await worlds[i].level.getFile()).size; } catch { worlds[i].bytes = 0; }
+    try { items.push({id: i, buf: await worlds[i].meta.arrayBuffer()}); } catch {}
   }
   if (token !== smRead) return;
   const metas = items.length ? await readMetaBatch(items) : [];
@@ -2017,8 +1988,7 @@ async function useDirectory(handle, {remember = true} = {}) {
   smWorldsFound = worlds;
   renderWorldList();
   smShow('smWorlds');
-  const first = document.querySelector('#smWorldList button');
-  (first || document.getElementById('smRescan')).focus();
+  (document.querySelector('#smWorldList button') || document.getElementById('smRescan')).focus();
 }
 
 function readMetaBatch(items) {
@@ -2057,7 +2027,7 @@ function renderWorldList() {
     const row = document.createElement('div'); row.className = 'worldrow'; row.setAttribute('role', 'listitem');
     const b = document.createElement('button'); b.type = 'button'; b.className = 'worldbtn';
     const t = document.createElement('span'); t.className = 'wname';
-    t.textContent = m && m.worldName ? m.worldName : wd.dir.name;
+    t.textContent = m && m.worldName ? m.worldName : wd.name;
     b.appendChild(t);
     const sub = document.createElement('span'); sub.className = 'wsub';
     const bits = [];
@@ -2068,56 +2038,28 @@ function renderWorldList() {
     if (!m) bits.push('no LevelMeta.sav — name unknown');
     sub.textContent = bits.join(' · ');
     b.appendChild(sub);
-    // The folder path disambiguates two worlds with the same name, but one of
-    // its segments is the Steam account id. Nothing here ever leaves the
-    // machine, but it costs nothing to keep an account id off a screen someone
-    // might screenshot for a bug report.
+    // The folder path tells two same-named worlds apart, but one of its
+    // segments is the Steam account id. Nothing here leaves the machine, but it
+    // costs nothing to keep an account id off a screen someone might screenshot.
     const pth = document.createElement('span'); pth.className = 'wpath';
     pth.textContent = wd.path.replace(/\b\d{17}\b/g, '…');
     b.appendChild(pth);
     b.setAttribute('aria-label', 'Read ' + t.textContent + (bits.length ? ', ' + bits.join(', ') : ''));
-    b.addEventListener('click', async () => {
-      try { readSaveFile(await wd.level.getFile()); }
-      catch { smFail('That world’s Level.sav couldn’t be opened. Nothing was changed.'); }
-    });
+    b.addEventListener('click', () => readSaveFile(wd.level));
     row.appendChild(b);
     list.appendChild(row);
   }
 }
 
-async function pickDirectory() {
-  try {
-    const opts = {id: 'palarium-saves', mode: 'read'};
-    if (smDirHandle) opts.startIn = smDirHandle;
-    const h = await window.showDirectoryPicker(opts);
-    await useDirectory(h);
-  } catch (e) {
-    if (e && e.name === 'AbortError') return;   // they closed the picker
-    smFail('That folder couldn’t be opened. Nothing was changed.');
-  }
-}
-async function openSaveReader() {
+function openSaveReader() {
   smCancelRead();
-  smParsed = null; smPlan = null; smScope = 'all'; smWorldsFound = [];
+  smParsed = null; smPlan = null; smScope = 'all'; smWorldsFound = []; smBackupData = null;
   setSeg(document.getElementById('smScope'), 'all', 's');
   smShow('smPick');
   smLastFocus = document.activeElement;
   sov.classList.add('open'); sov.scrollTop = 0;
   document.body.style.overflow = 'hidden';
-  document.getElementById('smChoose').focus();
-  if (!CAN_PICK_DIR) return;
-  // A folder we were already given access to: go straight to the world list.
-  // If the permission has lapsed the browser needs a fresh gesture, so leave
-  // the picker up rather than firing a prompt nobody asked for.
-  try {
-    const h = await recallDir();
-    if (!h) return;
-    if ((await h.queryPermission({mode: 'read'})) !== 'granted') { smDirHandle = h; return; }
-    if (sov.classList.contains('open') && !document.getElementById('smPick').hidden) {
-      document.getElementById('smForget').hidden = false;
-      await useDirectory(h, {remember: false});
-    }
-  } catch {}
+  document.getElementById('smChooseDir').focus();
 }
 function closeSaveReader() {
   smCancelRead();
@@ -2132,13 +2074,13 @@ function setSeg(row, val, attr) {
     b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
   }
 }
-document.getElementById('savereadBtn').addEventListener('click', openSaveReader);
+document.getElementById('importBtn').addEventListener('click', openSaveReader);
 document.getElementById('smClose').addEventListener('click', closeSaveReader);
 document.getElementById('smAbort').addEventListener('click', closeSaveReader);
 function smBack() {
   smCancelRead();
   if (smWorldsFound.length) { smShow('smWorlds'); (document.querySelector('#smWorldList button') || document.getElementById('smRescan')).focus(); }
-  else { smShow('smPick'); document.getElementById('smChoose').focus(); }
+  else { smShow('smPick'); document.getElementById('smChooseDir').focus(); }
 }
 document.getElementById('smCancel').addEventListener('click', smBack);
 document.getElementById('smRetry').addEventListener('click', smBack);
@@ -2149,24 +2091,39 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keydown', e => { if (sov.classList.contains('open')) trapTab(e, sov); });
 
 document.getElementById('smChoose').addEventListener('click', () => document.getElementById('saveFile').click());
-if (CAN_PICK_DIR) {
-  document.getElementById('smChooseDir').hidden = false;
-  document.getElementById('smDirHint').hidden = false;
-  document.getElementById('smChooseDir').addEventListener('click', pickDirectory);
-}
+document.getElementById('smChooseDir').addEventListener('click', () => document.getElementById('saveDir').click());
+document.getElementById('smChooseBackup').addEventListener('click', () => document.getElementById('importFile').click());
+document.getElementById('saveDir').addEventListener('change', e => {
+  const files = [...e.target.files];
+  e.target.value = '';
+  if (files.length) useFolder(files);
+});
 document.getElementById('smPath').textContent = SAVE_PATH;
 document.getElementById('smCopyPath').addEventListener('click', async e => {
   try { await navigator.clipboard.writeText(SAVE_PATH); e.target.textContent = 'Copied'; }
   catch { e.target.textContent = 'Press Ctrl+C'; getSelection().selectAllChildren(document.getElementById('smPath')); }
   setTimeout(() => { e.target.textContent = 'Copy'; }, 2000);
 });
-document.getElementById('smRescan').addEventListener('click', pickDirectory);
-document.getElementById('smForget').addEventListener('click', async () => {
-  await forgetDir(); smDirHandle = null;
-  document.getElementById('smForget').hidden = true;
-  smShow('smPick');
-  document.getElementById('smChooseDir').focus();
-  toast('Forgot that folder — you’ll be asked for it next time.');
+document.getElementById('smRescan').addEventListener('click', () => document.getElementById('saveDir').click());
+document.getElementById('smBackupCancel').addEventListener('click', smBack);
+document.getElementById('smBackupApply').addEventListener('click', () => {
+  const d = smBackupData;
+  if (!d) return;
+  const before = {roster: JSON.stringify(roster), plans: JSON.stringify(plans), owned: [...owned]};
+  roster = normRoster(Array.isArray(d.roster) ? d.roster : []);
+  plans = normPlans(Array.isArray(d.plans) ? d.plans : []);
+  owned.clear();
+  for (const k of Array.isArray(d.owned) ? d.owned : []) if (byKey.has(k)) owned.add(k);
+  saveRoster(); savePlans(); localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
+  renderRoster(); renderPlans(); renderDex(); renderReverse();
+  closeSaveReader();
+  toast(`Restored ${roster.length} pal${roster.length === 1 ? '' : 's'} and ${plans.length} plan${plans.length === 1 ? '' : 's'} from that backup.`, () => {
+    roster = normRoster(JSON.parse(before.roster));
+    plans = normPlans(JSON.parse(before.plans));
+    owned.clear(); for (const k of before.owned) owned.add(k);
+    saveRoster(); savePlans(); localStorage.setItem('palbreed_owned', JSON.stringify([...owned]));
+    renderRoster(); renderPlans(); renderDex(); renderReverse();
+  });
 });
 document.getElementById('saveFile').addEventListener('change', e => {
   const f = e.target.files[0];

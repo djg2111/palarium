@@ -10,6 +10,17 @@ async function open(opts = {}) {
   page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
   page.on('response', r => { if (r.status() >= 400) bad.push(r.status() + ' ' + r.url()); });
   await page.goto(BASE + '/index.html' + (opts.hash ? '#/' + opts.hash : ''), {waitUntil: 'load'});
+  // The service worker is network-first for the shell, but it still answers the
+  // very first load of a session from cache — which means a test can silently
+  // exercise the previous run's app.js. Clear it, or spend an hour proving a
+  // regex works while watching it not work.
+  await page.evaluate(async () => {
+    if (!navigator.serviceWorker) return;
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(r => r.unregister()));
+    if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
+  });
+  await page.reload({waitUntil: 'load'});
   await page.waitForTimeout(500);
   return {browser, ctx, page, errors, consoleErrors, bad};
 }

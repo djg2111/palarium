@@ -43,7 +43,7 @@ function check(label, got, want) {
   await page.waitForTimeout(300);
 
   console.log('\nBENCHMARK 3 — first import onto a hand-typed roster');
-  await page.click('#savereadBtn');
+  await page.click('#importBtn');
   await page.setInputFiles('#saveFile', BEFORE);
   await page.waitForSelector('#smResult:not([hidden])', {timeout: 30000});
 
@@ -100,7 +100,7 @@ function check(label, got, want) {
 
   await page.evaluate(() => location.hash = '#/roster');
   await page.waitForTimeout(200);
-  await page.click('#savereadBtn');
+  await page.click('#importBtn');
   await page.setInputFiles('#saveFile', AFTER);
   await page.waitForSelector('#smResult:not([hidden])', {timeout: 30000});
 

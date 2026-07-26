@@ -388,6 +388,20 @@ SaveData   Struct<PalWorldBaseInfoSaveData>
 `Timestamp` is a UE `DateTime`: 100-nanosecond ticks since year 1, so
 `ms = ticks / 10000 - 62135596800000`.
 
+**Getting at the folder at all is its own problem, and the obvious API is the
+wrong one.** Palworld saves live under `%LOCALAPPDATA%`, and Chrome blocklists
+the entire AppData tree as system files — `showDirectoryPicker` refuses it
+outright with "this folder contains system files", which makes the File System
+Access API useless for exactly the one folder that matters. The older
+`<input webkitdirectory>` is not on that blocklist, works in every browser
+here, and hands back a flat `FileList` with `webkitRelativePath`. The cost is
+that there is no handle to keep, so the folder cannot be remembered between
+visits. Chrome also words its confirmation as "upload", which the UI has to
+pre-empt: nothing is uploaded.
+
+Skip anything under a `backup/` segment. Palworld keeps timestamped copies of
+every save there, and they are not worlds anybody is playing.
+
 ---
 
 ## 5b. Per-player records — `Players/<uid>.sav`

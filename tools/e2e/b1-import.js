@@ -8,7 +8,7 @@ const SAVE = process.argv[2] || path.join(__dirname, '..', 'saves', 'Level.sav')
   await page.click('.tabs button[data-t="roster"]').catch(() => {});
   await page.evaluate(() => location.hash = '#/roster');
   await page.waitForTimeout(300);
-  await page.click('#savereadBtn');
+  await page.click('#importBtn');
   await page.waitForSelector('#smPick:not([hidden])');
   const t0 = Date.now();
   await page.setInputFiles('#saveFile', SAVE);

@@ -9,7 +9,7 @@ const TESTS = path.join(__dirname, '..', '..', 'tests');
   await page.evaluate(() => localStorage.clear());
   await page.reload({waitUntil: 'load'}); await page.waitForTimeout(400);
   await page.evaluate(() => location.hash = '#/roster'); await page.waitForTimeout(300);
-  await page.click('#savereadBtn');
+  await page.click('#importBtn');
   await page.setInputFiles('#saveFile', BIG);
   await page.waitForSelector('#smBusy:not([hidden])');
   await page.click('#smCancel');
