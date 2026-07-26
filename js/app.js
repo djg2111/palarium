@@ -428,9 +428,9 @@ function openModal(p, rentry) {
     const ps = sec('Partner skill');
     const card = document.createElement('div'); card.className = 'pskill';
     const n = document.createElement('div'); n.className = 'psn'; n.textContent = p.ps.n;
-    if (AURA_KEYS.has(p.k)) {
+    if ((p.ps.t || []).includes('Base Aura')) {
       const b = document.createElement('span'); b.className = 'badge aura'; b.textContent = 'Base aura';
-      b.title = 'Pays out while this pal is assigned to a base';
+      b.title = 'Lifts every other pal at the base while this one is assigned there';
       n.appendChild(b);
     }
     card.appendChild(n);
@@ -3233,7 +3233,8 @@ function renderCombos() {
 // Everything the rank tables need now ships in the data (see
 // tools/partner-skills.js), so nothing here has to be inferred:
 //   rl  label per row          ru  unit: '%' | '' | 'lv' | 's' | 'x' | 'flag'
-//   rt  who it lands on        re  five ranks of [row index, value]
+//   rt  who it lands on        rc  what narrows it, where anything does
+//   re  five ranks of [row index, value]
 // Rank 1 is what the description quotes; a row can start empty and appear from
 // rank 2 (Direhowl's move speed), which is a real fact about the skill.
 const PS_PALS = PALS.filter(p => p.ps && p.ps.n);
@@ -3257,6 +3258,7 @@ function psRankRows(ps) {
     if (unit === 'flag') continue;
     const seen = [...new Set(vals.filter(v => v !== null))];
     rows.push({label: ps.rl[li] ?? '', unit, target: (ps.rt || [])[li] || '',
+      cond: (ps.rc || [])[li] || '',
       vals, flat: seen.length === 1 && vals.every(v => v !== null)});
   }
   return rows;
@@ -3292,7 +3294,12 @@ function psRankTable(p) {
     // itself — without the target the two rows read as a duplicate
     if (PS_TARGET[r.target]) {
       const w = document.createElement('span'); w.className = 'rtgt';
-      w.textContent = PS_TARGET[r.target];
+      // A condition on a group target narrows who receives it, so it replaces
+      // the target ("Anubis only"); on a self/player target it's a requirement
+      // for the effect to fire at all, so it qualifies it instead.
+      w.textContent = !r.cond ? PS_TARGET[r.target]
+        : /^[bfoa]$/.test(r.target) ? r.cond
+        : PS_TARGET[r.target] + ' — ' + r.cond;
       th.appendChild(w);
     }
     tr.appendChild(th);
@@ -3540,7 +3547,8 @@ function rankStrip(p, scalingOnly, baseOnly) {
   w.appendChild(cap);
   for (const r of rows) {
     const s = document.createElement('span'); s.className = 'rk';
-    const l = document.createElement('b'); l.textContent = r.label;
+    const l = document.createElement('b');
+    l.textContent = r.label + (r.cond ? ' (' + r.cond + ')' : '');
     s.appendChild(l);
     const first = r.vals.find(v => v !== null), last = r.vals[4];
     const v = document.createElement('span');
@@ -3714,9 +3722,9 @@ function psCard(p) {
   const card = document.createElement('div'); card.className = 'skillcard';
   const head = document.createElement('div'); head.className = 'shead';
   head.appendChild(palLink(p, 40, true));
-  if (AURA_KEYS.has(p.k)) {
+  if ((p.ps.t || []).includes('Base Aura')) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'badge aura';
-    b.textContent = 'Base aura'; b.title = 'Works while assigned to a base — see the Base auras tab';
+    b.textContent = 'Base aura'; b.title = 'Lifts every other pal at the base — see the Base auras tab';
     b.addEventListener('click', () => { setSkillMode('auras'); scrollTo({top: 0, behavior: SMOOTH}); });
     head.appendChild(b);
   }

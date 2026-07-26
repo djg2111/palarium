@@ -216,7 +216,42 @@ const ACTIVE_LABEL = {
 
 const ev = s => String(s ?? '').split('::').pop();
 
-function makePartnerSkills({ psp, main, warn = console.warn }) {
+// Per-row conditions, from the Parameters block next to each passive row. Only
+// a handful of pals carry one, but without them the target overstates the
+// effect: Sekhmet's +20% is aimed at ToBaseCampPal *and* filtered to Anubis, so
+// reading the target alone says it lifts the whole base, which it does not.
+//
+// A tribe id means two different things depending on who the effect targets,
+// and each reading matches that pal's own description:
+//   · a group target (base pals) -> it narrows who receives it
+//       Sekhmet: "boosts Anubis's work speed by 20%"
+//   · ToSelf -> that pal must be present for the effect to fire at all
+//       Jelliette: "While Jelliette and Jellroy are in your base, Jelliette's
+//       watering speed increases by 50%"
+// MapObjectId (Sekhmet's workbenches, Ribbuny Botan's weapon factories) is left
+// out: both descriptions already name the facilities, and the ids would have to
+// be given display names this data doesn't have.
+const WORKTYPE_NAME = {Watering: 'watering', Watering_Farm: 'watering crops',
+  EmitFlame: 'kindling', Seeding: 'planting', Handcraft: 'handiwork',
+  Collection: 'gathering', Deforest: 'lumbering', Mining: 'mining',
+  ProductMedicine: 'medicine production', Cool: 'cooling', Transport: 'transporting',
+  MonsterFarm: 'ranch work', GenerateElectricity: 'generating electricity'};
+function conditionOf(params, targetCode, palName) {
+  if (!params) return '';
+  const bits = [];
+  const tribes = [...(params.PalTribeIds || []),
+    ...((params.TriggerParam || {}).TargetTribeIds || [])].map(t => palName(ev(t)));
+  if (tribes.length) {
+    bits.push(targetCode === 's'
+      ? 'only with ' + tribes.join(' and ') + ' at the base'
+      : tribes.join(' and ') + ' only');
+  }
+  const wt = ev(params.WorkType);
+  if (wt && wt !== 'None') bits.push(WORKTYPE_NAME[wt] ? WORKTYPE_NAME[wt] + ' only' : wt + ' only');
+  return bits.join(' · ');
+}
+
+function makePartnerSkills({ psp, main, palName = k => k, warn = console.warn }) {
   const mainLC = new Map(Object.entries(main).map(([k, v]) => [k.toLowerCase(), v]));
   const pspLC = new Map(Object.entries(psp).map(([k, v]) => [k.toLowerCase(), v]));
   const unknown = new Set(), conflicts = [];
@@ -253,22 +288,24 @@ function makePartnerSkills({ psp, main, warn = console.warn }) {
         if (isRidden) tags.add('Mount');
         if (isCollared) tags.add('Collar Pal');
         if (picksUpItems) tags.add('Item Pickup');
-        return {rl: [], ru: [], rt: [], re: [], t: [...tags].sort()};
+        return {rl: [], ru: [], rt: [], rc: [], re: [], t: [...tags].sort()};
       };
       if (!row) return empty();
 
       // A row is one (effect type, target) pair: Sekhmet's +20% work speed for
       // base pals and its +30% for itself are the same type and must not merge.
-      const idx = new Map(), rl = [], ru = [], rt = [], re = [[], [], [], [], []];
-      const rowFor = (type, tgt) => {
+      const idx = new Map(), rl = [], ru = [], rt = [], rc = [], re = [[], [], [], [], []];
+      const rowFor = (type, tgt, cond) => {
         const id = type + '|' + tgt;
         if (idx.has(id)) return idx.get(id);
         const meta = EFFECTS[type];
         if (!meta) { unknown.add(type); return -1; }
         const i = rl.length;
-        rl.push(meta.l); ru.push(meta.u); rt.push(tgt); idx.set(id, i);
+        rl.push(meta.l); ru.push(meta.u); rt.push(tgt); rc.push(cond); idx.set(id, i);
         tags.add(typeof meta.tag === 'function' ? meta.tag(tgt) : meta.tag);
-        if (BASE_TARGETS.has(tgt)) tags.add('Base Aura');
+        // an effect narrowed to one species doesn't lift the base, whatever it
+        // is nominally targeted at — Sekhmet buffs Anubis, not the workforce
+        if (BASE_TARGETS.has(tgt) && !cond) tags.add('Base Aura');
         return i;
       };
       const ranks = row.PassiveSkills || [];
@@ -277,7 +314,9 @@ function makePartnerSkills({ psp, main, warn = console.warn }) {
       // leaves rank 1 empty, which is a fact about the skill, not a gap
       for (const rank of ranks) {
         for (const s of rank.SkillAndParametersArray || []) {
-          for (const [type, , tgt] of effectsOf(s.SkillName?.Key)) rowFor(type, tgt);
+          for (const [type, , tgt] of effectsOf(s.SkillName?.Key)) {
+            rowFor(type, tgt, conditionOf(s.Parameters, tgt, palName));
+          }
         }
       }
       ranks.forEach((rank, ri) => {
@@ -305,7 +344,7 @@ function makePartnerSkills({ psp, main, warn = console.warn }) {
         if (!vals || vals.length !== 5) return;   // a partial array isn't a rank table
         if (new Set(vals).size === 1) return;     // constant: nothing to show per rank
         const i = rl.length;
-        rl.push(label); ru.push(unit); rt.push('p');
+        rl.push(label); ru.push(unit); rt.push('p'); rc.push('');
         vals.forEach((v, ri) => re[ri].push([i, v]));
       };
       const ov = ACTIVE_LABEL[a.ActiveSkill_MainValue_Overview_EditorOnly];
@@ -321,7 +360,7 @@ function makePartnerSkills({ psp, main, warn = console.warn }) {
       // the collar pals that fetch items say so in prose, not in an effect row
       if (picksUpItems) tags.add('Item Pickup');
       tags.delete(undefined); tags.delete(null);
-      return {rl, ru, rt, re: re.some(r => r.length) ? re : [], t: [...tags].sort()};
+      return {rl, ru, rt, rc, re: re.some(r => r.length) ? re : [], t: [...tags].sort()};
     },
 
     // "increases Attack by {ReferencePassive1_EffectValue1}%" — the game ships

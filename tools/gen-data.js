@@ -31,7 +31,11 @@ const { makePartnerSkills, checkUnits, unitOf } = require('./partner-skills');
 const mp = rows('DT_PalMonsterParameter');
 const combi = rows('DT_PalCombiUnique');
 const passiveRows = rows('DT_PassiveSkill_Main');
-const partner = makePartnerSkills({ psp: rows('DT_PartnerSkillParameter'), main: passiveRows });
+const partner = makePartnerSkills({
+  psp: rows('DT_PartnerSkillParameter'), main: passiveRows,
+  // a tribe id in an effect's conditions is a pal: EPalTribeID::Anubis
+  palName: t => (NAME.get('PAL_NAME_' + t) ?? t).trim(),
+});
 const dropRows = Object.values(rows('DT_PalDropItem'));
 const NAME = text('DT_PalNameText_Common');
 const DESC = text('DT_PalLongDescriptionText');
@@ -149,7 +153,10 @@ function buildPal([k, v], zOverride, collab) {
     noct: v.Nocturnal ? 1 : 0,
     st: [v.Hp ?? 0, v.ShotAttack ?? 0, v.Defense ?? 0, v.Support ?? 0,
          v.CraftSpeed ?? 0, v.MaxFullStomach ?? 0, v.FoodAmount ?? 0, v.Price ?? 0],
-    ps: { n: psName, d: psDescClean, t: ps.t, rl: ps.rl, ru: ps.ru, rt: ps.rt, re: ps.re },
+    ps: { n: psName, d: psDescClean, t: ps.t, rl: ps.rl, ru: ps.ru, rt: ps.rt,
+          // only a handful of rows are conditional; the array is dropped entirely
+          // rather than shipping 299 lists of empty strings
+          ...(ps.rc.some(Boolean) ? {rc: ps.rc} : {}), re: ps.re },
     dr: dropsByPal.get(k) ?? [],
   };
 }

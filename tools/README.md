@@ -147,6 +147,13 @@ Each of these silently corrupts the data if you don't handle it.
 `Blueplatypus` in `DT_PalCombiUnique`. Exact-match lookups drop real pals. All
 lookups here are case-insensitive.
 
+**A partner-skill effect can be filtered in three different fields.**
+`Parameters.PalTribeIds`, `Parameters.TriggerParam.TargetTribeIds` and
+`Parameters.OtherOtomoConditionParam.PalTribeIds` all narrow an effect, and a
+given pal uses only one of them — Sekhmet's Anubis restriction is in the second,
+with the first empty. Read one field and conclude the effect is unrestricted and
+you will "find" bugs in the game that aren't there.
+
 **Unreleased content sits in the shipped files.** ~87 rows have
 `ZukanIndex = -1`, `CombiRank = 9999` and untranslated `en_text` names. Seven of
 them have unique-combo recipes. Importing those adds phantom pals to the
@@ -306,10 +313,20 @@ Two things fall out of it that the old data couldn't express:
   player's (`ToTrainer` → `Player Atk++`), which is how those two tags were
   originally derived. Shipped as `ps.rt`.
 - **Base auras are sourced.** An effect aimed at `ToBaseCampPal` or
-  `ToBuildObject` reaches the rest of the base by definition — 20 pals, tagged
-  `Base Aura`. Reading the prose instead finds 23, and the extra three are
-  Jelliette and Jellroy (who buff only themselves, when both are home) and
-  Panthalus (who just patrols).
+  `ToBuildObject` reaches the rest of the base — 19 pals, tagged `Base Aura`.
+  Reading the prose instead finds 23: the extra four are Jelliette and Jellroy
+  (who buff only themselves, and only when both are home), Panthalus (who just
+  patrols), and Sekhmet, whose base-wide effect is filtered to Anubis.
+
+The filter is the catch here. `Parameters.PalTribeIds` is empty on Sekhmet's
+row and the tribe sits in `Parameters.TriggerParam.TargetTribeIds` instead, so
+checking only the first field says the +20% work speed lands on the entire
+base — it does not, and the description was right all along. Conditions are
+shipped as `ps.rc` and a tribe-filtered row does not earn the `Base Aura` tag.
+The same block also holds `WorkType` (Jelliette's watering) and `MapObjectId`
+(Sekhmet's workbenches, Ribbuny Botan's weapon factories); the last is left out
+because those descriptions already name the facilities and the ids have no
+display names in the data.
 
 `ps.ru` carries the **unit** per row (`%`, `lv`, `s`, `x`, `flag`, or bare),
 because the game stores every `EffectValue` as a naked number and the unit is
