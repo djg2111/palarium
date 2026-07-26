@@ -130,7 +130,8 @@ siblings, so grouping is the shape of the data, not a preference):
 | Class | Role |
 |---|---|
 | `.rosgrp` | One species section. A native `<details>/<summary>` — native keyboard, native `aria-expanded`, no JS. `<summary>` holds no nested interactive elements. Shut, it renders as a tile (art, name, count, gender tally); open, it spans every column and shows its `.roslist`. Both are the same summary, switched by `:not([open])` in CSS — never by JS, so `aria-expanded` and native keyboard stay correct. |
-| `.roster` | The species grid. `display:grid`; 2 columns ≤640px (horizontal tiles, 44px art), 3 up to 899px, then auto-fill at 216px (vertical tiles, 56px art). `.rosgrp[open]` and `.hint` span `1/-1`. `grid-auto-flow:dense` is **forbidden** — it would backfill tiles around an open section and make visual order disagree with DOM order. |
+| `.roster` | The species grid. `display:grid`, auto-fill: 148px track ≤640px, 240px to 1023px, 216px above. Tiles are **horizontal below 1024px** (44px art) and vertical above (56px art) — a vertical tile only fits narrow columns below that and comes out taller than the bar it replaces. Column counts follow from the track, so they are 1 below ~356px and 2–4 above. `.rosgrp[open]` and `.hint` span `1/-1`. `grid-auto-flow:dense` is **forbidden** — it would backfill tiles around an open section and make visual order disagree with DOM order. |
+| `.tilebody` / `.chiprow` | Two layout-transparent wrappers inside a `<summary>`. `display:contents` by default, so an open section's summary is exactly the flex row it always was; each becomes a real box only where a tile needs it (`.tilebody` a centred column ≥1024px, a wrapping row below; `.chiprow` a wrapping chip line ≥1024px). Neither carries a role, so the summary's accessible name is unchanged. |
 | `.roslist` / `.rosrow` | The section's `<ul>` and one pal per `<li>`. Fixed grid tracks (identity · passives · note · actions) so columns align down the whole section. Replaces the former `.rospal` **and** `.gentry`. |
 | `.mchip.warn` | A meta chip carrying a warning — `--danger` text, tint fill, `--danger-line` border. Always states the warning in words; colour is never the only signal. |
 | `.rentacts` | The full, named action set for one entry, inside its pal card. Row toolbars stay to three glyphs; everything else lives here at comfortable size. |
@@ -145,9 +146,11 @@ A `[hidden]` element whose class sets its own `display` needs an explicit
 `.cls[hidden]{display:none}` — the UA rule loses to any class rule.
 
 Pal art sizes from a `--ico` custom property set by `icon()`, so a rule can
-resize it per presentation. Never write an inline `width`/`height` on a `.pico`:
-as an inline style it outranks every selector, which is what stranded the
-missing-image fallback at the wrong size. `icon(p, size, clickable, decorative)`
+resize it per presentation. Never write an inline `width`/`height` **or an
+inline `--ico`** on a `.pico` you want a rule to size: either outranks every
+selector, which is what stranded the missing-image fallback at the wrong size.
+A caller that wants CSS to own the size strips the property, and the fallback
+only re-applies what it finds still set. `icon(p, size, clickable, decorative)`
 — pass `decorative` when a text label sits directly beside the image, or the
 name is announced twice.
 
@@ -235,6 +238,10 @@ recoloring/filters).
 - Mobile (≤640px): no horizontal page scroll ever — wide content scrolls inside its
   own container. Primary actions within thumb reach where feasible. The tab bar fades
   its clipped edge (`fadeL/fadeR`).
+- A `<details>` rebuilt by a renderer echoes a `toggle` event for every section
+  that opens, and the event is a queued task — a timing flag cannot catch it.
+  Distinguish the renderer's own output from a user press by comparing the new
+  state against the state you already hold, never by a timer.
 - Group controls by proximity, split by what they act on: `.dex-controls` holds
   controls that change how the list is **filtered, ordered or presented** (search,
   filter, sort, collapse, density); `.collacts` holds actions on the **data itself**

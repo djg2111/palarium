@@ -169,7 +169,10 @@ function icon(p, size, clickable, decorative) {
   img.onerror = () => {
     const d = document.createElement('div');
     d.className = 'pico f' + (clickable ? ' click' : '');
-    d.style.setProperty('--ico', size + 'px');
+    // carry only the size the caller actually left on the image: if it stripped
+    // --ico so a rule could size the art, the fallback must not put it back
+    const ico = img.style.getPropertyValue('--ico');
+    if (ico) d.style.setProperty('--ico', ico);
     d.textContent = p.n[0];
     if (decorative) d.setAttribute('aria-hidden', 'true');
     if (clickable) d.addEventListener('click', e => { e.stopPropagation(); openModal(p); });
@@ -1944,11 +1947,18 @@ function renderRoster() {
     const det = document.createElement('details');
     det.className = 'moredet rosgrp';
     det.dataset.k = k;
-    // Filtering down to a single species makes a one-tile overview pure cost,
-    // so that case opens regardless. Filtering never writes to `collapsed` —
-    // the collapse choice is the user's, and a search must not undo it.
-    det.open = !collapsed.has(k) || sections.length === 1;
+    // A filter that leaves one species makes a one-tile overview pure cost, so
+    // it opens — but only when a filter caused it, and never over a collapse
+    // the user chose. `collapsed` is theirs; a search must not rewrite it.
+    const forced = collapsed.has(k) && sections.length === 1 && filtering;
+    det.open = !collapsed.has(k) || forced;
+    // Setting det.open on a freshly built <details> queues a toggle event, so
+    // every open section echoes one back on every render. A timing flag can't
+    // catch them — the event is a queued task and may land after any timeout.
+    // Compare against what `collapsed` already says instead: if they agree,
+    // nothing changed and this is the renderer hearing itself.
     det.addEventListener('toggle', () => {
+      if (det.open === (!collapsed.has(k) || forced)) return;
       if (det.open) collapsed.delete(k); else collapsed.add(k);
       syncCollapseBtn();
       // opening a tile moves it down to start its own full-width row
@@ -2034,8 +2044,10 @@ function renderRoster() {
 function syncCollapseBtn() {
   const allShut = lastSections.length && lastSections.every(k => collapsed.has(k));
   collapseAllBtn.textContent = allShut ? 'Show every pal' : 'Show species only';
-  // one species is already its own overview
-  collapseAllBtn.disabled = lastSections.length < 2;
+  // One species is already its own overview, so there is nothing to collapse —
+  // but once it IS collapsed this button is the only way back, so it stays live.
+  collapseAllBtn.disabled = !lastSections.length ||
+    (lastSections.length < 2 && !collapsed.has(lastSections[0]));
 }
 function renderRosterStrip() {
   const strip = document.getElementById('rosterStrip');

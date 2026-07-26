@@ -446,10 +446,11 @@ tbody tr:hover{background:var(--surface)}
    section and make visual order disagree with DOM order. */
 .roster{display:grid;gap:10px;margin-top:16px;
   grid-template-columns:repeat(auto-fill,minmax(min(216px,100%),1fr))}
-/* auto-fill only reaches 2 columns between 641 and 899, which is taller than
-   the bars it replaces — the one band that has to be pinned */
-@media (min-width:641px) and (max-width:899px){
-  .roster{grid-template-columns:repeat(3,minmax(0,1fr))}
+/* Between 641 and 1023 a vertical tile only fits two or three narrow columns
+   and comes out taller than the bars it replaces, so the horizontal tile runs
+   all the way up to 1023 (rules below) on a wider track. */
+@media (min-width:641px) and (max-width:1023px){
+  .roster{grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr))}
 }
 .rosgrp[open],.roster>.hint{grid-column:1/-1}
 .strip{display:flex;flex-wrap:wrap;gap:8px}
@@ -526,26 +527,44 @@ select#genderSel{padding:10px 12px}
   font-size:var(--fs-xs);padding:1px 9px;color:var(--muted);font-weight:600;white-space:nowrap}
 
 /* ---- a shut section is a tile ---- */
-.rosgrp:not([open]){background:var(--raised)}
+.rosgrp:not([open]){background:var(--raised);
+  transition:border-color var(--t-fast),background var(--t-fast)}
+.rosgrp:not([open]):hover{border-color:var(--border-strong);background:var(--overlay)}
+.rosgrp:not([open]):active{background:var(--raised)}
 .rosgrp:not([open])>summary{position:relative;flex-direction:column;align-items:center;
-  text-align:center;gap:6px;padding:16px 12px 14px}
-.rosgrp:not([open])>summary::before{position:absolute;top:8px;left:10px}
+  text-align:center;gap:8px;padding:16px 12px}
+.rosgrp:not([open])>summary::before{position:absolute;top:8px;left:12px}
 .rosgrp:not([open]) .pico{--ico:56px}
 .rosgrp:not([open]) .gname2{white-space:normal;overflow:visible;line-height:1.25}
-.rosgrp:not([open])>summary .cntb,.rosgrp:not([open])>summary .mchip{margin:0}
 /* Both wrappers are transparent to layout by default and become real boxes
    only where a tile needs one. On the vertical tile the body is a centred
    column and the chips share one wrapping line. On the mobile tile neither
    applies: everything flows in a single wrapping row, so the name and count
    sit on one line and only the tally drops below. */
 .tilebody,.chiprow{display:contents}
-@media (min-width:641px){
-  .rosgrp:not([open]) .tilebody{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
-  .rosgrp:not([open])>summary .chiprow{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+@media (min-width:1024px){
+  .rosgrp:not([open]) .tilebody{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+  .rosgrp:not([open])>summary .chiprow{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 }
-/* on a --raised tile the count chip's own --raised fill vanishes, leaving a
-   1.66:1 border as the only boundary — which §1 forbids as a sole indicator */
-.rosgrp:not([open]) .cntb{background:var(--bg)}
+/* Below 1024 the tile is horizontal: a vertical one only fits narrow columns
+   here and runs taller than the bar it replaces. Everything flows in one
+   wrapping row, so the name and count share a line and the tally drops below. */
+@media (max-width:1023px){
+  .rosgrp:not([open])>summary{flex-direction:row;text-align:left;align-items:center;
+    padding:8px 12px 8px 24px;gap:8px;min-height:44px}
+  .rosgrp:not([open])>summary::before{top:50%;left:8px;transform:translateY(-50%)}
+  .rosgrp:not([open]) .pico{--ico:44px}
+  .rosgrp:not([open]) .tilebody{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0;flex:1}
+  /* genderize() splits a tally into separate spans, so an inline-flex .mchip
+     can't shrink below their sum — it overflowed its tile onto the neighbour.
+     Let its parts wrap, and let both chips shrink. */
+  .rosgrp:not([open]) .tilebody>*{min-width:0;max-width:100%}
+  .rosgrp:not([open]) .mchip{flex-wrap:wrap;justify-content:center;row-gap:0}
+}
+/* the chip's own --raised fill vanishes against a --raised tile, so it takes
+   the recessed fill and a --muted edge (5.37:1) rather than relying on
+   --border-strong, which is 1.66:1 and decorative-only per §1 */
+.rosgrp:not([open]) .cntb{background:var(--bg);border-color:var(--muted)}
 .rosgrp .gname2{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .roslist{list-style:none;margin:0;padding:0}
 /* Identical tracks on every row, so columns line up down the whole section.
@@ -1163,14 +1182,7 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   /* thumb-sized targets without changing how the buttons look */
   .rosrow .acts button{min-width:32px;min-height:32px}
   .rosgrp[open]>summary{min-height:44px}
-  /* A vertical tile at 150px runs ~130px tall — 14 of them beat the stack they
-     replace. Horizontal is ~60px and still shows the art at 44px, not 28. */
   .roster{grid-template-columns:repeat(auto-fill,minmax(min(148px,100%),1fr));gap:8px}
-  .rosgrp:not([open])>summary{flex-direction:row;text-align:left;align-items:center;
-    padding:8px 10px 8px 22px;gap:8px;min-height:44px}
-  .rosgrp:not([open])>summary::before{top:50%;left:8px;transform:translateY(-50%)}
-  .rosgrp:not([open]) .pico{--ico:44px}
-  .rosgrp:not([open]) .tilebody{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;min-width:0;flex:1}
   .roster.dense .rosrow{padding:7px 12px}
 
   /* --- add-pal dialog: three buttons in one row collapsed the primary to a
