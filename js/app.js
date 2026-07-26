@@ -3353,6 +3353,7 @@ function auraOf(p) {
   const reaches = (p.ps.t || []).includes('Base Aura');
   let group = 'other';
   if (work) group = 'work';
+  else if (/patrol|intruder|bombard/i.test(clause)) group = 'guard';
   else if (!reaches) group = 'cond';          // a base effect that buffs nobody else
   else if (/crop|harvest|egg|incubat|breeding farm/i.test(clause)) group = 'farm';
   else if (/hunger|SAN\b|sanity/i.test(clause)) group = 'upkeep';
@@ -3368,9 +3369,10 @@ const AURA_GROUPS = [
    s: 'Base-wide output, and the only partner skills that touch breeding throughput.'},
   {k: 'upkeep', t: 'Upkeep — hunger & sanity',
    s: 'Base pals that stop working to eat or to sulk are the usual reason a base stalls.'},
-  {k: 'other', t: 'Base defense'},
+  {k: 'other', t: 'Other base bonuses'},
+  {k: 'guard', t: 'Base defense'},
   {k: 'cond', t: 'Conditional & single-target',
-   s: 'Base effects that only fire for one named pal, or need a specific partner present.'},
+   s: 'Base effects that reach nobody else — they need a specific partner at the base, and then only pay out to the pal itself.'},
 ];
 
 // ---------- partner-skill effect tags ----------
@@ -3517,8 +3519,18 @@ function tagChips(ps, {link = true} = {}) {
 // "+10% → +20%" — the rank scaling in one line, for the aura cards. The work
 // auras are all flat +1s, which the group blurb already says once; repeating it
 // on twelve cards buries the one row that does move (Ribbuny's attack buff).
-function rankStrip(p, scalingOnly) {
-  const rows = psRankRows(p.ps).filter(r => !scalingOnly || !r.flat);
+function rankStrip(p, scalingOnly, baseOnly) {
+  let rows = psRankRows(p.ps);
+  // On an aura card, the rows that matter are the ones aimed at the base. A pal
+  // whose triggered skill also scales (Smokie Cryst's cooldown, Cinnamoth's
+  // damage multiplier) would otherwise look as though its aura scaled too — so
+  // narrow to the base rows first, and only then drop the flat ones. Jelliette
+  // and Jellroy have no base-targeted row at all — their base effect is on
+  // themselves — so they keep the full list.
+  if (baseOnly && rows.some(r => r.target === 'b' || r.target === 'f')) {
+    rows = rows.filter(r => r.target === 'b' || r.target === 'f');
+  }
+  rows = rows.filter(r => !scalingOnly || !r.flat);
   if (!rows.length) return null;
   const w = document.createElement('div'); w.className = 'rankstrip';
   // named, because a multi-clause skill's other effects scale here too and the
@@ -3614,7 +3626,7 @@ function auraCard(a) {
   card.appendChild(palLink(a.p, 34));
   if (a.work) { const sn = document.createElement('div'); sn.className = 'askill'; sn.textContent = a.p.ps.n; card.appendChild(sn); }
   const d = document.createElement('p'); d.className = 'aclause'; d.textContent = a.clause; card.appendChild(d);
-  const strip = rankStrip(a.p, !!a.work);
+  const strip = rankStrip(a.p, !!a.work, true);
   if (strip) card.appendChild(strip);
   return card;
 }
