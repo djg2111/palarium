@@ -54,6 +54,49 @@ if (cosmeticChanges.size) {
   console.log(yel('  cosmetic field changes: ') + [...cosmeticChanges].map(([f, n]) => `${f}x${n}`).join(', '));
 }
 
+// Partner skills were carried over from the pre-1.0 dataset until the
+// DT_PartnerSkillParameter link was found, so their diff gets spelled out
+// rather than counted: a rank table that changes shape, or a tag that
+// disappears, silently changes what the Skills catalog can find.
+console.log(bold('\npartner skills'));
+{
+  const has = f => arr => arr.filter(p => (p.ps?.[f] || []).length).length;
+  console.log(`  rank tables: ${has('re')(A.pals)} -> ${has('re')(B.pals)}` +
+    ` · tagged: ${has('t')(A.pals)} -> ${has('t')(B.pals)}` +
+    ` · units shipped: ${A.pals.some(p => p.ps?.ru) ? 'yes' : 'no'} -> ${B.pals.some(p => p.ps?.ru) ? 'yes' : 'no'}`);
+  const tagsOf = arr => new Set(arr.flatMap(p => p.ps?.t || []));
+  const ta = tagsOf(A.pals), tb = tagsOf(B.pals);
+  const tAdd = [...tb].filter(t => !ta.has(t)).sort(), tRem = [...ta].filter(t => !tb.has(t)).sort();
+  console.log(`  tag vocabulary: ${ta.size} -> ${tb.size}`);
+  if (tAdd.length) console.log(grn(`   +${tAdd.length}: `) + tAdd.join(', '));
+  if (tRem.length) console.log(yel(`   -${tRem.length}: `) + tRem.join(', '));
+  let dChg = 0, reAdd = 0, reDrop = 0, reChg = [], tokenA = 0, tokenB = 0;
+  for (const [k, o] of pa) {
+    const n = pb.get(k); if (!n) continue;
+    if (/\{[A-Za-z]/.test(o.ps?.d || '')) tokenA++;
+    if (/\{[A-Za-z]/.test(n.ps?.d || '')) tokenB++;
+    if ((o.ps?.d || '') !== (n.ps?.d || '')) dChg++;
+    const ol = (o.ps?.re || []).length, nl = (n.ps?.re || []).length;
+    if (!ol && nl) reAdd++;
+    else if (ol && !nl) reDrop++;
+    else if (ol && nl) {
+      // compare as label -> five values, so a re-ordering isn't a change
+      const flat = p => {
+        const m = new Map();
+        (p.ps.re || []).forEach((rank, ri) => rank.forEach(([i, v]) => {
+          if (!m.has(i)) m.set(i, new Array(5).fill(null));
+          m.get(i)[ri] = v;
+        }));
+        return [...m].map(([i, vals]) => JSON.stringify(vals)).sort();
+      };
+      if (!eq(flat(o), flat(n))) reChg.push(o.n);
+    }
+  }
+  console.log(`  descriptions changed: ${dChg} · unresolved {tokens}: ${tokenA} -> ${tokenB > 0 ? red(tokenB) : grn(0)}`);
+  console.log(`  rank tables gained: ${reAdd} · lost: ${reDrop > 0 ? red(reDrop) : 0}` +
+    ` · value sets changed: ${reChg.length ? yel(reChg.length) + ' (' + reChg.slice(0, 10).join(', ') + ')' : grn(0)}`);
+}
+
 console.log(bold(`\ncombos  ${A.combos.length} -> ${B.combos.length}`));
 const ck = c => `${c.a}+${c.b}${c.ga ? `(${c.ga}/${c.gb})` : ''}`;
 const ca = indexBy(A.combos, 0), cb = new Map(B.combos.map(c => [ck(c), c]));

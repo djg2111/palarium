@@ -31,7 +31,9 @@ const workImgTag = k =>
   `<img class="uii" src="${UI}work/${k}.webp" alt="" width="15" height="15" loading="lazy" decoding="async">`;
 // A passive's icon is keyed by its primary effect type, which is already the
 // first token of the effect string the dataset carries — no extra data needed.
-const passiveIconKey = meta => (meta && meta.e ? meta.e.split(' ')[0] : null);
+// An effect with no number is written as the bare key ("nightowl"), so the first
+// token can end at the comma rather than at a space.
+const passiveIconKey = meta => (meta && meta.e ? meta.e.split(/[\s,]/)[0] : null);
 function passiveIcon(meta, size = 15) {
   const k = passiveIconKey(meta);
   return k ? uiIcon('passive', k, size) : null;
@@ -435,6 +437,12 @@ function openModal(p, rentry) {
     // the tags are the catalog's filter, so each one is a way into it
     if (p.ps.t.length) card.appendChild(tagChips(p.ps));
     const d = document.createElement('div'); d.className = 'psd'; d.append(psDesc(p.ps.d)); card.appendChild(d);
+    const flags = psFlags(p.ps);
+    if (flags.length) {
+      const f = document.createElement('div'); f.className = 'flatnote';
+      f.textContent = 'Always on: ' + flags.join(' · ');
+      card.appendChild(f);
+    }
     const tbl = psRankTable(p);
     if (tbl) card.appendChild(tbl);
     ps.appendChild(card);
@@ -3222,77 +3230,49 @@ function renderCombos() {
 // indexes plus the base-aura group, which is the reason the tab exists.
 
 // ---------- reading DATA.pals[i].ps ----------
-// ps.re is five ranks (the partner-skill enhancement levels you spend souls on).
-// Each rank is a list of [i, value] pairs where i indexes ps.rl, the game's own
-// per-value labels. Rank 1 is what the description text quotes, which is how the
-// mapping was confirmed: Braloha's "by 20%" is re[0]=[[0,20]] against
-// rl=["Breed Speed In Base Camp"], and its rank 5 is 50.
-//
-// Three wrinkles the raw data has and the render has to survive:
-//   · a pair can be missing at rank 1 and appear from rank 2 (Direhowl's move
-//     speed) — that's a real fact, not a hole;
-//   · a pair can be listed twice in one rank (Katress, Fenglope Lux) — same
-//     value, so dedupe rather than sum;
-//   · rl also carries internal parameters that are not player-facing numbers:
-//     "Element Water" 1, "Curve Type" 19, "Low Gravity" 1. Those are enums and
-//     flags, and printing them as values invents meaning. They're recognised by
-//     being both uncurated (absent from ps.t) and identical at all five ranks —
-//     nothing that scales with rank is dropped.
+// Everything the rank tables need now ships in the data (see
+// tools/partner-skills.js), so nothing here has to be inferred:
+//   rl  label per row          ru  unit: '%' | '' | 'lv' | 's' | 'x' | 'flag'
+//   rt  who it lands on        re  five ranks of [row index, value]
+// Rank 1 is what the description quotes; a row can start empty and appear from
+// rank 2 (Direhowl's move speed), which is a real fact about the skill.
 const PS_PALS = PALS.filter(p => p.ps && p.ps.n);
-// Units aren't in the data, so they're proved from the description text rather
-// than guessed: if a pal's own description spells its rank-1 value as "20%" the
-// row is a percentage, and if it spells it bare ("by 100", "+2") it isn't.
-// Proof is per pal AND per label because one label covers both — Mining++ is a
-// percentage on Digtoise (640) and a suitability level on Tetroise (+1). A label
-// proved a percentage by any pal carries that over to pals whose own text is
-// silent (most mount speed lines never quote their number). Anything still
-// unproved prints as a bare number rather than inventing a unit for it.
-const PCT_LABELS = new Set(), FLAT_PAIRS = new Set(), PCT_PAIRS = new Set();
-for (const p of PS_PALS) {
-  const d = (p.ps.d || '').replace(/\s+/g, ' ');
-  for (const rank of p.ps.re || []) for (const [li, v] of rank) {
-    const l = p.ps.rl[li];
-    if (l == null) continue;
-    const a = Math.abs(v);
-    if (new RegExp('(^|[^0-9])' + a + '\\s*%').test(d)) { PCT_LABELS.add(l); PCT_PAIRS.add(p.k + '|' + l); }
-    else if (new RegExp('(^|[^0-9.])' + a + '([^0-9%]|$)').test(d)) FLAT_PAIRS.add(p.k + '|' + l);
-  }
-}
-// rows of the rank table, internals dropped — [{label, vals[5], flat, unit}]
-function psRankRows(ps, key) {
-  if (!ps || !ps.re || ps.re.length < 5 || !ps.rl.length) return [];
-  const curated = new Set(ps.t || []);
-  const lvl = /Work Suitability Level/i.test(ps.d || '');
+const PS_TARGET = {s: 'this pal', p: 'you', sp: 'you and this pal', o: 'your party pals',
+  a: 'the pal fighting with you', b: 'every pal at the base', f: 'base facilities'};
+// rows of the rank table — [{label, unit, target, vals[5], flat}]. A 'flag' row
+// is an on/off trait with no number (an air dash, a lava immunity); it is not a
+// rank row and comes back separately.
+function psRankRows(ps) {
+  if (!ps || !ps.re || !ps.re.length || !ps.rl.length) return [];
   const byIdx = new Map();
   ps.re.forEach((rank, ri) => {
     for (const [li, v] of rank) {
       if (!byIdx.has(li)) byIdx.set(li, new Array(5).fill(null));
-      byIdx.get(li)[ri] = v;    // duplicates inside one rank carry the same value
+      byIdx.get(li)[ri] = v;
     }
   });
   const rows = [];
   for (const [li, vals] of byIdx) {
-    const label = ps.rl[li];
-    if (label == null) continue;
+    const unit = (ps.ru || [])[li] ?? '';
+    if (unit === 'flag') continue;
     const seen = [...new Set(vals.filter(v => v !== null))];
-    const flat = seen.length === 1 && vals.every(v => v !== null);
-    if (flat && !curated.has(label)) continue;              // internal constant
-    const pair = key + '|' + label;
-    rows.push({label, vals, flat,
-      unit: PCT_PAIRS.has(pair) ? '%'
-        : lvl && Math.abs(seen[0]) <= 5 && Number.isInteger(seen[0]) ? 'lv'
-        : FLAT_PAIRS.has(pair) ? ''
-        : PCT_LABELS.has(label) ? '%' : ''});
+    rows.push({label: ps.rl[li] ?? '', unit, target: (ps.rt || [])[li] || '',
+      vals, flat: seen.length === 1 && vals.every(v => v !== null)});
   }
   return rows;
 }
+// the on/off traits, which the rank table has no column for
+const psFlags = ps => (ps.rl || [])
+  .map((l, i) => ((ps.ru || [])[i] === 'flag' ? l : null)).filter(Boolean);
 const psVal = (v, unit) => v === null ? '—'
-  : unit === 'lv' ? (v > 0 ? '+' + v : String(v))
   : unit === '%' ? (v > 0 ? '+' + v + '%' : v + '%')
+  : unit === 'lv' ? (v > 0 ? '+' + v : String(v))
+  : unit === 's' ? v + 's'
+  : unit === 'x' ? '×' + v
   : String(v);
-// the 5×n table, shared by the pal card and the catalog
+// the 5xN table, shared by the pal card and the catalog
 function psRankTable(p) {
-  const rows = psRankRows(p.ps, p.k);
+  const rows = psRankRows(p.ps);
   if (!rows.length) return null;
   const tbl = document.createElement('table'); tbl.className = 'ranktbl';
   const cap = document.createElement('caption');
@@ -3307,7 +3287,15 @@ function psRankTable(p) {
   const tb = document.createElement('tbody');
   for (const r of rows) {
     const tr = document.createElement('tr');
-    const th = document.createElement('th'); th.scope = 'row'; th.textContent = psLabel(r.label); tr.appendChild(th);
+    const th = document.createElement('th'); th.scope = 'row'; th.textContent = r.label;
+    // Sekhmet grants work speed twice over, +20% to the base and +30% to
+    // itself — without the target the two rows read as a duplicate
+    if (PS_TARGET[r.target]) {
+      const w = document.createElement('span'); w.className = 'rtgt';
+      w.textContent = PS_TARGET[r.target];
+      th.appendChild(w);
+    }
+    tr.appendChild(th);
     r.vals.forEach(v => {
       const td = document.createElement('td');
       td.textContent = psVal(v, r.unit);
@@ -3319,43 +3307,11 @@ function psRankTable(p) {
   tbl.appendChild(tb);
   return tbl;
 }
-// rl labels come out of the game data as raw parameter names; the ones that made
-// it into ps.t are already display text, the rest get spaced-out casing tidied
-const PS_LABEL_FIX = {
-  'Breed Speed In Base Camp': 'Breeding farm egg speed',
-  'Pal Egg Hatching Speed': 'Egg hatching speed',
-  'Regene Stomatch Hungriest': 'Stomach refill when starving',
-  'Sphere Recovery': 'Sphere returned on catch',
-  'Fishing Salvage Item Drop': 'Salvage yield',
-  'Climb Move Speed Rate': 'Climb speed',
-  'Item Corruption Speed Rate': 'Food spoilage rate',
-  'Defeat Enemy Active Skill Cool Time Decrease': 'Cooldown reset on kill',
-  'Meat Cut Add Item Drop': 'Extra meat from butchering',
-  'Reload Speed Up': 'Reload speed',
-  'Avoid Duration Up Partner Skill': 'Dodge window',
-  'Damage Up Partner Skill Attack': 'Partner-skill attack damage',
-  'Damage Up Last Bullet': 'Last-bullet damage',
-  'Attack Rate HPThreshold': 'Attack while healthy',
-  'Player Low Health Blast': 'Blast at low health',
-  'Player Shield Recover Start Time Rate': 'Shield recharge delay',
-  'Syncro Passive When Capture': 'Passive shared on capture',
-  'Player Arrow Explosion': 'Explosive arrows',
-  'Bullet Hit Stack Buff': 'Damage stacks per hit',
-  'Defeat Enemy Stack Buff': 'Damage stacks per kill',
-  'Player Inflict Effect Melee Hit Barrier': 'Barrier on melee hit',
-  'Player Inflict Effect Weak Point Hit Damage Up': 'Weak-point damage',
-};
-const psLabel = l => PS_LABEL_FIX[l] || l.replace(/^Damage Rate If Defender /, 'Damage vs ')
-  .replace(/^Player Element Step Attack /, 'Step attack: ')
-  .replace(/^Player Inflict Effect Attack /, 'On hit: ');
 
-// 19 partner-skill descriptions ship with an unresolved localisation token
-// ("increases Attack by {ReferencePassive1_EffectValue1}%") — the game's own
-// text, not something this app broke. The token can't be filled in honestly:
-// 13 of the 19 carry no rank values at all, and where values do exist they
-// don't line up (Dupin's token is a Burn buildup, but rl[0] is an attack rate).
-// So it's marked as the gap it is, and the rank table underneath shows whatever
-// numbers the data does have.
+// The generator resolves the game's unresolved {ReferencePassive1_EffectValue1}
+// tokens against DT_PartnerSkillParameter, so none reach the app today. This
+// stays as the guard for a future game update that ships a token the extractor
+// doesn't know: marked as the gap it is, rather than printed raw.
 const PS_PLACEHOLDER = /\{[^}]+\}/g;
 function psDesc(text) {
   const f = document.createDocumentFragment();
@@ -3375,6 +3331,13 @@ function psDesc(text) {
 // The flagship group. 23 partner skills do something while the pal is assigned
 // to a base; 12 of them raise one Work Suitability by +1 for every other pal
 // there, and between them they cover all twelve jobs exactly once.
+//
+// Two signals, answering different questions. The "Base Aura" tag is sourced —
+// the game aims those effects at ToBaseCampPal or ToBuildObject, so they really
+// do reach the rest of the base. The description clause is what gets shown, and
+// it also catches the three pals whose base effect is not an aura at all:
+// Jelliette and Jellroy buff only themselves when both are home, and Panthalus
+// just patrols.
 const BASE_CLAUSE = /\bWhile\b[^.]*\bbase\b[^.]*(\.|$)/i;
 const AURA_WORK = [['gathering', /Gathering/i], ['lumbering', /Lumbering/i], ['handiwork', /Handiwork/i],
   ['watering', /Watering/i], ['farming', /Farming/i], ['generatingElectricity', /Generating Electricity/i],
@@ -3387,12 +3350,13 @@ function auraOf(p) {
   const clause = m[0].trim();
   const work = /Work Suitability Level/i.test(clause)
     ? (AURA_WORK.find(([, re]) => re.test(clause)) || [null])[0] : null;
+  const reaches = (p.ps.t || []).includes('Base Aura');
   let group = 'other';
   if (work) group = 'work';
+  else if (!reaches) group = 'cond';          // a base effect that buffs nobody else
   else if (/crop|harvest|egg|incubat|breeding farm/i.test(clause)) group = 'farm';
   else if (/hunger|SAN\b|sanity/i.test(clause)) group = 'upkeep';
-  else if (/\b(only|both|and .* are in your base|boosts \w+'s)/i.test(clause) || /Jelliette|Jellroy|Anubis/.test(clause)) group = 'cond';
-  return {p, clause, work, group,
+  return {p, clause, work, group, reaches,
     stacks: !/does not stack/i.test(d)};
 }
 const AURAS = PS_PALS.map(auraOf).filter(Boolean);
@@ -3419,10 +3383,10 @@ const tagSlug = t => t.toLowerCase().replace(/\+\+$/, '').replace(/--$/, '-down'
 const TAG_BY_SLUG = new Map([...PS_TAGS.keys()].map(t => [tagSlug(t), t]));
 // families, by rule rather than by an 89-entry hand list
 function tagFamily(t) {
-  if (/Resist|Inflict|Slower /.test(t)) return 'status';
-  if (/Capture|Collar|Drop|Item Pickup|Carry Capacity|Pal EXP|Extra Drops|Fishing/.test(t)) return 'loot';
-  if (/Mount|Move Speed|Swim Speed|Stealth|Durability/.test(t)) return 'travel';
-  if (/Dmg|Atk|Attack|Defense|Life Steal|HP Regen|Shield|Cooldown|Weak Point/.test(t)) return 'combat';
+  if (/Mount|Move Speed|Swim Speed|Climb Speed|Jump|Stealth|Durability|Fall Damage/.test(t)) return 'travel';
+  if (/Resist|Inflict|Immunity|Damage vs|Slower /.test(t)) return 'status';
+  if (/Capture|Collar|Drop|Item Pickup|Carry Capacity|Pal EXP|Extra Drops|Fishing|Homing/.test(t)) return 'loot';
+  if (/Dmg|Atk|Attack|Defense|Life Steal|HP Regen|Shield|Cooldown|Weak Point|Dodge|Reload/.test(t)) return 'combat';
   return 'work';
 }
 const TAG_ICON = {   // tags that map straight onto an already-shipped game icon
@@ -3442,59 +3406,62 @@ function tagIcon(t, size = 15) {
 }
 
 // ---------- passive effects ----------
-// DATA.passives[i].e is the parsed effect string, one "key +N%" per effect. The
-// key is also the icon name (see passiveIconKey), so the table below only has to
-// add a human label, which category it belongs to and which direction is good.
-// EffectValue is written as a percentage by the extractor for every key, but a
-// few of them are counts or plain flags — those are marked and not printed as %.
+// DATA.passives[i].e is the parsed effect string, one effect per comma. The key
+// is also the icon name (see passiveIconKey) and the generator writes the unit
+// it sourced, so the table below only adds a human label, which category the
+// effect belongs to, and which direction of the number is the good one.
 const PV_EFFECTS = {
   craftspeed: ['Work speed', 'work', 1], logging: ['Lumbering speed', 'work', 1],
   mining: ['Mining speed', 'work', 1],
-  worksuitabilityaddrank_monsterfarm: ['Farming suitability', 'work', 1, 'lv'],
+  worksuitabilityaddrank_monsterfarm: ['Farming suitability', 'work', 1],
   shotattack: ['Attack', 'atk', 1], lifesteal: ['Life steal', 'atk', 1],
   defense: ['Defense', 'def', 1], maxhp: ['Max HP', 'def', 1],
   autohpregenerate: ['HP regeneration', 'def', 1], explosionresist: ['Explosion resistance', 'def', 1],
   resistadditionaleffect_burn: ['Burn resistance', 'def', 1],
   resistadditionaleffect_poison: ['Poison resistance', 'def', 1],
-  knockbackinvalid_forpassiveskill: ['Immune to knockback', 'def', 1, 'flag'],
-  leanbackinvalid_forpassiveskill: ['Immune to flinching', 'def', 1, 'flag'],
+  knockbackinvalid_forpassiveskill: ['Immune to knockback', 'def', 1],
+  leanbackinvalid_forpassiveskill: ['Immune to flinching', 'def', 1],
   activeskillcooltime_decrease: ['Skill cooldown reduction', 'atk', 1],
   reloadspeedup: ['Reload speed', 'atk', 1],
   movespeed: ['Move speed', 'move', 1], swimspeed: ['Swim speed', 'move', 1],
   palsp_increase: ['Pal stamina', 'move', 1],
   playersp_decreaserate: ['Player stamina drain', 'move', -1],
-  ridejumpcount_increase: ['Extra mount jumps', 'move', 1, 'ct'],
+  ridejumpcount_increase: ['Extra mount jumps', 'move', 1],
   fullstomatch_decrease: ['Hunger rate', 'upkeep', -1],
   sanity_decrease: ['Sanity loss rate', 'upkeep', -1],
-  nightowl: ['Works through the night', 'upkeep', 1, 'flag'],
-  nocturnal: ['Nocturnal — works at night', 'upkeep', 1, 'flag'],
+  nightowl: ['Works through the night', 'upkeep', 1],
+  nocturnal: ['Nocturnal — works at night', 'upkeep', 1],
   breedspeed: ['Breeding speed', 'breed', 1],
   breedspeed_inbasecamp: ['Breeding speed at base', 'breed', 1],
   palegghatchingspeed: ['Egg hatching speed', 'breed', 1],
   selfdeathadditemdrop: ['Extra drops when defeated', 'loot', 1],
   shopsellprice_money_increase: ['Selling price', 'loot', 1],
   shopbuyprice_money_increase: ['Buying price', 'loot', -1],
-  nonkilling: ['Never lands the killing blow', 'loot', 1, 'flag'],
-  worldtreedecayimmunity: ['Immune to World Tree decay', 'def', 1, 'flag'],
+  nonkilling: ['Never lands the killing blow', 'loot', 1],
+  worldtreedecayimmunity: ['Immune to World Tree decay', 'def', 1],
 };
 const PV_CATS = [['work', 'Work speed'], ['atk', 'Attack'], ['def', 'Defense & survival'],
   ['move', 'Movement & stamina'], ['upkeep', 'Hunger & sanity'], ['breed', 'Breeding'],
   ['loot', 'Loot & trade'], ['elem', 'Element damage & resistance']];
 function pvEffect(part) {
-  // "craftspeed +50% (party)" -> {key, val, party, label, cat, good, unit}
-  const m = part.match(/^(\S+)\s+([+-]?[\d.]+)%(\s*\(party\))?$/);
+  // The generator writes the unit it sourced, so the shape says which it is:
+  //   "craftspeed +50% (party)"        percentage
+  //   "ridejumpcount_increase +2"      a count, not a percentage
+  //   "nightowl"                       an on/off trait, no number at all
+  const m = part.match(/^(\S+)(?:\s+([+-]?[\d.]+)(%?))?(\s*\(party\))?$/);
   if (!m) return {key: part, val: null, party: false, label: part, cat: 'elem', good: 1, unit: ''};
-  const key = m[1], val = parseFloat(m[2]);
+  const key = m[1], val = m[2] === undefined ? null : parseFloat(m[2]);
+  const unit = val === null ? 'flag' : m[3] || '';
   const e = PV_EFFECTS[key];
-  if (e) return {key, val, party: !!m[3], label: e[0], cat: e[1], good: e[2], unit: e[3] || '%'};
+  if (e) return {key, val, party: !!m[4], label: e[0], cat: e[1], good: e[2], unit};
   const el = key.match(/^element(boost|resist)_(\w+)$/);
   const nm = {leaf: 'Grass', earth: 'Ground', electricity: 'Electric', normal: 'Neutral'};
   if (el) {
     const t = nm[el[2]] || el[2][0].toUpperCase() + el[2].slice(1);
-    return {key, val, party: !!m[3], cat: 'elem', good: 1, unit: '%',
+    return {key, val, party: !!m[4], cat: 'elem', good: 1, unit,
       label: t + (el[1] === 'boost' ? ' attack' : ' resistance')};
   }
-  return {key, val, party: !!m[3], label: pretty(key), cat: 'elem', good: 1, unit: '%'};
+  return {key, val, party: !!m[4], label: pretty(key), cat: 'elem', good: 1, unit};
 }
 const pvText = e => e.unit === 'flag' ? e.label
   : e.label + ' ' + (e.val > 0 ? '+' : '') + e.val + (e.unit === '%' ? '%' : '');
@@ -3531,7 +3498,8 @@ function palLink(p, size, num) {
 }
 function tagChips(ps, {link = true} = {}) {
   const w = document.createElement('div'); w.className = 'pst';
-  for (const t of ps.t || []) {
+  // "Base Aura" already has a badge of its own on every card that carries it
+  for (const t of (ps.t || []).filter(t => t !== 'Base Aura')) {
     const c = document.createElement(link ? 'button' : 'span');
     c.className = 'mchip' + (link ? ' tagbtn' : '');
     const ic = tagIcon(t, 14); if (ic) c.appendChild(ic);
@@ -3550,7 +3518,7 @@ function tagChips(ps, {link = true} = {}) {
 // auras are all flat +1s, which the group blurb already says once; repeating it
 // on twelve cards buries the one row that does move (Ribbuny's attack buff).
 function rankStrip(p, scalingOnly) {
-  const rows = psRankRows(p.ps, p.k).filter(r => !scalingOnly || !r.flat);
+  const rows = psRankRows(p.ps).filter(r => !scalingOnly || !r.flat);
   if (!rows.length) return null;
   const w = document.createElement('div'); w.className = 'rankstrip';
   // named, because a multi-clause skill's other effects scale here too and the
@@ -3560,7 +3528,7 @@ function rankStrip(p, scalingOnly) {
   w.appendChild(cap);
   for (const r of rows) {
     const s = document.createElement('span'); s.className = 'rk';
-    const l = document.createElement('b'); l.textContent = psLabel(r.label);
+    const l = document.createElement('b'); l.textContent = r.label;
     s.appendChild(l);
     const first = r.vals.find(v => v !== null), last = r.vals[4];
     const v = document.createElement('span');
@@ -3744,17 +3712,20 @@ function psCard(p) {
   const n = document.createElement('div'); n.className = 'psn'; n.textContent = p.ps.n; card.appendChild(n);
   if ((p.ps.t || []).length) card.appendChild(tagChips(p.ps));
   const d = document.createElement('p'); d.className = 'psd'; d.append(psDesc(p.ps.d || '—')); card.appendChild(d);
-  const rows = psRankRows(p.ps, p.k);
+  // on/off traits carry no number, so they'd be an empty row in the table
+  const flags = psFlags(p.ps);
+  if (flags.length) {
+    const f = document.createElement('div'); f.className = 'flatnote';
+    f.textContent = 'Always on: ' + flags.join(' · ');
+    card.appendChild(f);
+  }
+  const rows = psRankRows(p.ps);
   if (rows.length) {
     const det = document.createElement('details'); det.className = 'rankdet';
     const sum = document.createElement('summary');
     sum.textContent = rows.some(r => !r.flat) ? 'Rank scaling' : 'Rank values (flat)';
     det.append(sum, psRankTable(p));
     card.appendChild(det);
-  } else if (p.ps.re && p.ps.re.length) {
-    const f = document.createElement('div'); f.className = 'flatnote';
-    f.textContent = 'Nothing here scales with partner-skill rank.';
-    card.appendChild(f);
   }
   return card;
 }

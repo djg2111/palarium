@@ -128,6 +128,15 @@ const GUIDE_ITEMS = ['Flour', 'Berries', 'Milk', 'Egg', 'Honey', 'Mushroom', 'Ca
   'Meat_GrassMammoth', 'Cake', 'Cake02', 'Cake03', 'Cake04', 'Cake05'];
 function resolveItemIcons() {
   const rows = JSON.parse(fs.readFileSync('extract/dt/DT_ItemIconDataTable.json', 'utf8'))[0].Rows;
+  // Some ids aren't in the icon table at all and point at another id that is:
+  // DT_ItemDataTable.IconName sends PalUpgradeStone -> PalUpgradeStone1 (the
+  // icon table only has the four numbered tiers) and Cloth2 -> Cloth. Without
+  // following it those two drops render as a text chip with a 404 behind it.
+  const itemRows = JSON.parse(fs.readFileSync('extract/dt/DT_ItemDataTable.json', 'utf8'))[0].Rows;
+  const aliasOf = id => {
+    const n = itemRows[id]?.IconName;
+    return n && n !== 'None' && n !== id ? n : null;
+  };
   // ids differ from the icon table's keys by zero-padding as well as case
   // (WorldTreeRelic_01 vs WorldTreeRelic_1)
   const norm = k => k.toLowerCase().replace(/_0+(\d)/g, '_$1');
@@ -139,7 +148,9 @@ function resolveItemIcons() {
 
   const map = {}, miss = [];
   for (const id of [...want].sort()) {
-    const row = rows[id] || idx.get(norm(id));
+    const alias = aliasOf(id);
+    const row = rows[id] || idx.get(norm(id))
+      || (alias && (rows[alias] || idx.get(norm(alias))));
     if (row) map[id] = row.Icon.AssetPathName.split('/').pop().split('.')[0];
     else miss.push(id);
   }

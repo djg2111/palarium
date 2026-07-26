@@ -363,7 +363,13 @@ tbody tr:hover{background:var(--surface)}
 .ranktbl caption{caption-side:top;text-align:left;color:var(--muted);font-size:var(--fs-xs);padding-bottom:4px}
 .ranktbl th{position:static;background:none;padding:4px 8px;font-size:var(--fs-xs);cursor:default;white-space:nowrap}
 .ranktbl thead th{color:var(--muted)}
-.ranktbl tbody th{text-align:left;font-weight:600;color:var(--text-2);font-size:var(--fs-sm)}
+/* row headers are effect names, not column labels — the Paldex's uppercase
+   table-header treatment makes a phrase like "Extra mid-air jumps" shout */
+.ranktbl tbody th{text-align:left;font-weight:600;color:var(--text-2);font-size:var(--fs-sm);
+  white-space:normal;text-transform:none;letter-spacing:0}
+/* who the effect lands on — Sekhmet grants work speed to the base and to
+   itself, and without this the two rows read as one repeated twice */
+.ranktbl .rtgt{display:block;font-weight:400;font-size:var(--fs-xs);color:var(--muted)}
 .ranktbl td{padding:4px 8px;border-bottom:1px solid var(--border);text-align:right;font-variant-numeric:tabular-nums}
 .ranktbl tbody th{border-bottom:1px solid var(--border)}
 /* rank 5 is the one people are deciding whether to pay for */
@@ -912,7 +918,8 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 .skillgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:10px;align-items:start}
 .skillcard .psn{font-weight:700;color:var(--gold);font-size:var(--fs-base)}
 .skillcard .pst{display:flex;gap:6px;flex-wrap:wrap}
-.skillcard .flatnote{color:var(--muted);font-size:var(--fs-sm)}
+.flatnote{color:var(--muted);font-size:var(--fs-sm)}
+.pskill .flatnote{margin-top:7px}
 /* a number the game's own description ships without — see psDesc */
 .phold{display:inline-block;min-width:1.1em;text-align:center;color:var(--muted);
   background:var(--raised);border:1px dashed var(--border-strong);border-radius:var(--r-sm);

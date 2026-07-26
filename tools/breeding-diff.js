@@ -55,9 +55,14 @@ const gameCombos = Object.values(combi).map(c => ({
   ga: enumv(c.ParentGenderA), gb: enumv(c.ParentGenderB),
 })).filter(c => c.a && c.b && c.c);
 
+// Lower-cased, because the game's own tables disagree on casing: CombiUnique
+// says `Blueplatypus` where MonsterParameter says `BluePlatypus`, and gen-data
+// canonicalises to the latter. Comparing them raw reported the same two recipes
+// as both "new in 1.0" and "gone from game", i.e. two false alarms in the one
+// tool whose job is to shout when the calculator's inputs move.
 const key = c => {
   const g = (c.ga && c.ga !== 'None') ? `|${c.ga}/${c.gb}` : '';
-  return `${c.a}+${c.b}${g}`;
+  return `${c.a}+${c.b}${g}`.toLowerCase();
 };
 const gameMap = new Map(gameCombos.map(c => [key(c), c]));
 const appMap = new Map(APP.combos.map(c => [key({ a: c.a, b: c.b, ga: c.ga, gb: c.gb }), c]));

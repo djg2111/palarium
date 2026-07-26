@@ -65,7 +65,7 @@ Expect ~185,000 mounted files. Everything below assumes output lands in
 
 ```bash
 # datatables
-dotnet run -- json "Pal/DataTable/(Character/DT_PalMonsterParameter|Character/DT_PalCombiUnique|Character/DT_PalDropItem|UI/DT_BossSpawnerLoactionData|WorldMapUIData/DT_WorldMapUIData|WorldMapAreaData/DT_WorldMapAreaData|Spawner/DT_PalWildSpawner|Spawner/DT_PalSpawnerPlacement|Item/DT_ItemIconDataTable)\.uasset$" ../extract/dt
+dotnet run -- json "Pal/DataTable/(Character/DT_PalMonsterParameter|Character/DT_PalCombiUnique|Character/DT_PalDropItem|PassiveSkill/DT_PassiveSkill_Main|PassiveSkill/DT_PartnerSkillParameter|UI/DT_BossSpawnerLoactionData|WorldMapUIData/DT_WorldMapUIData|WorldMapAreaData/DT_WorldMapAreaData|Spawner/DT_PalWildSpawner|Spawner/DT_PalSpawnerPlacement|Item/DT_ItemIconDataTable|Item/DT_ItemDataTable)\.uasset$" ../extract/dt
 
 # english text
 dotnet run -- json "L10N/en/Pal/DataTable/Text/(DT_PalNameText_Common|DT_PalLongDescriptionText|DT_SkillNameText_Common|DT_SkillDescText_Common|DT_PartnerSkillAppendText|DT_MapRespawnPointInfoText|DT_UniqueNPCText_Common|DT_WorldMap_Common_Text_Common|DT_ItemNameText_Common)\.uasset$" ../extract/l10n
@@ -118,6 +118,7 @@ so the app can address `assets/items/<id>.webp` with no lookup table.
 ```bash
 node datadiff.js <old data.js> <new data.js>   # what changed, engine fields called out
 node breeding-diff.js                          # app vs game: CombiRank / combos
+node partner-diff.js                           # app vs game: partner-skill rank tables
 node calibrate.js                              # re-derive the map coordinate transform
 node format-bench.js                           # size/quality per encode option
 node sharpen-bench.js                          # unsharp settings for the tiler
@@ -132,6 +133,8 @@ recommend something that has visible halos or misregistered colour seams.
 combo table) from cosmetic ones, because a silent change to those changes every
 prediction the calculator makes. It also warns when a pal key disappears —
 saved rosters, plans and owned-stars are stored by key and get dropped on load.
+Its partner-skill section spells out tag and rank-table changes one by one
+rather than counting them, since the Skills catalog is built on those.
 
 ---
 
@@ -262,32 +265,64 @@ yields **115** rows.
   with commas. **`(party)` is appended per individual effect**, not to the skill
   as a whole — Lucky is party-wide on defence only, so a single trailing marker
   would misattribute it.
+- **Not every EffectValue is a percentage.** Writing one on all of them said
+  "+2%" where Skymarcher gives two extra mount jumps, and "+0%" where Night Owl
+  is a plain on/off trait. The unit comes from the same effect table the partner
+  skills use (`partner-skills.js`), so the shape of each effect says which it
+  is: `craftspeed +50%` a percentage, `ridejumpcount_increase +2` a count,
+  `nightowl` a flag with no number. A passive effect type with no entry in that
+  table fails the build.
 - `mt` (mutation-exclusive) is `AddMutationPal && !AddPal && !AddRarePal &&
   !AddWorldTreePal`. Matches all five known mutation passives exactly.
 - Verified: reproduces the previous 114 entries with **zero** effect-string,
   rank or mutation-flag mismatches, and adds **Mercy Hit** (`NonKilling`,
   Rank −1), which the old dataset was missing. Confirmed breedable in-game.
 
-## The one remaining carry-over
+## Partner skills
 
-`ps.rl` / `ps.re` — partner-skill **rank tables** (214 of 299 pals) are still
-inherited from the pre-1.0 dataset. `ps.n` and `ps.d` are first-party.
+Everything under `ps` is first-party. The rank tables and effect tags used to be
+the one pre-1.0 carry-over here, because the pal → rank-values link looked
+missing: it is *not* in `DT_PalMonsterParameter`, *not* in `DT_PartnerSkill`
+(50 rows, cooldowns and costs only), and not readable out of the pal Blueprint.
 
-What's known, so a future attempt doesn't start cold:
+It is **`DT_PartnerSkill/../PassiveSkill/DT_PartnerSkillParameter`**, 682 rows
+keyed by tribe, and it carries three things:
 
-- The values **are** in `DT_PassiveSkill_Main`, under rows named
-  `<Effect>_Partnerskill_<Archetype>_<rank>`. Verified exactly for Cattiva:
-  `MaxInventoryWeight_up_Partnerskill_PinkCat_1..5` → 100/120/140/160/200,
-  matching the shipped `ps.re` precisely.
-- There are **62 such archetypes**. Only ~50 are named after the pal itself; the
-  rest are shared skill types (`Ride`, `Otomo`, `Coop`, `SpecificElement`…).
-- The blocker is the **pal → archetype link**. It is *not* in
-  `DT_PalMonsterParameter` (`OverridePartnerSkillNameTextID` is `None` for the
-  pals that need it), *not* in `DT_PartnerSkill` (50 rows, cooldowns/costs only),
-  and *not* in the pal's own Blueprint as a readable property — `BP_PinkCat`
-  contains none of the rank values.
-- Matching by value-signature covers 85/214, but that is inference, not a
-  linkage, so it isn't used. Guessed data shouldn't masquerade as sourced data.
+| field | what it gives |
+|---|---|
+| `PassiveSkills[rank].SkillAndParametersArray[].SkillName.Key` | the `DT_PassiveSkill_Main` row for that rank — five entries, one per partner-skill rank |
+| `TextReferencePassiveSkills[rank].PassiveSkillIds[n]` | the rows the description text quotes, i.e. what `{ReferencePassive1_EffectValue1}` means |
+| `ActiveSkill.*ByRank` | the triggered half: `MainValue`, `OverWriteCoolTime`, `OverWriteEffectTime` |
 
-The rank tables only feed a display table on the pal card. Nothing about
-breeding, planning or search depends on them.
+`tools/partner-skills.js` walks it. Rebuilding the carried-over tables from this
+reproduced **all 215 of them exactly**, which is what made it safe to generate
+the 39 that were missing as well.
+
+Two things fall out of it that the old data couldn't express:
+
+- **`TargetType` per effect.** Sekhmet has two `CraftSpeed` effects in one rank,
+  +20% `ToBaseCampPal` and +30% `ToSelf`; the carry-over only had one of them.
+  It also separates the pal's own attack (`ToSelf` → `Attack++`) from the
+  player's (`ToTrainer` → `Player Atk++`), which is how those two tags were
+  originally derived. Shipped as `ps.rt`.
+- **Base auras are sourced.** An effect aimed at `ToBaseCampPal` or
+  `ToBuildObject` reaches the rest of the base by definition — 20 pals, tagged
+  `Base Aura`. Reading the prose instead finds 23, and the extra three are
+  Jelliette and Jellroy (who buff only themselves, when both are home) and
+  Panthalus (who just patrols).
+
+`ps.ru` carries the **unit** per row (`%`, `lv`, `s`, `x`, `flag`, or bare),
+because the game stores every `EffectValue` as a naked number and the unit is
+only implied. The map in `partner-skills.js` is the one curated part of this,
+and `checkUnits` tests each one against the prose: if a description spells the
+rank-1 value as "20%" the unit must be `%`, and if it spells it bare it must
+not be. A wrong guess fails the build.
+
+Two guards, both fatal rather than advisory, so a game update surfaces instead
+of silently dropping data: an effect type with no entry in the table, and the
+same effect+target listed twice in one rank with different values.
+
+`node partner-diff.js` re-walks the game tables independently of the generator
+and checks every shipped rank value against them — 312 rows, no mismatches.
+`node probe-units.js` prints each effect type with the evidence its description
+gives about the unit; run it after an update before trusting a new entry.

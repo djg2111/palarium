@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Regenerate js/data.js from Palworld 1.0 game files.
 //
-// Everything here is sourced from the game's own datatables except the partner
-// skill RANK tables (ps.rl / ps.re): those values live in per-pal Blueprints,
-// not any datatable, so they're carried over from the existing file. Every
-// other field is first-party. See gen-data-report.txt for the field-by-field
-// comparison against what the app shipped.
+// Every field is sourced from the game's own datatables. The partner-skill rank
+// tables (ps.rl / ps.ru / ps.re) and effect tags (ps.t) used to be carried over
+// from the pre-1.0 dataset because the pal -> rank-values link was unknown; it
+// is DT_PartnerSkillParameter, and partner-skills.js walks it. See
+// gen-data-report.txt for the field-by-field comparison against what shipped.
 const fs = require('fs');
 const E = 'extract';
 const OUT = process.argv[2] || 'extract/out/data.new.js';
@@ -26,8 +26,12 @@ const text = f => {
 };
 const ev = s => String(s ?? '').split('::').pop();
 
+const { makePartnerSkills, checkUnits, unitOf } = require('./partner-skills');
+
 const mp = rows('DT_PalMonsterParameter');
 const combi = rows('DT_PalCombiUnique');
+const passiveRows = rows('DT_PassiveSkill_Main');
+const partner = makePartnerSkills({ psp: rows('DT_PartnerSkillParameter'), main: passiveRows });
 const dropRows = Object.values(rows('DT_PalDropItem'));
 const NAME = text('DT_PalNameText_Common');
 const DESC = text('DT_PalLongDescriptionText');
@@ -35,7 +39,9 @@ const SKILLNAME = text('DT_SkillNameText_Common');
 const SKILLDESC = text('DT_SkillDescText_Common');
 const APPEND = text('DT_PartnerSkillAppendText');
 
-// the file we're replacing — used only for the partner-skill rank tables
+// The file we're replacing. Nothing is taken from it wholesale any more — it is
+// only a fallback for a name or description the L10N tables don't answer, so a
+// missing text row degrades to the shipped string instead of an empty card.
 const oldSrc = fs.readFileSync('c:/Users/David/Documents/Palarium/js/data.js', 'utf8');
 const sb = { window: {} }; new Function('window', oldSrc).call(sb, sb.window);
 const OLD = sb.window.PALDATA;
@@ -118,7 +124,12 @@ function buildPal([k, v], zOverride, collab) {
   const psName = (SKILLNAME.get('PARTNERSKILL_' + k) ?? old?.ps?.n ?? '').trim();
   const psDesc = SKILLDESC.get('PARTNERSKILL_' + k) ?? APPEND.get('PARTNERSKILL_' + k)
     ?? SKILLDESC.get('PARTNERSKILL_DESC_' + k) ?? old?.ps?.d ?? '';
-  const psDescClean = cleanText(psDesc) || old?.ps?.d || '';
+  // 19 descriptions ship with an unresolved {ReferencePassive1_EffectValue1}
+  // style token; the values they quote are in DT_PartnerSkillParameter
+  const psDescClean = partner.resolve(k, cleanText(psDesc) || old?.ps?.d || '');
+  const ps = partner.build(k, /can be ridden|can be mounted/i.test(psDescClean),
+    /appears near the player/i.test(psDescClean),
+    /picks up nearby items/i.test(psDescClean));
   return {
     k,
     n: (NAME.get('PAL_NAME_' + k) ?? old?.n ?? k).trim(),
@@ -138,8 +149,7 @@ function buildPal([k, v], zOverride, collab) {
     noct: v.Nocturnal ? 1 : 0,
     st: [v.Hp ?? 0, v.ShotAttack ?? 0, v.Defense ?? 0, v.Support ?? 0,
          v.CraftSpeed ?? 0, v.MaxFullStomach ?? 0, v.FoodAmount ?? 0, v.Price ?? 0],
-    // name/desc are first-party; the rank tables are carried over (see header)
-    ps: { n: psName, d: psDescClean, t: old?.ps?.t ?? [], rl: old?.ps?.rl ?? [], re: old?.ps?.re ?? [] },
+    ps: { n: psName, d: psDescClean, t: ps.t, rl: ps.rl, ru: ps.ru, rt: ps.rt, re: ps.re },
     dr: dropsByPal.get(k) ?? [],
   };
 }
@@ -173,7 +183,14 @@ for (const row of Object.values(combi)) {
 // SortDisplayable is the game's own "show in the passive list" flag: 115 rows.
 // "(party)" marks each individual effect that reaches beyond the pal itself,
 // not the skill as a whole — Lucky is party-wide on defence only.
-const passiveRows = rows('DT_PassiveSkill_Main');
+//
+// Not every EffectValue is a percentage, and writing one on all of them said
+// "+2%" where the game means two extra jumps and "+0%" where it means a plain
+// on/off trait. The unit comes from the same effect table the rank tables use:
+//   percent  craftspeed +50%
+//   count    ridejumpcount_increase +2
+//   flag     nightowl
+const passiveUnitErrors = [];
 const passives = [];
 for (const [key, g] of Object.entries(passiveRows)) {
   const n = SKILLNAME.get('PASSIVE_' + key);
@@ -184,7 +201,10 @@ for (const [key, g] of Object.entries(passiveRows)) {
     if (!type || type === 'no' || type === 'None') continue;
     const val = g['EffectValue' + i] ?? 0;
     const party = ev(g['TargetType' + i]) !== 'ToSelf' ? ' (party)' : '';
-    parts.push(`${type.toLowerCase()} ${val >= 0 ? '+' : ''}${val}%${party}`);
+    const unit = unitOf(type);
+    if (unit === null) { passiveUnitErrors.push(`${n}: no effect-table entry for ${type}`); continue; }
+    parts.push(unit === 'flag' ? `${type.toLowerCase()}${party}`
+      : `${type.toLowerCase()} ${val >= 0 ? '+' : ''}${val}${unit === '%' ? '%' : ''}${party}`);
   }
   const p = { n, r: g.Rank ?? 0, e: parts.join(', ') };
   if (g.AddMutationPal && !g.AddPal && !g.AddRarePal && !g.AddWorldTreePal) p.mt = 1;
@@ -192,8 +212,39 @@ for (const [key, g] of Object.entries(passiveRows)) {
 }
 passives.sort((a, b) => a.n.localeCompare(b.n));
 
+// ---- partner-skill sanity checks ----------------------------------------
+// An effect type with no entry in partner-skills.js would silently vanish from
+// the rank tables, and a wrong unit would print "+2%" where the game means
+// "+2 levels". Both are build failures, not warnings to scroll past.
+if (partner.unknownTypes.size) {
+  console.error('UNMAPPED partner-skill effect types (add them to partner-skills.js):');
+  for (const t of [...partner.unknownTypes].sort()) console.error('  ' + t);
+  process.exit(1);
+}
+if (partner.conflicts.length) {
+  console.error('SAME effect+target listed twice in one rank with different values:');
+  partner.conflicts.forEach(c => console.error('  ' + c));
+  process.exit(1);
+}
+if (passiveUnitErrors.length) {
+  console.error('UNMAPPED passive effect types (add them to partner-skills.js):');
+  passiveUnitErrors.forEach(e => console.error('  ' + e));
+  process.exit(1);
+}
+const unitErrors = checkUnits(pals);
+if (unitErrors.length) {
+  console.error('UNIT MISMATCH between partner-skills.js and the description text:');
+  unitErrors.forEach(e => console.error('  ' + e));
+  process.exit(1);
+}
+const stillTokened = pals.filter(p => /\{[A-Za-z]/.test(p.ps.d));
+if (stillTokened.length) console.warn(`  ${stillTokened.length} descriptions still hold a placeholder:`,
+  stillTokened.map(p => p.n).join(', '));
+
 const D = { pals, combos, passives };
 fs.mkdirSync('extract/out', { recursive: true });
 fs.writeFileSync(OUT, `window.PALDATA = ${JSON.stringify(D)};\n`);
 console.log(`wrote ${OUT}`);
 console.log(`  pals ${pals.length} (dex ${dexRows.length} + collab ${collabRows.length}) · combos ${combos.length} · passives ${passives.length}`);
+console.log(`  partner skills: ${pals.filter(p => p.ps.re.length).length} with rank tables · ` +
+  `${new Set(pals.flatMap(p => p.ps.t)).size} distinct effect tags`);
