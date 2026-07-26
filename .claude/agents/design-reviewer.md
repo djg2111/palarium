@@ -20,9 +20,9 @@ defect — cite which.
 2. Serve the app (`python -m http.server 8123`) and exercise the changed surface in
    headless Edge (puppeteer-core + Edge at
    `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`; `npm i
-   puppeteer-core` in a scratch dir — never in the repo). Recipes in DESIGN.md §9.
+   puppeteer-core` in a scratch dir — never in the repo). Recipes in DESIGN.md §10.
 3. Test BOTH cold start (`localStorage.clear()`) and a lived-in state (seed
-   `palbreed_owned`/`palbreed_roster`/`palbreed_plans` — see DESIGN.md §9), at 360
+   `palbreed_owned`/`palbreed_roster`/`palbreed_plans` — see DESIGN.md §10), at 360
    and 1366px minimum; 390/768 when layout is affected.
 4. Measure, don't eyeball: `getBoundingClientRect` for sizes/overflow (no horizontal
    page scroll ≤640px; targets ≥24px, 44px for primary mobile actions),
@@ -40,8 +40,10 @@ defect — cite which.
   disabled states; state styling inconsistent with siblings.
 - **Hierarchy & layout**: does the changed view still answer "where am I, what first";
   proximity grouping; label-vs-data emphasis; density regressions.
-- **Copy**: lexicon violations (DESIGN.md §6), Title Case, >15-word sentences,
-  UI-describing instructions, emoji policy, error text that's color-only.
+- **Copy & icons**: lexicon violations (DESIGN.md §6), Title Case, >15-word
+  sentences, UI-describing instructions, error text that's color-only; icon policy
+  (§7) — new emoji are findings, game concepts must use extracted game assets,
+  generic glyphs use inline Lucide SVG.
 - **Interaction**: feedback within 100ms; destructive-without-undo; hover-only
   information (touch!); motion outside 120–250ms or missing reduced-motion guard.
 - **Regression watch**: the change didn't break adjacent flows, deep links

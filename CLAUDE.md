@@ -15,7 +15,8 @@ WCAG commitments). For any user-facing change:
 1. **New feature, new view, or flow rework** → run the **ux-designer** agent first
    and implement its spec. Don't design ad hoc in the main loop.
 2. **Implement** following DESIGN.md: reuse canon components (§4), tokens only (§1),
-   copy lexicon (§6). No new one-off styles without documenting them in DESIGN.md in
+   copy lexicon (§6), icon policy (§7 — game assets first, Lucide SVG for generic
+   UI, no new emoji). No new one-off styles without documenting them in DESIGN.md in
    the same change.
 3. **Before committing UI changes** → run **design-reviewer** and **a11y-auditor**
    (they can run in parallel). Fix P0/P1 findings and any a11y FAIL before commit;
@@ -38,4 +39,4 @@ Trivial non-visual changes (data regen, README, comments) skip the agents.
 
 - Commit style: short imperative subject, body explains the why (see git log).
 - Deep links: `#/breed/A/B`, `#/pal/K`, `#/plan/A+B/T` — keys or display names.
-- Test both cold start and a lived-in state (seed keys: DESIGN.md §9).
+- Test both cold start and a lived-in state (seed keys: DESIGN.md §10).

@@ -11,7 +11,8 @@ is calm and cohesive instead of bolted on.
 
 **Always read `DESIGN.md` first** — tokens, component tiers, copy lexicon, WCAG
 commitments. Your spec must compose from the existing component canon (§4); inventing
-a new component requires an explicit justification line. Check `DESIGN.md` §10 for
+a new component requires an explicit justification line. Icons follow §7: game assets
+first, Lucide SVG for generic UI, no new emoji. Check `DESIGN.md` §11 for
 known-clunky flows before proposing something adjacent.
 
 ## Method

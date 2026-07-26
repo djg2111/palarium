@@ -91,7 +91,7 @@ Button tiers (one primary per view, never mix tiers inside one button group):
 Required state coverage for every interactive element: default · hover · focus-visible
 (2px `--accent` outline, offset 2 — global rule exists, don't suppress it) · active ·
 disabled (`opacity:.35`, no hover). Hover on touch devices must not gate any
-information (see §7 tooltips).
+information (see §8 tooltips).
 
 Other canon components: `.pcard` (view card), `.hint` (empty state — must include a
 next action), `.warnbox` (inline warning), `.toast` (feedback ≤8s, with Undo for
@@ -118,11 +118,42 @@ no looping/attention animation, ever.
 - Sentence case for all labels, buttons, and tab names. Title Case is not used.
 - Empty states: 1 sentence of what this is + 1 action button. Errors: what happened +
   the next step, colored `--pink` *plus* text (never color alone).
-- Emoji policy: allowed as *leading glyph* in card headings and toasts where they aid
-  scanning (🥚 📦 🗺️ 🎲 ⚠), never mid-sentence, never as the only label, max one per
-  string. Interactive glyphs (✕ ✎ ★ ⇄) always carry `aria-label`/`title`.
+- Icons & glyphs: see §7. Emoji are last-resort placeholders, never design elements
+  in new work.
 
-## 7 · Accessibility commitments (non-negotiable)
+## 7 · Iconography
+
+Priority order — always exhaust a tier before falling to the next:
+
+1. **Extracted game assets** (`assets/ui/*`, `assets/items/*`, `assets/pals/*`) for
+   anything that *is* a game concept: elements (`ui/element/`), work suitability
+   (`ui/work/`), egg types incl. mutation (`ui/egg/`), passives (`ui/passive/`), map
+   markers (`ui/map/`), items like cake (`items/`), pals (`pals/`). Players already
+   know these shapes from the game — that recognition is free UX. Render 16–20px
+   inline with a text label (`alt=""`/`aria-hidden` when the label is adjacent;
+   `alt`/`aria-label` when standalone).
+2. **Open-source SVG icons for generic UI** — standardize on **Lucide** (ISC
+   license): stroke-based, `fill="none" stroke="currentColor" stroke-width="2"`, so
+   icons inherit text color and sit naturally on the dark palette. Self-host by
+   inlining only the icons used as `<svg>` markup (offline PWA — no CDN, no icon
+   font, no full pack in the repo). Sizes 16/18/20/24 to match type scale. Use for:
+   search, close, edit, swap, external/link, upload/download, warning, dice/odds,
+   tree/branch, settings, chevrons.
+3. **Emoji — last resort only.** Acceptable as a temporary placeholder during
+   development; flagged for replacement before the work is called done. Never in new
+   polished UI.
+
+Plain **text symbols** (★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×) are typography, not emoji — they
+render monochrome, inherit color, and remain allowed where established (ownership
+stars, gender marks, close/clear, step arrows). Don't add new ones when a Lucide
+icon exists for the concept.
+
+Rules: never mix an emoji and an SVG/asset icon within the same component family;
+interactive icon-only controls keep ≥24px hit areas and `aria-label`; decorative
+icons are `aria-hidden="true"`; game-asset icons keep their original art (no
+recoloring/filters).
+
+## 8 · Accessibility commitments (non-negotiable)
 
 - **axe-core clean (WCAG 2.1 A + AA) in every state** — cold start, lived-in, every
   modal/popover open. This is a gate, not a goal.
@@ -141,7 +172,7 @@ no looping/attention animation, ever.
 - `aria-live="polite"` on counts/status that change from filtering; toasts live in the
   existing polite region.
 
-## 8 · Layout & structure
+## 9 · Layout & structure
 
 - Max width 1200px; view content in `.pcard`s. Every view leads with a recognizable
   header block (heading or controls) that answers "where am I, what do I do first".
@@ -152,7 +183,7 @@ no looping/attention animation, ever.
   `.collacts`, never mixed.
 - Progressive disclosure for optional complexity (`.moredet` details, slot reveal).
 
-## 9 · Verification recipes
+## 10 · Verification recipes
 
 ```sh
 # serve
@@ -168,16 +199,20 @@ msedge --headless=new --disable-gpu --enable-logging=stderr --virtual-time-budge
 Measure claims (getBoundingClientRect / getComputedStyle); screenshot evidence for
 visual claims; contrast ratios computed, not eyeballed.
 
-## 10 · Known-clunky backlog (ux-designer: start here)
+## 11 · Known-clunky backlog (ux-designer: start here)
 
-- **Import/export flow** (Roster header): export downloads silently; import is a
-  bare file-picker → toast-confirm. Wants a proper flow: what's in the backup, what
-  will be replaced, merge-vs-replace choice, success summary.
+- **Save-import & backup flows** (Roster header: "Read my save", "Backup &
+  restore"): flows work but feel bolted-on — wants a designed sequence: what will be
+  read/replaced, merge-vs-replace choice, progress state, success summary with
+  counts, and clear separation between "read game save" and "Palarium backup".
 - **Roster "Group by species" layout**: `.rosgroup` rows cram identity, passives,
   note, and actions into one wrapping line — poor scannability at exactly the moment
   the user has many pals.
-- View heading inconsistency (Breed / Find Parents / Paldex have no heading block).
-- Tab label casing ("Find Parents" vs "Breedable now") vs §6 sentence-case rule.
+- **Emoji migration (§7)**: replace remaining pictographic emoji with game assets or
+  Lucide SVGs — 🎮 (Read my save), 🍰 (guide; `items/cake.webp` exists), 🧬 mutation
+  marks (`ui/egg/mutation.webp`), 🐣, 🔍, 🗺, 🌙 nocturnal, 🌳 tree button,
+  🍖 food stat, ⚠ warnboxes, 🎲 odds, 📦, 📍.
+- View heading inconsistency (Breed / Find parents have no heading block).
 - Toggle label grammar varies across views (§4 switch rule).
 - Select conventions: "All elements" vs "Any work suitability"; "Sort:" prefix exists
   only in Roster.
