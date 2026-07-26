@@ -953,27 +953,30 @@ async function parseSave(buf, onProgress) {
     if (h.type === 0x32) gvas = await inflate(gvas, 12);
     onProgress && onProgress('read', 1);
   } else {
-    if (h.uncompressed > PREFIX_CAP * 8)
-      throw SaveError('This save decompresses to ' + Math.round(h.uncompressed / 1048576) +
-        ' MB, which is more than a browser tab can hold. Nothing was changed.', 'toobig');
-    // Decode only as far as the pal list. Two passes: the first chunk tells us
-    // where the list ends, then we decode exactly that much.
-    const cap = Math.min(h.uncompressed, PREFIX_CAP);
-    const dst = new Uint8Array(cap);
+    // Decode only as far as the pal list, and only allocate that much. The
+    // buffer starts at a megabyte and grows to what the file actually asks
+    // for, so a save that decompresses to gigabytes still costs a few MB —
+    // the pal map is the first thing in worldSaveData, and everything after
+    // it is bases, foliage and dungeons that no roster needs.
+    let cap = Math.min(h.uncompressed, 1 << 20);
     let need = Math.min(cap, 1 << 18);
-    let have = 0;
-    for (let round = 0; round < 40; round++) {
-      have = oodleDecode(bytes, 12, dst, cap, done => {
-        onProgress && onProgress('read', Math.min(1, done / Math.max(need, 1)));
+    for (let round = 0; round < 24; round++) {
+      const dst = new Uint8Array(cap);
+      const have = oodleDecode(bytes, 12, dst, cap, done => {
+        onProgress && onProgress('read', Math.min(0.99, done / Math.max(need, 1)));
         return done >= need;
       });
-      let probe;
-      try { probe = extractPals(dst.subarray(0, have), have); }
-      catch (e) { if (have >= cap || have >= h.uncompressed) throw e; need = Math.min(cap, have * 2); continue; }
-      if (probe.need == null) return finish(probe, h);
-      if (probe.need > cap) throw SaveError('This save’s pal list is larger than Palarium can read in a browser tab. Nothing was changed.', 'toobig');
-      need = probe.need;
-      if (have >= need) return finish(extractPals(dst.subarray(0, have), 0), h);
+      let probe = null, err = null;
+      try { probe = extractPals(dst.subarray(0, have), have); } catch (e) { err = e; }
+      if (probe && probe.need == null) return finish(probe, h);
+      const want = probe ? probe.need : have * 4;
+      if (have >= h.uncompressed || cap >= h.uncompressed) { if (err) throw err; }
+      if (want > PREFIX_CAP)
+        throw SaveError('This save’s pal list starts ' + Math.round(want / 1048576) +
+          ' MB into the file, which is more than Palarium can hold in a browser tab. Nothing was changed.', 'toobig');
+      if (cap >= h.uncompressed && err) throw err;
+      need = Math.min(want, h.uncompressed);
+      cap = Math.min(h.uncompressed, Math.max(need, cap * 4));
     }
     throw SaveError('Palarium couldn’t locate the pal list in this save. Nothing was changed.', 'bad');
   }

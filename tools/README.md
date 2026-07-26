@@ -343,3 +343,85 @@ same effect+target listed twice in one rank with different values.
 and checks every shipped rank value against them — 312 rows, no mismatches.
 `node probe-units.js` prints each effect type with the evidence its description
 gives about the unit; run it after an update before trusting a new entry.
+
+---
+
+## Reading a save file
+
+`js/savparse.js` reads a Palworld save in the browser. It is not part of this
+pipeline — it ships — but two tools here exist only to check it, and the
+format notes belong with the rest of the traps.
+
+```bash
+node make-fixture.js                      # (re)write the synthetic saves in tests/
+node sav-check.js <Level.sav> [Level.gvas]  # cross-check the reader against a real save
+cd oodle-ref && dotnet run -- <in.sav> <out.gvas>   # reference decompression
+node e2e/b1-import.js [Level.sav]         # benchmarks 1-2 in Chrome
+node e2e/b3-b4-merge.js                   # benchmarks 3-4, on the fixtures
+node e2e/b5-b6-rest.js [Level.sav]        # benchmarks 5-6
+node e2e/b6-scale.js 400 3000             # time and memory on a 400 MB save
+node e2e/a11y.js                          # axe, keyboard and overflow, seven states
+```
+
+`oodle-ref` is a ~40-line C# program over **OodleSharp** (MIT), which arrives
+with CUE4Parse and is a managed reimplementation of Oodle. It exists so the
+shipped JavaScript decoder has a target that was not written by the same
+person on the same day. `sav-check.js` compares against it *and* re-reads
+every pal with a string scanner that never walks the property tree, because
+"my parser agrees with my parser" is not evidence.
+
+**Palworld 1.0 saves are not zlib.** This is the one that breaks every
+pre-0.6 tool and script. The header is:
+
+| offset | | |
+|---|---|---|
+| 0 | u32 | uncompressed size |
+| 4 | u32 | compressed size |
+| 8 | 3 bytes | magic — **`PlM`** on 0.6+, `PlZ` before that |
+| 11 | 1 byte | `0x31` single, `0x32` double (zlib only) |
+
+`PlZ` is zlib and the browser reads it natively. `PlM` is **Oodle
+Mermaid/Selkie**, which has no browser-native decoder and no published format
+description, hence the port. Only `WorldOption.sav` in a long-running world is
+still `PlZ`, because nothing has rewritten it since 2024.
+
+**The Oodle framing, which is not in any spec:** per ≤256 KB block a 2-byte
+header (`b0 & 0xF == 0xC`, decoder type = `b1 & 0x7F`, 10 = Mermaid/Selkie),
+then per quantum a 3-byte big-endian header whose compressed length is
+`(v & 0x3FFFF) + 1`. A quantum whose compressed length equals its block length
+is stored verbatim — which is what lets `make-fixture.js` write a valid save
+without an Oodle compressor, since no such compressor exists outside Rad.
+
+**Literal arrays are uncompressed but packet arrays are Huffman.** Assuming
+"Selkie means no entropy coding" gets you a decoder that dies on the second
+array of the first chunk. Across four real saves the array types present are
+0 (uncompressed), 3 (RLE) and 4 (six-stream Huffman). TANS and SPLIT have
+never appeared and are not ported; they raise a named error rather than
+decoding to nonsense.
+
+**`SlotID` does not exist.** The brief for this feature said to read `SlotID`;
+the field is `SlotId`, and it is not a number — it is a struct of
+`{ContainerId: {ID}, SlotIndex}`. The information is there, one letter and one
+level of nesting away from where it was looked for.
+
+**`Level` and the three `Talent_*` IVs are `ByteProperty`, not
+`IntProperty`.** Reading them as ints yields a silent 0 for every pal, which
+looks exactly like a save full of level-1 pals with no IVs.
+
+**UE only serialises non-default values.** In a 202-pal save, 192 entries have
+`Level`, 180 have `PassiveSkillList`, 199 have `Talent_Shot`. A missing field
+means the default — level 1, no passives, IV 0 — not a parse failure.
+
+**The player is in the pal map.** One entry in `CharacterSaveParameterMap` has
+`IsPlayer` and no `CharacterID` at all. Filter on both.
+
+**Each map value's `RawData` is a second property tree** and has to be parsed
+again; this is the step naive parsers miss. The map *key* is a property tree
+too — `{PlayerUId, InstanceId}` — and `InstanceId` is the stable per-instance
+GUID the roster links to.
+
+**Only the front of the file is ever decompressed.** `CharacterSaveParameterMap`
+is the first child of `worldSaveData`, and Oodle matches only reach backwards,
+so a prefix is final as soon as it is written. A 400 MB save answers in ~850 ms
+having materialised about 3 MB; the remaining bases, foliage and dungeon data
+is never touched. Without that, a 400 MB save would want several GB.

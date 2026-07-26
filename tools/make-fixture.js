@@ -174,6 +174,11 @@ const AFTER = BEFORE.map(p => ({...p})).map(p => {
   return p;
 }).concat([{guid: '99999999999999999999999999990000', cid: 'FoxMage', gender: 'F', level: 3, iv: [11, 22, 33], passives: ['PAL_ALLAttack_up1']}]);
 
+module.exports = {buildGvas, wrapOodle};
+
+// running it directly writes the fixtures; requiring it just lends the writers
+if (require.main === module) writeFixtures();
+function writeFixtures() {
 const outDir = path.join(__dirname, '..', 'tests');
 fs.mkdirSync(outDir, {recursive: true});
 for (const [name, pals] of [['fixture-before', BEFORE], ['fixture-after', AFTER]]) {
@@ -187,3 +192,4 @@ fs.writeFileSync(path.join(outDir, 'fixture-notasave.sav'), Buffer.from('This is
 const full = fs.readFileSync(path.join(outDir, 'fixture-before.sav'));
 fs.writeFileSync(path.join(outDir, 'fixture-truncated.sav'), full.subarray(0, Math.floor(full.length / 3)));
 console.log('fixture-notasave.sav and fixture-truncated.sav written');
+}

@@ -2040,6 +2040,10 @@ function showSavePreview() {
 }
 
 function recomputePlan() {
+  // Re-rendering the list destroys whatever the keyboard was on, which drops
+  // focus to <body> mid-decision. Every control here carries a stable id so it
+  // can be handed back afterwards.
+  const hadFocus = document.activeElement && document.activeElement.id;
   // keep the user's answers while the numbers move under them
   const prev = smPlan ? smPlan.conflicts : [];
   smPlan = buildPlan();
@@ -2053,6 +2057,11 @@ function recomputePlan() {
   for (const c of smPlan.conflicts) if (c.choice === 'mine' && c.pick >= 0) skipped.add(c.cands[c.pick].guid);
   smPlan.added = smPlan.fresh.filter(sp => !claimed.has(sp.guid) && !skipped.has(sp.guid));
   renderSavePreview();
+  if (hadFocus) {
+    const back = document.getElementById(hadFocus);
+    if (back && back.offsetParent !== null) back.focus();
+    else document.getElementById('smApply').focus();
+  }
 }
 
 function describeSavePal(sp) {
@@ -2116,7 +2125,7 @@ function renderSavePreview() {
       ]) {
         const b = document.createElement('button'); b.type = 'button';
         b.textContent = label; b.title = title;
-        b.dataset.v = val;
+        b.dataset.v = val; b.id = 'confbtn' + ci + '-' + val;
         const on = c.choice === val;
         b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
         b.addEventListener('click', () => { c.choice = val; c.pick = 0; recomputePlan(); });
@@ -2181,6 +2190,7 @@ function renderSavePreview() {
 }
 
 for (const b of document.getElementById('smScope').querySelectorAll('button')) {
+  b.id = 'smscope-' + b.dataset.s;
   b.addEventListener('click', () => { smScope = b.dataset.s; setSeg(document.getElementById('smScope'), smScope, 's'); recomputePlan(); });
 }
 
