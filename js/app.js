@@ -1905,12 +1905,18 @@ const passiveDisplay = key => PASSIVE_NAME_BY_KEY.get(String(key).toLowerCase())
 
 const sov = document.getElementById('soverlay');
 let smWorker = null, smParsed = null, smPlan = null, smScope = 'all', smLastFocus = null;
+// Reading the file into an ArrayBuffer is itself async and not cancellable, so
+// Cancel can't stop one already in flight. Every read carries a token; a read
+// whose token has moved on drops its result instead of clobbering a newer one.
+let smRead = 0;
 
+function smCancelRead() { smRead++; if (smWorker) { smWorker.terminate(); smWorker = null; } }
 function smShow(which) {
   for (const id of ['smPick', 'smBusy', 'smResult', 'smError'])
     document.getElementById(id).hidden = id !== which;
 }
 function openSaveReader() {
+  smCancelRead();
   smParsed = null; smPlan = null; smScope = 'all';
   setSeg(document.getElementById('smScope'), 'all', 's');
   smShow('smPick');
@@ -1920,7 +1926,7 @@ function openSaveReader() {
   document.getElementById('smChoose').focus();
 }
 function closeSaveReader() {
-  if (smWorker) { smWorker.terminate(); smWorker = null; }
+  smCancelRead();
   sov.classList.remove('open');
   document.body.style.overflow = '';
   if (smLastFocus && document.contains(smLastFocus)) smLastFocus.focus();
@@ -1936,7 +1942,7 @@ document.getElementById('savereadBtn').addEventListener('click', openSaveReader)
 document.getElementById('smClose').addEventListener('click', closeSaveReader);
 document.getElementById('smAbort').addEventListener('click', closeSaveReader);
 document.getElementById('smCancel').addEventListener('click', () => {
-  if (smWorker) { smWorker.terminate(); smWorker = null; }
+  smCancelRead();
   smShow('smPick');
   document.getElementById('smChoose').focus();
 });
@@ -1955,10 +1961,12 @@ document.getElementById('saveFile').addEventListener('change', e => {
   e.target.value = '';
   if (f) readSaveFile(f);
 });
+document.getElementById('smRetry').addEventListener('click', smCancelRead);
 
 function smFail(msg) { smShow('smError'); document.getElementById('smErrMsg').textContent = msg; document.getElementById('smRetry').focus(); }
 
 function readSaveFile(file) {
+  const token = ++smRead;
   smShow('smBusy');
   const bar = document.getElementById('smBar');
   const msg = document.getElementById('smBusyMsg');
@@ -1966,12 +1974,14 @@ function readSaveFile(file) {
   msg.textContent = `Reading ${file.name} (${(file.size / 1048576).toFixed(1)} MB)…`;
   document.getElementById('smCancel').focus();
   file.arrayBuffer().then(buf => {
-    if (!sov.classList.contains('open')) return;
+    if (token !== smRead || !sov.classList.contains('open')) return;
     // The parse happens in a worker so a several-hundred-megabyte save can't
     // freeze the tab. A frozen tab with no feedback reads as a crash.
     try { smWorker = new Worker('js/savparse.js'); }
     catch (err) { smFail('Your browser blocked the background reader this needs. Nothing was changed.'); return; }
+    const w = smWorker;
     smWorker.onmessage = ev => {
+      if (token !== smRead) { w.terminate(); return; }
       const d = ev.data;
       if (d.type === 'progress') { bar.style.width = Math.round(6 + d.pct * 88) + '%'; return; }
       if (d.type === 'error') { smWorker.terminate(); smWorker = null; smFail(d.message); return; }
@@ -1982,9 +1992,9 @@ function readSaveFile(file) {
         showSavePreview();
       }
     };
-    smWorker.onerror = () => { if (smWorker) { smWorker.terminate(); smWorker = null; } smFail('The background reader stopped unexpectedly. Nothing was changed.'); };
+    smWorker.onerror = () => { if (smWorker) { smWorker.terminate(); smWorker = null; } if (token === smRead) smFail('The background reader stopped unexpectedly. Nothing was changed.'); };
     smWorker.postMessage({buf}, [buf]);
-  }).catch(() => smFail('That file could not be opened. Nothing was changed.'));
+  }).catch(() => { if (token === smRead) smFail('That file could not be opened. Nothing was changed.'); });
 }
 
 // Does everything this hand-typed entry actually records agree with this pal
