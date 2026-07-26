@@ -99,8 +99,8 @@ async function focusSane(page, label) {
   await audit(page, 'preview without collisions');
   await overflow(page, 'preview without collisions');
   await page.screenshot({path: path.join(__dirname, 'shot-preview-desktop.png')});
-  await page.setViewportSize({width: 320, height: 900}); await page.waitForTimeout(250);
-  await page.screenshot({path: path.join(__dirname, 'shot-preview-320.png'), fullPage: true});
+  await page.setViewportSize({width: 320, height: 1200}); await page.waitForTimeout(250);
+  await page.screenshot({path: path.join(__dirname, 'shot-preview-320.png')});
   await page.setViewportSize({width: 1280, height: 900}); await page.waitForTimeout(200);
   await page.click('#smClose');
   await page.waitForTimeout(200);
@@ -123,8 +123,8 @@ async function focusSane(page, label) {
   await audit(page, 'preview with collisions and an ambiguous match');
   await overflow(page, 'preview with collisions');
   await page.screenshot({path: path.join(__dirname, 'shot-conflicts-desktop.png')});
-  await page.setViewportSize({width: 320, height: 900}); await page.waitForTimeout(250);
-  await page.screenshot({path: path.join(__dirname, 'shot-conflicts-320.png'), fullPage: true});
+  await page.setViewportSize({width: 320, height: 1400}); await page.waitForTimeout(250);
+  await page.screenshot({path: path.join(__dirname, 'shot-conflicts-320.png')});
   await page.setViewportSize({width: 1280, height: 900}); await page.waitForTimeout(200);
   // drive the whole collision row from the keyboard
   await page.focus('#smConflicts .confseg button');

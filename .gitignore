@@ -6,6 +6,9 @@ desktop.ini
 bin/
 obj/
 
-# Palworld saves — never commit; they contain a Steam ID, world GUID and player names
+# Palworld saves — never commit; a real one carries a Steam ID, a world GUID
+# and player names. The only exception is tests/, whose saves are synthetic:
+# made-up pals written by tools/make-fixture.js, with nothing personal in them.
 *.sav
 tools/saves/
+!tests/*.sav

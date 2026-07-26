@@ -1,9 +1,10 @@
 // Local verification aid only — never shipped. Decompresses a Palworld .sav with
-// OodleSharp (managed, comes in via CUE4Parse) to give the JS decoder a byte-exact target.
+// OodleSharp (MIT, managed, arrives via CUE4Parse) to give js/savparse.js a
+// byte-exact target written by someone else. tools/sav-check.js consumes it.
+//
+//   dotnet run -- <in.sav> <out.gvas>
 using System;using System.IO;using System.IO.Compression;using OodleSharp;
 class P{static int Main(string[] a){
-  if(a.Length==1&&a[0]=="--oracle"){Oracle.Run();return 0;}
-  if(a.Length==3&&a[0]=="--patch"){Patch.Run(a[1],a[2]);return 0;}
   if(a.Length<2){Console.Error.WriteLine("usage: oodleref <in.sav> <out.gvas>");return 2;}
   var b=File.ReadAllBytes(a[0]);
   uint un=BitConverter.ToUInt32(b,0), co=BitConverter.ToUInt32(b,4);
