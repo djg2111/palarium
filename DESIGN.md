@@ -129,7 +129,8 @@ siblings, so grouping is the shape of the data, not a preference):
 
 | Class | Role |
 |---|---|
-| `.rosgrp` | One species section. A native `<details>/<summary>` — native keyboard, native `aria-expanded`, no JS. `<summary>` holds no nested interactive elements. |
+| `.rosgrp` | One species section. A native `<details>/<summary>` — native keyboard, native `aria-expanded`, no JS. `<summary>` holds no nested interactive elements. Shut, it renders as a tile (art, name, count, gender tally); open, it spans every column and shows its `.roslist`. Both are the same summary, switched by `:not([open])` in CSS — never by JS, so `aria-expanded` and native keyboard stay correct. |
+| `.roster` | The species grid. `display:grid`; 2 columns ≤640px (horizontal tiles, 44px art), 3 up to 899px, then auto-fill at 216px (vertical tiles, 56px art). `.rosgrp[open]` and `.hint` span `1/-1`. `grid-auto-flow:dense` is **forbidden** — it would backfill tiles around an open section and make visual order disagree with DOM order. |
 | `.roslist` / `.rosrow` | The section's `<ul>` and one pal per `<li>`. Fixed grid tracks (identity · passives · note · actions) so columns align down the whole section. Replaces the former `.rospal` **and** `.gentry`. |
 | `.mchip.warn` | A meta chip carrying a warning — `--danger` text, tint fill, `--danger-line` border. Always states the warning in words; colour is never the only signal. |
 | `.rentacts` | The full, named action set for one entry, inside its pal card. Row toolbars stay to three glyphs; everything else lives here at comfortable size. |
@@ -142,6 +143,13 @@ gutter is reserved in both cases so nothing shifts.
 
 A `[hidden]` element whose class sets its own `display` needs an explicit
 `.cls[hidden]{display:none}` — the UA rule loses to any class rule.
+
+Pal art sizes from a `--ico` custom property set by `icon()`, so a rule can
+resize it per presentation. Never write an inline `width`/`height` on a `.pico`:
+as an inline style it outranks every selector, which is what stranded the
+missing-image fallback at the wrong size. `icon(p, size, clickable, decorative)`
+— pass `decorative` when a text label sits directly beside the image, or the
+name is announced twice.
 
 ## 5 · Motion
 

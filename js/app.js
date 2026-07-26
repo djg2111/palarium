@@ -153,16 +153,25 @@ function pushRecent(k) {
 }
 
 // ---------- shared rendering ----------
-function icon(p, size, clickable) {
+// size comes through as --ico rather than an inline width/height, so a rule can
+// resize the art at a breakpoint. The missing-image fallback has to carry the
+// same property: as an inline style it outranked every selector, which left a
+// letter-circle at the wrong size next to correctly-sized neighbours.
+// decorative: the label is already adjacent, so the image must not repeat it.
+function icon(p, size, clickable, decorative) {
   const img = document.createElement('img');
   img.className = 'pico' + (clickable ? ' click' : '');
   img.width = size; img.height = size;
+  img.style.setProperty('--ico', size + 'px');
   img.draggable = false;
-  img.loading = 'lazy'; img.src = IMG + p.img; img.alt = p.n;
+  img.loading = 'lazy'; img.src = IMG + p.img; img.alt = decorative ? '' : p.n;
   if (clickable) { img.title = 'View ' + p.n; img.addEventListener('click', e => { e.stopPropagation(); openModal(p); }); }
   img.onerror = () => {
     const d = document.createElement('div');
-    d.className = 'pico f' + (clickable ? ' click' : ''); d.style.width = d.style.height = size+'px'; d.textContent = p.n[0];
+    d.className = 'pico f' + (clickable ? ' click' : '');
+    d.style.setProperty('--ico', size + 'px');
+    d.textContent = p.n[0];
+    if (decorative) d.setAttribute('aria-hidden', 'true');
     if (clickable) d.addEventListener('click', e => { e.stopPropagation(); openModal(p); });
     img.replaceWith(d);
   };
@@ -1935,18 +1944,36 @@ function renderRoster() {
     const det = document.createElement('details');
     det.className = 'moredet rosgrp';
     det.dataset.k = k;
-    det.open = !collapsed.has(k);
+    // Filtering down to a single species makes a one-tile overview pure cost,
+    // so that case opens regardless. Filtering never writes to `collapsed` —
+    // the collapse choice is the user's, and a search must not undo it.
+    det.open = !collapsed.has(k) || sections.length === 1;
     det.addEventListener('toggle', () => {
       if (det.open) collapsed.delete(k); else collapsed.add(k);
       syncCollapseBtn();
+      // opening a tile moves it down to start its own full-width row
+      if (det.open) sum.scrollIntoView({block: 'nearest',
+        behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
     });
 
     const sum = document.createElement('summary');
-    sum.appendChild(icon(p, 28));
-    const nm = document.createElement('span'); nm.className = 'gname2'; nm.textContent = p.n; sum.appendChild(nm);
+    // decorative: the species name is the very next node, so the image must
+    // not repeat it — every header used to announce "Lamball Lamball ×5".
+    // The inline --ico is dropped so a rule can size the art per presentation.
+    const ic = icon(p, 28, false, true);
+    ic.style.removeProperty('--ico');
+    sum.appendChild(ic);
+    // display:contents everywhere except the mobile tile, where the name and
+    // chips have to stack in a column beside the art instead of beside it
+    const body = document.createElement('span'); body.className = 'tilebody';
+    sum.appendChild(body);
+    const nm = document.createElement('span'); nm.className = 'gname2'; nm.textContent = p.n; body.appendChild(nm);
+    // the chips share one wrapping line on a tile rather than taking one each
+    const chips = document.createElement('span'); chips.className = 'chiprow';
+    body.appendChild(chips);
     const cnt = document.createElement('span'); cnt.className = 'cntb';
     cnt.textContent = entries.length < total ? `${entries.length} of ${total}` : '×' + entries.length;
-    sum.appendChild(cnt);
+    chips.appendChild(cnt);
     // The breeding question, answered on a closed section. The tally always
     // counts the whole species, so while a filter is on it says so — two
     // numbers in one summary must not describe two different populations.
@@ -1958,9 +1985,9 @@ function renderRoster() {
       const tally = [gi.M ? gi.M + '♂' : '', gi.F ? gi.F + '♀' : '', gi.U ? gi.U + ' ?' : ''].filter(Boolean).join(' · ');
       const filtered = entries.length < total;
       chip.appendChild(genderize(oneSided
-        ? `All ${gi.M ? '♂' : '♀'} — no ${gi.M ? '♀' : '♂'} to breed with`
+        ? `No ${gi.M ? '♀' : '♂'} to breed with`
         : filtered ? `of all ${total}: ${tally}` : tally));
-      sum.appendChild(chip);
+      chips.appendChild(chip);
     }
     det.appendChild(sum);
 
@@ -2002,10 +2029,13 @@ function renderRoster() {
 
   renderRosterStrip();
 }
+// The button switches between two presentations, so it names the one you get
+// next rather than the <details> mechanism underneath (DESIGN.md §6).
 function syncCollapseBtn() {
   const allShut = lastSections.length && lastSections.every(k => collapsed.has(k));
-  collapseAllBtn.textContent = allShut ? 'Expand all' : 'Collapse all';
-  collapseAllBtn.disabled = !lastSections.length;
+  collapseAllBtn.textContent = allShut ? 'Show every pal' : 'Show species only';
+  // one species is already its own overview
+  collapseAllBtn.disabled = lastSections.length < 2;
 }
 function renderRosterStrip() {
   const strip = document.getElementById('rosterStrip');

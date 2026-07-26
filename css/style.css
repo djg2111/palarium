@@ -159,7 +159,7 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 }
 
 /* ---------- pal icon / chips ---------- */
-.pico{border-radius:50%;background:var(--raised);flex-shrink:0;object-fit:cover;border:2px solid var(--border-strong)}
+.pico{width:var(--ico);height:var(--ico);border-radius:50%;background:var(--raised);flex-shrink:0;object-fit:cover;border:2px solid var(--border-strong)}
 .pico.f{display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--muted)}
 .pico.click{cursor:pointer;transition:border-color var(--t-fast)}
 .pico.click:hover{border-color:var(--border-strong)}
@@ -437,10 +437,21 @@ tbody tr:hover{background:var(--surface)}
 .pchip.ro{cursor:default}
 .pchip.ro:hover{border-color:var(--success-line);color:var(--success)}
 .pchip.neg.ro:hover{border-color:var(--danger-line);color:var(--danger)}
-/* A full-width stack of species sections. Rows are wide enough for four
-   passive chips on one line, which is where the density comes from — the old
-   300px grid tiles could never fit two. */
-.roster{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+/* The species grid. A shut section is a tile; an open one spans every column
+   and gets the full width its rows need for four passive chips on one line —
+   which the old 300px card grid could never manage, because there every *pal*
+   was a tile. Presentation follows open/shut in CSS alone, so <details> keeps
+   its native keyboard and aria-expanded.
+   grid-auto-flow:dense is forbidden — it would backfill tiles around an open
+   section and make visual order disagree with DOM order. */
+.roster{display:grid;gap:10px;margin-top:16px;
+  grid-template-columns:repeat(auto-fill,minmax(min(216px,100%),1fr))}
+/* auto-fill only reaches 2 columns between 641 and 899, which is taller than
+   the bars it replaces — the one band that has to be pinned */
+@media (min-width:641px) and (max-width:899px){
+  .roster{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+.rosgrp[open],.roster>.hint{grid-column:1/-1}
 .strip{display:flex;flex-wrap:wrap;gap:8px}
 .spal{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-full);padding:4px 13px 4px 5px;cursor:pointer;font-size:var(--fs-md);font-weight:600}
 .spal:hover{border-color:var(--border-strong)}
@@ -513,6 +524,28 @@ select#genderSel{padding:10px 12px}
 .rosgrp>summary:hover{color:var(--accent)}
 .rosgrp .cntb{background:var(--raised);border:1px solid var(--border-strong);border-radius:var(--r-full);
   font-size:var(--fs-xs);padding:1px 9px;color:var(--muted);font-weight:600;white-space:nowrap}
+
+/* ---- a shut section is a tile ---- */
+.rosgrp:not([open]){background:var(--raised)}
+.rosgrp:not([open])>summary{position:relative;flex-direction:column;align-items:center;
+  text-align:center;gap:6px;padding:16px 12px 14px}
+.rosgrp:not([open])>summary::before{position:absolute;top:8px;left:10px}
+.rosgrp:not([open]) .pico{--ico:56px}
+.rosgrp:not([open]) .gname2{white-space:normal;overflow:visible;line-height:1.25}
+.rosgrp:not([open])>summary .cntb,.rosgrp:not([open])>summary .mchip{margin:0}
+/* Both wrappers are transparent to layout by default and become real boxes
+   only where a tile needs one. On the vertical tile the body is a centred
+   column and the chips share one wrapping line. On the mobile tile neither
+   applies: everything flows in a single wrapping row, so the name and count
+   sit on one line and only the tally drops below. */
+.tilebody,.chiprow{display:contents}
+@media (min-width:641px){
+  .rosgrp:not([open]) .tilebody{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+  .rosgrp:not([open])>summary .chiprow{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+}
+/* on a --raised tile the count chip's own --raised fill vanishes, leaving a
+   1.66:1 border as the only boundary — which §1 forbids as a sole indicator */
+.rosgrp:not([open]) .cntb{background:var(--bg)}
 .rosgrp .gname2{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .roslist{list-style:none;margin:0;padding:0}
 /* Identical tracks on every row, so columns line up down the whole section.
@@ -553,9 +586,12 @@ select#genderSel{padding:10px 12px}
 }
 /* a meta chip that carries a warning — never colour alone, it says the words */
 .mchip.warn{color:var(--danger);border-color:var(--danger-line);background:var(--danger-tint)}
-/* compact: the same row, less air */
+.rosgrp[open] .pico{--ico:28px}
+/* compact: the same row, less air. Scoped to open sections — a tile is
+   already the dense presentation of a species, which keeps "Compact rows"
+   an honest label. */
 .roster.dense .rosrow{padding:3px 15px;gap:10px}
-.roster.dense .rosgrp>summary{padding:8px 15px}
+.roster.dense .rosgrp[open]>summary{padding:8px 15px}
 /* every action for one entry, named, at comfortable size — see openModal */
 .rentacts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
 /* shared small ghost button: roster actions, plan delete, step-open, chain nav */
@@ -1126,7 +1162,15 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .rosrow .note{grid-column:1/-1;white-space:normal}
   /* thumb-sized targets without changing how the buttons look */
   .rosrow .acts button{min-width:32px;min-height:32px}
-  .rosgrp>summary{min-height:44px}
+  .rosgrp[open]>summary{min-height:44px}
+  /* A vertical tile at 150px runs ~130px tall — 14 of them beat the stack they
+     replace. Horizontal is ~60px and still shows the art at 44px, not 28. */
+  .roster{grid-template-columns:repeat(auto-fill,minmax(min(148px,100%),1fr));gap:8px}
+  .rosgrp:not([open])>summary{flex-direction:row;text-align:left;align-items:center;
+    padding:8px 10px 8px 22px;gap:8px;min-height:44px}
+  .rosgrp:not([open])>summary::before{top:50%;left:8px;transform:translateY(-50%)}
+  .rosgrp:not([open]) .pico{--ico:44px}
+  .rosgrp:not([open]) .tilebody{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;min-width:0;flex:1}
   .roster.dense .rosrow{padding:7px 12px}
 
   /* --- add-pal dialog: three buttons in one row collapsed the primary to a
