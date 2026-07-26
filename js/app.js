@@ -792,7 +792,7 @@ function save() {
   const s = {
     tab: currentTab, a: pickA.get()?.k, b: pickB.get()?.k, t: pickT.get()?.k, l: pickL.get()?.k,
     ownedOnly, dexOwnedOnly, rgroup: typeof groupBySpecies !== 'undefined' && groupBySpecies,
-    pt: pickPT.get()?.k, po: partnerOwnedOnly, ac: avoidCollab, sp: slotPassives, sg: slotGenders,
+    pt: pickPT.get()?.k, po: partnerMode, ml: myLevel, ac: avoidCollab, sp: slotPassives, sg: slotGenders,
     dp: desiredPick.get(),
     ro: !!currentRoute, chain: breedChain,
     hn: typeof hatchNewOnly !== 'undefined' && hatchNewOnly,
@@ -1810,9 +1810,37 @@ function setPlanMode(m) {
 }
 planModeEl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setPlanMode(b.dataset.m); });
 tablistKeys(planModeEl);
-let partnerOwnedOnly = false;
-const partnerToggle = document.getElementById('partnerToggle');
-partnerToggle.addEventListener('click', () => { partnerOwnedOnly = !partnerOwnedOnly; setSwitch(partnerToggle, partnerOwnedOnly); save(); scheduleAuto(); });
+// which species may be used as a chain partner:
+//   'any'  — every species, whether or not the player could ever hold one
+//   'wild' — owned, or catchable somewhere in the world (see partnerPool)
+//   'mine' — owned only
+// Three states, so a switch won't do it; .segrow is what the rest of the app
+// already uses for a small exclusive choice (#hatchDepth, #comboKind).
+let partnerMode = 'any';
+const partnerModeEl = document.getElementById('partnerMode');
+function setPartnerMode(m, silent) {
+  partnerMode = m;
+  partnerModeEl.querySelectorAll('button').forEach(b => {
+    const on = b.dataset.m === m;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+  if (!silent) { save(); scheduleAuto(); }
+}
+partnerModeEl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setPartnerMode(b.dataset.m); });
+// "my level", optional and empty by default. It never gates anything — the app
+// doesn't know your gear or sphere tier, and Palworld has no level gate on
+// capture — so all it does is turn a level band into a gap you can read, and
+// tip the ordering among partners that were already interchangeable.
+let myLevel = 0;
+const myLevelEl = document.getElementById('myLevel');
+myLevelEl.addEventListener('input', () => {
+  const v = Math.floor(+myLevelEl.value);
+  myLevel = myLevelEl.value.trim() && v >= 1 && v <= 99 ? v : 0;
+  save();
+  accDecorate(document, true);
+  scheduleAuto();
+});
 let avoidCollab = false;
 const collabToggle = document.getElementById('collabToggle');
 collabToggle.addEventListener('click', () => { avoidCollab = !avoidCollab; setSwitch(collabToggle, avoidCollab); save(); scheduleAuto(); });
@@ -1822,19 +1850,177 @@ function ownedSpeciesSet() {
   for (const r of roster) s.add(r.k);
   return s;
 }
+// ---------- how gettable is a species, really ----------
+// The partner sort used to break ties on `rar`. Rarity was a stand-in written
+// before the app had spawn data: it says how special a pal is, not whether you
+// could go and find one. These tiers answer the question the sort was actually
+// asking, out of the same first-party spawn table the Map tab reads.
+//
+// EFFORT, NOT PERMISSION. Palworld has no level gate on capture — catch rate
+// falls with target level and rises with sphere tier, and a determined player
+// takes things well above their own. So nothing below ever removes a candidate
+// from the pool; it orders them, and says out loud why. The one place a
+// species does drop out is the 'wild' pool, and that test is factual (has a
+// spawner or an alpha, or doesn't), never a judgement about difficulty.
+const ACC_LABEL = {
+  easy:  'Easy catch',
+  mid:   'Some effort',
+  hard:  'Hard catch',
+  grind: 'A grind',
+  alpha: 'Alpha only',
+  none:  'Not catchable',
+};
+// Score bands. Four named steps rather than a continuous number, for the same
+// reason the map buckets its spawn shading: a reader can name a tier and check
+// it against the stated reason, but can't name a 0.37.
+const ACC_BANDS = [['easy', 0.25], ['mid', 0.45], ['hard', 0.65], ['grind', Infinity]];
+// Weights, and why each. Level dominates: it is the one input that moves catch
+// rate at every sphere tier. Encounter share and area count decide how long you
+// stand there once you have arrived. Distance to a statue is a one-off travel
+// cost, so it counts least. Night- and dungeon-only are conditions on when you
+// can go at all, so they add on top rather than blend in.
+const ACC_W_LEVEL = 0.42, ACC_W_SHARE = 0.24, ACC_W_SPOTS = 0.20, ACC_W_DIST = 0.14;
+const ACC_NIGHT_PEN = 0.10, ACC_DUNGEON_PEN = 0.14;
+// Anchors read off the real distribution over the 272 species that have spawn
+// areas: share runs 1.4%–100% (median 24%), areas 1–5327 (median 88), nearest
+// statue 4 m–628 m (median 22 m). Each pair is "no worse than this" -> "as bad
+// as it gets"; everything between is logarithmic, because the difference
+// between 4 and 40 areas matters and the one between 400 and 4000 doesn't.
+const ACC_SHARE_HI = 0.5, ACC_SHARE_LO = 0.02;
+const ACC_SPOTS_HI = 120, ACC_SPOTS_LO = 4;
+const ACC_DIST_NEAR = 40, ACC_DIST_FAR = 300;
+// A statue this far from the nearest area is worth saying out loud — the top
+// ~2% of species, the ones stranded on an outlying island or deep in the volcano.
+const ACC_DIST_CALLOUT = 150;
+const ACC_MAX_LEVEL = 80;
+// alphas aren't scored on the wild scale — one fixed fight on a respawn timer
+// is a different shape of effort — but they still need a place in the order,
+// above every wild spawn and below "no way to catch one at all".
+const ACC_ALPHA_BASE = 0.62, ACC_ALPHA_LEVEL = 0.30;
+
+const accClamp = x => x < 0 ? 0 : x > 1 ? 1 : x;
+// log-scaled 0 (at `zero`) to 1 (at `one`), in either direction
+const accLog = (v, zero, one) =>
+  accClamp((Math.log10(zero) - Math.log10(Math.max(v, 1e-6))) / (Math.log10(zero) - Math.log10(one)));
+
+let accIndex = null;      // palKey -> record, built once, the first time it's wanted
+let accPending = false;   // a spawn-table load the Planner is waiting on
+let accFailed = false;    // ...that never arrived, so stop asking and say so
+// Progressive enhancement, and a TDZ guard in one. The first statement is a
+// plain window property read on purpose: computeRoute() runs during boot to
+// restore a saved route, and every spawn helper this needs is a `const` arrow
+// declared ~1700 lines further down — naming one before its definition
+// evaluates is a ReferenceError, not an undefined, and this project has been
+// bitten by exactly that. Only mapLoadSpawns() ever sets window.SPAWNDATA, and
+// nothing calls it until boot has finished, so when it is absent we return
+// before touching a single one of them. Callers all fall back to today's sort.
+function accessTable() {
+  if (!window.SPAWNDATA || !window.MAPDATA) return null;
+  if (accIndex) return accIndex;
+  // How far is the nearest fast-travel statue from each spawner group? Done
+  // once per group rather than per species: 265 groups against 152 statues,
+  // where the same answer per species would redo the work 272 times.
+  const near = new Float64Array(SPAWN.groups.length).fill(Infinity);
+  for (const layer of Object.keys(MAP.layers)) {
+    const runs = spawnRuns[layer];
+    if (!runs) continue;
+    const m = mPerPx(layer);
+    const statues = MAP.markers.filter(f => f.type === 'fastTravel' && f.layer === layer);
+    if (!statues.length) continue;
+    for (const [gi, run] of runs) {
+      let best = Infinity;
+      for (let i = 1; i < run.length; i += 2) {
+        for (const f of statues) {
+          const d = Math.hypot(run[i] - f.map.x, run[i + 1] - f.map.y);
+          if (d < best) best = d;
+        }
+      }
+      if (best * m < near[gi]) near[gi] = best * m;
+    }
+  }
+  accIndex = new Map();
+  for (const p of PALS) {
+    // mapSpawnSummary() already folds level band, area count and the night /
+    // dungeon-only flags out of the same entries — reuse it rather than
+    // inventing a second answer to a question the Map tab already answers.
+    const sum = mapSpawnSummary(p.k);
+    if (!sum) {
+      const alphas = MAP_ALPHAS.get(p.k);
+      if (!alphas) { accIndex.set(p.k, {tier: 'none', score: 1}); continue; }
+      const lv = Math.max(...alphas.map(a => a.level || 0));
+      accIndex.set(p.k, {tier: 'alpha', score: ACC_ALPHA_BASE + ACC_ALPHA_LEVEL * accClamp(lv / ACC_MAX_LEVEL),
+        lo: lv, hi: lv, alphas: alphas.length});
+      continue;
+    }
+    let dist = Infinity;
+    for (const e of spawnEntries(p.k)) if (near[e.gi] < dist) dist = near[e.gi];
+    // the lowest band, not the average: you can go to the easiest area it has
+    let score = ACC_W_LEVEL * accClamp(sum.lo / ACC_MAX_LEVEL)
+      + ACC_W_SHARE * accLog(sum.shareHi, ACC_SHARE_HI, ACC_SHARE_LO)
+      + ACC_W_SPOTS * accLog(sum.spots, ACC_SPOTS_HI, ACC_SPOTS_LO)
+      + ACC_W_DIST * accClamp((dist - ACC_DIST_NEAR) / (ACC_DIST_FAR - ACC_DIST_NEAR));
+    if (sum.night) score += ACC_NIGHT_PEN;
+    if (sum.dungeonOnly) score += ACC_DUNGEON_PEN;
+    score = accClamp(score);
+    accIndex.set(p.k, {tier: ACC_BANDS.find(b => score < b[1])[0], score,
+      lo: sum.lo, hi: sum.hi, spots: sum.spots, share: sum.shareHi,
+      night: sum.night, dungeon: sum.dungeonOnly, far: isFinite(dist) && dist > ACC_DIST_CALLOUT});
+  }
+  return accIndex;
+}
+// The stated reason behind the tier name — the facts it was computed from, in
+// the order a player would want them. Share and distance only appear when they
+// are the thing that hurts, so a common pal reads "Lv 1–5 · 350 areas" rather
+// than a row of numbers that all say "fine".
+function accReason(a) {
+  if (!a) return '';
+  if (a.tier === 'none') return 'no wild spawner anywhere — breed or win it from a raid';
+  const parts = [];
+  const band = a.lo === a.hi ? 'Lv ' + a.lo : `Lv ${a.lo}–${a.hi}`;
+  // with no level on file the band is the whole honest statement; guessing at
+  // difficulty from it would be inventing a player the app has never met
+  parts.push(myLevel && a.lo > myLevel ? `${band} — ${a.lo - myLevel} above you`
+    : myLevel ? `${band} — at or below you` : band);
+  if (a.tier === 'alpha') {
+    parts.push(a.alphas === 1 ? 'one field alpha, no wild areas' : `${a.alphas} field alphas, no wild areas`);
+    return parts.join(' · ');
+  }
+  if (a.night) parts.push('night only');
+  if (a.dungeon) parts.push('dungeons only');
+  parts.push(a.spots === 1 ? '1 area' : a.spots + ' areas');
+  if (a.share < 0.1) parts.push((a.share * 100).toFixed(1) + '% of that spawn table');
+  if (a.far) parts.push('far from any statue');
+  return parts.join(' · ');
+}
 function partnerPool() {
   const own = ownedSpeciesSet();
-  if (partnerOwnedOnly) return [...own];
+  if (partnerMode === 'mine') return [...own];
+  const acc = accessTable();
   let keys = PALS.map(p => p.k);
+  if (partnerMode === 'wild' && acc) {
+    // Factual, not a judgement: a species qualifies if it has any wild spawn
+    // area or a field alpha. That drops exactly the 18 pals with neither — six
+    // sub-species, eleven raid / tower / legendary bosses, and Eye of Cthulhu.
+    // No level, share or distance enters this test; a Lv 80 filler spawn at
+    // 1.4% still counts, because a determined player can go and get it.
+    // (Known gap: Necromus has no spawner row of its own — the boss table
+    // lists only Paladius — so it reads as uncatchable here even though the
+    // pair shares a desert location in game.)
+    keys = keys.filter(k => own.has(k) || acc.get(k)?.tier !== 'none');
+  }
   // collab-exclusive species aren't catchable in every game version — when
-  // asked, only use them as partners if the player already owns them
+  // asked, only use them as partners if the player already owns them. Separate
+  // question from catchability: 10 of the 11 do have wild spawns.
   if (avoidCollab) keys = keys.filter(k => !byKey.get(k).cb || own.has(k));
-  // owned species first, then common catchable pals before rare/collab ones,
-  // so equal-length routes prefer partners the player can realistically get
+  // Owned species first, then non-collab, then whichever the player could most
+  // realistically go and get, so equal-length routes prefer the cheaper one.
+  // With no spawn table loaded `acc` is null and this collapses to exactly the
+  // rarity ordering it has always used — same routes, same length, older taste.
   return keys.sort((a, b) => {
     const A = byKey.get(a), B = byKey.get(b);
     return (own.has(b) ? 1 : 0) - (own.has(a) ? 1 : 0)
       || (A.cb ? 1 : 0) - (B.cb ? 1 : 0)
+      || (acc ? (acc.get(a)?.score ?? 1) - (acc.get(b)?.score ?? 1) : 0)
       || A.rar - B.rar
       || A.z - B.z;
   });
@@ -1856,13 +2042,40 @@ function neededRow(need) {
   for (const k of need) {
     const p = byKey.get(k);
     const c = document.createElement('button'); c.type = 'button'; c.className = 'tchip';
+    c.dataset.acc = k;
     c.appendChild(icon(p, 22));
     const nm = document.createElement('span'); nm.textContent = p.n; c.appendChild(nm);
     c.title = 'Not owned yet — view ' + p.n + '’s card';
     c.addEventListener('click', () => openModal(p));
     nr.appendChild(c);
   }
+  accDecorate(nr);
   return nr;
+}
+// Name the tier on the chips for the species you actually have to go and get.
+// A rank the reader can't see is a rank they can't trust, so the badge carries
+// the name and the line beside it carries the facts it was computed from.
+//
+// Progressive enhancement both ways: with no spawn table there is nothing
+// honest to say and the chip stays exactly as it was, and when the table lands
+// later — the Map tab, or any "where do I catch one" panel — this runs again
+// and fills in every chip still missing one. `force` re-does chips that
+// already have a badge, for when "my level" changes what the reason says.
+function accDecorate(root = document, force) {
+  const acc = accessTable();
+  if (!acc) return;
+  for (const c of root.querySelectorAll('.tchip[data-acc]')) {
+    const had = c.querySelector('.accb');
+    if (had && !force) continue;
+    if (had) c.querySelectorAll('.accb,.accr').forEach(n => n.remove());
+    const a = acc.get(c.dataset.acc), p = byKey.get(c.dataset.acc);
+    if (!a || !p) continue;
+    const why = accReason(a);
+    const b = document.createElement('span'); b.className = 'accb ' + a.tier; b.textContent = ACC_LABEL[a.tier];
+    const r = document.createElement('span'); r.className = 'accr'; r.textContent = why;
+    c.append(b, r);
+    c.title = `${ACC_LABEL[a.tier]} — ${why}. Not owned yet — view ${p.n}’s card`;
+  }
 }
 // BFS from startK to targetK over "current × partner -> child" edges
 function findRoute(startK, targetK, pool) {
@@ -1922,8 +2135,28 @@ function computeRoute() {
   const starters = [];
   for (const n of SLOTS) { const p = pickS[n].get(); if (p) starters.push({k: p.k, ps: slotPassives[n], g: slotGenders[n]}); }
   if (!starters.length || !t) { out.innerHTML = ROUTE_HINT; return; }
+  // "In the wild" is the one route option that needs the 124 KB spawn table,
+  // and choosing it is a deliberate act — so it pays for the load here, in
+  // front of the user, rather than every planner visit paying for it silently.
+  // The other two states never reach this and never fetch it.
+  if (partnerMode === 'wild' && !window.SPAWNDATA && !accFailed) {
+    out.innerHTML = '';
+    const h = document.createElement('div'); h.className = 'hint';
+    h.setAttribute('aria-live', 'polite');
+    h.textContent = 'Looking up which species you could catch…';
+    out.appendChild(h);
+    if (!accPending) {
+      accPending = true;
+      mapLoadSpawns()
+        .then(() => { accPending = false; computeRoute(); })
+        // a failed load must not cost the reader a route: fall through to the
+        // full pool, and say so on the result rather than pretending
+        .catch(() => { accPending = false; accFailed = true; computeRoute(); });
+    }
+    return;
+  }
   const pool = partnerPool();
-  if (partnerOwnedOnly && pool.length < 2) { out.innerHTML = '<div class="hint">Your owned pool is too small — star more pals or turn off "only my pals".</div>'; return; }
+  if (partnerMode === 'mine' && pool.length < 2) { out.innerHTML = '<div class="hint">Your owned pool is too small — star more pals or switch chain partners off "Only mine".</div>'; return; }
   const carried = [...new Set(starters.flatMap(s => s.ps))];
   const desired = desiredPick.get();
   const goal = desired.length ? desired : carried;
@@ -1962,6 +2195,13 @@ function computeRoute() {
     stepOdds: wo ? wo.odds : null,
     starterKs: starters.map(s => s.k),
   });
+  // say it plainly when the wild filter couldn't be applied — the toggle still
+  // reads "In the wild", and a route that quietly ignored it would be a lie
+  if (partnerMode === 'wild' && accFailed) {
+    const w = document.createElement('div'); w.className = 'warnbox';
+    w.textContent = '⚠ The spawn data didn’t load, so this route used every species as a partner — it may route through pals you can’t catch anywhere. Reload the page to try again.';
+    out.prepend(w);
+  }
   // warn when desired passives are covered by neither a starter nor a roster partner on the route
   const uncovered = best && best.length && wo ? desired.filter(x => !wo.carry.includes(x)) : missing;
   if (uncovered.length) {
@@ -2103,7 +2343,12 @@ function stepEl(s, opts = {}) {
       // first expand anywhere pays for it, and mapLoadSpawns() is idempotent,
       // so the Map tab and every other row share that one load.
       mapLoadSpawns()
-        .then(() => { if (box.isConnected) wildInfo(box, pb, bredAt, skips); })
+        .then(() => {
+          if (box.isConnected) wildInfo(box, pb, bredAt, skips);
+          // the table is here now, so every catch-list chip on the page can
+          // finally say how gettable its species is
+          accDecorate();
+        })
         .catch(() => {
           if (box.isConnected) box.textContent = 'Spawn data didn’t load — check your connection, then try again.';
         });
@@ -2145,21 +2390,34 @@ function wildInfo(box, p, bredAt = -1, skips = []) {
       ? `Step ${bredAt + 1} hatches one — catching a wild ${p.n} instead skips ${list}.`
       : `Step ${bredAt + 1} already hatches one, and the rest of the chain still needs it — a wild ${p.n} saves the hatch, not the step.`;
   }
+  // The same named tier the partner sort ranked this species by, shown on the
+  // panel that lists the facts behind it — so a reader can check one against
+  // the other instead of taking the ordering on faith.
+  const tierBadge = () => {
+    const a = accessTable()?.get(p.k);
+    if (!a) return null;
+    const s = document.createElement('span'); s.className = 'accb ' + a.tier;
+    s.textContent = ACC_LABEL[a.tier];
+    return s;
+  };
   const sum = mapSpawnSummary(p.k);
   if (!sum) {
     // the same three honest outcomes the Map tab already distinguishes
     const alpha = MAP_ALPHAS.get(p.k);
+    const l = line();
     if (!alpha) {
-      line().textContent = `${p.n} can’t be caught in the wild — it has no spawner anywhere in the world. ` +
+      l.textContent = `${p.n} can’t be caught in the wild — it has no spawner anywhere in the world. ` +
         'The only ways to get one are to breed it or win it from a raid.';
+      l.prepend(tierBadge() || '');
       return;
     }
     const a = alpha[0];
     const near = mapNearest(a, 'fastTravel', 1)[0];
-    line().textContent = `No wild spawn areas. The only ${p.n} in the world is the` +
+    l.textContent = `No wild spawn areas. The only ${p.n} in the world is the` +
       (a.level ? ` Lv ${a.level}` : '') + ` alpha on ${LAYER_NAME[a.layer] || 'the map'}` +
       (near ? `, nearest statue ${mapTitle(near.f)}` : '') +
       '. Beat it and catch it there.';
+    l.prepend(tierBadge() || '');
     mapLink('Show the alpha on the map ↗', '#/map/' + encodeURIComponent(a.id));
     return;
   }
@@ -2168,7 +2426,14 @@ function wildInfo(box, p, bredAt = -1, skips = []) {
   b.textContent = sum.lo === sum.hi ? 'Lv ' + sum.lo : `Lv ${sum.lo}–${sum.hi}`;
   const cnt = document.createElement('span');
   cnt.textContent = `${sum.spots} spawn area${sum.spots === 1 ? '' : 's'}`;
-  head.append(b, cnt);
+  head.append(tierBadge() || '', b, cnt);
+  // a band only becomes a gap once there's a level to measure it against; with
+  // none on file, saying anything about difficulty would be inventing a player
+  if (myLevel) {
+    const g = document.createElement('span');
+    g.textContent = sum.lo > myLevel ? `${sum.lo - myLevel} above you` : 'at or below your level';
+    head.insertBefore(g, cnt);
+  }
   if (sum.night) { const t = document.createElement('span'); t.className = 'wtag'; t.textContent = '🌙 Night only'; head.appendChild(t); }
   if (sum.dungeonOnly) { const t = document.createElement('span'); t.className = 'wtag'; t.textContent = 'Dungeons only'; head.appendChild(t); }
 
@@ -2384,9 +2649,12 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
   out.innerHTML = '';
   if (steps === null) {
     const h = document.createElement('div'); h.className = 'hint';
+    const narrowed = partnerMode === 'mine' ? ' with only your pals'
+      : partnerMode === 'wild' ? ' with only catchable partners' : '';
     h.textContent = (target.ic || uniqueChildren.has(target.k))
-      ? `${target.n} can only come from its unique combo — no averaging chain reaches it${partnerOwnedOnly ? ' with only your pals' : ''}. Check its pairs in Find Parents.`
-      : `No route found${partnerOwnedOnly ? ' using only your pals — try turning off "Only use my pals as partners"'
+      ? `${target.n} can only come from its unique combo — no averaging chain reaches it${narrowed}. Check its pairs in Find Parents.`
+      : `No route found${partnerMode === 'mine' ? ' using only your pals — try switching chain partners to “In the wild” or “Any species”'
+        : partnerMode === 'wild' ? ' using only catchable partners — try switching chain partners to “Any species”'
         : avoidCollab ? ' without collab partners — try turning off "Avoid Terraria collab partners"' : ' within 8 steps'}.`;
     out.appendChild(h); return;
   }
@@ -2670,7 +2938,7 @@ function hatchChainPanel(r, kids, ownSet) {
     }
     renderSlotChips();
     pickPT.set(r.p, true);
-    if (!partnerOwnedOnly) { partnerOwnedOnly = true; setSwitch(partnerToggle, true); }
+    if (partnerMode !== 'mine') setPartnerMode('mine', true);
     setPlanMode('new');
     navTab('plan');
     save(); scheduleAuto();
@@ -2938,7 +3206,12 @@ for (const n of SLOTS) {
 }
 if (state.pt && byKey.has(state.pt)) pickPT.set(byKey.get(state.pt), true);
 if (Array.isArray(state.dp) && state.dp.length) desiredPick.set(state.dp);
-if (state.po) { partnerOwnedOnly = true; setSwitch(partnerToggle, true); }
+// `po` used to be a boolean, where true meant "only use my pals". Read both
+// shapes: an old true lands on 'mine', an old false (or anything unrecognised)
+// on 'any' — the two states that existed before, unchanged either way.
+setPartnerMode(state.po === true || state.po === 'mine' ? 'mine'
+  : state.po === 'wild' ? 'wild' : 'any', true);
+if (state.ml >= 1 && state.ml <= 99) { myLevel = Math.floor(state.ml); myLevelEl.value = String(myLevel); }
 if (state.ac) { avoidCollab = true; setSwitch(collabToggle, true); }
 if (state.hn) { hatchNewOnly = true; setSwitch(hatchNewBtn, true); }
 if (state.hd === 0 || state.hd === 2) setHatchDepth(state.hd, true);
@@ -3483,6 +3756,7 @@ function mapActivate() {
     mapLoadSpawns().then(() => {
       mapRenderResults();
       if (mapSpawnKey) mapSetSpawn(mapSpawnKey);
+      accDecorate();   // the Planner's catch list can be annotated now too
     }).catch(() => toast('Spawn data failed to load — markers still work'));
   }
   // the map now owns a screenful; bring it under the header rather than

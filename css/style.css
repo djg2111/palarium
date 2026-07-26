@@ -517,7 +517,28 @@ select#genderSel{padding:10px 12px}
 .needrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;font-size:var(--fs-sm);color:var(--muted)}
 .needrow .tchip{cursor:pointer}
 .needrow .tchip:hover{border-color:var(--border-strong)}
+/* how gettable a species is — a named tier plus the facts it came from.
+   Four ordered steps on one severity ramp (green -> neutral -> gold -> pink)
+   so the order is readable without the labels, and two categorical ones off
+   that scale: an alpha and an uncatchable pal aren't "harder", they're a
+   different kind of answer. */
+.accb{font-size:var(--fs-xs);font-weight:700;letter-spacing:.3px;padding:1px 8px;border-radius:var(--r-sm);white-space:nowrap}
+.accb.easy{background:var(--success-tint);color:var(--success);border:1px solid var(--success-line)}
+.accb.mid{background:rgba(154,165,177,.12);color:var(--neutral);border:1px solid var(--border-strong)}
+.accb.hard{background:var(--gold-tint);color:var(--gold);border:1px solid var(--gold-line)}
+.accb.grind{background:var(--danger-tint);color:var(--danger);border:1px solid var(--danger-line)}
+.accb.alpha{background:rgba(183,138,255,.12);color:var(--dark);border:1px solid rgba(183,138,255,.35)}
+.accb.none{background:transparent;color:var(--muted);border:1px dashed var(--border-strong)}
+.accr{font-size:var(--fs-xs);font-weight:500;color:var(--muted);white-space:nowrap}
+.wildinfo .accb{flex-shrink:0}
 .fldhint{font-size:var(--fs-sm);color:var(--muted);margin-top:6px}
+/* optional "my level" — deliberately the smallest control in the slot, since
+   it changes only how catches are worded and ordered, never what's offered */
+.mylv{display:flex;align-items:center;gap:9px;font-size:var(--fs-sm);color:var(--muted)}
+.mylv label{font-weight:600}
+.mylv input{width:74px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:7px 9px;color:var(--text);font:inherit;font-weight:600}
+.mylv input:hover{border-color:var(--border-strong)}
 .gjump{padding:3px 12px;font-size:var(--fs-sm);margin-left:4px}
 .slotlb.mt{margin-top:12px}
 .slot .ptag{max-width:none;min-width:0}
@@ -587,7 +608,10 @@ select#genderSel{padding:10px 12px}
 .slot .picker-btn{padding:8px 12px}
 .targetrow{display:flex;gap:14px;flex-wrap:wrap;align-items:stretch}
 .targetrow .slot{flex:1;min-width:240px;max-width:380px;border-style:solid;border-color:var(--accent);border-width:1px}
-.targetrow .slot.opts{border-style:dashed;border-color:var(--border-strong);flex:0 1 auto;min-width:220px;max-width:320px;display:flex;flex-direction:column;gap:8px;align-items:stretch}
+/* max-width sized to the three-way partner control: at 320px "Any species"
+   was the only label wrapping to two lines, which read as a broken column */
+.targetrow .slot.opts{border-style:dashed;border-color:var(--border-strong);flex:0 1 auto;min-width:220px;max-width:352px;display:flex;flex-direction:column;gap:8px;align-items:stretch}
+#partnerMode button{padding-left:7px;padding-right:7px}
 .targetrow .slot.opts .slotlb{margin-bottom:0}
 .routewrap{margin-top:20px}
 .rstep{display:flex;align-items:center;gap:12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 16px;margin-bottom:8px;flex-wrap:wrap}
@@ -867,6 +891,14 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
   /* --- planner --- */
   .slotgrid{grid-template-columns:1fr}
   .targetrow .slot,.targetrow .slot.opts{flex:1 1 100%;min-width:0;max-width:none}
+  /* same treatment #hatchDepth and #comboKind get above: three equal columns
+     that shrink their padding rather than ellipsizing the middle label */
+  #partnerMode button{flex:1 1 0;padding:9px 4px}
+  /* a catch-list chip carries a tier and a reason now, so at 320px it is a
+     paragraph, not a pill — let it wrap inside its own border instead of
+     pushing the row sideways */
+  .needrow .tchip{white-space:normal;text-align:left}
+  .needrow .accr{white-space:normal}
   /* margin-left:auto on a wrapping row gave the ↗ button a whole empty line */
   .rstep{position:relative;--gutter:50px;padding-right:var(--gutter)}
   .rstep .stepopen{position:absolute;top:11px;right:12px;margin-left:0}

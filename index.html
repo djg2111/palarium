@@ -139,8 +139,18 @@
           <div class="slotlb mt">Desired passives · optional</div><div id="desiredPass"></div>
           <div class="fldhint">Leave empty to track every passive your starters carry.</div></div>
         <div class="slot opts"><div class="slotlb">Route options</div>
-          <button type="button" class="toggle" id="partnerToggle" role="switch" aria-checked="false" title="Only use species you own (starred or in roster) as chain partners"><span class="kn"></span>Only use my pals as partners</button>
+          <div class="segrow" id="partnerMode" role="group" aria-label="Which species the route may use as chain partners">
+            <button type="button" data-m="any" class="on" aria-pressed="true" title="Route through any species, whether or not you can get one">Any species</button>
+            <button type="button" data-m="wild" aria-pressed="false" title="Only species you own, or that have a wild spawn area or a field alpha somewhere in the world">In the wild</button>
+            <button type="button" data-m="mine" aria-pressed="false" title="Only species you own — ★ starred or in your roster">Only mine</button>
+          </div>
+          <div class="fldhint" id="partnerHint">Chain partners: any species, ones you could go and catch, or only pals you own.</div>
           <button type="button" class="toggle" id="collabToggle" role="switch" aria-checked="false" title="Don't route through Terraria collab species you don't own — they can't be caught in every game version"><span class="kn"></span>Avoid Terraria collab partners</button>
+          <div class="mylv">
+            <label for="myLevel">My level</label>
+            <input type="number" id="myLevel" min="1" max="99" step="1" inputmode="numeric" placeholder="—" aria-describedby="myLevelHint">
+          </div>
+          <div class="fldhint" id="myLevelHint">Optional. Describes and ranks catches relative to you — it never rules one out.</div>
         </div>
       </div>
       <div class="plansec">3 · Route</div>
