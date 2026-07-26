@@ -1,0 +1,4 @@
+# Save fixtures are binary. Without this, git core.autocrlf rewrites LF bytes
+# inside them on checkout and the parser reads a corrupt file.
+*.sav binary
+*.png binary
