@@ -263,8 +263,10 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .combo .crecipe{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:4px;font-size:var(--fs-sm);color:var(--muted)}
 .combo .cp{display:inline-flex;align-items:center;gap:5px}
 .combo .cp .pico{width:20px;height:20px;border-width:1px}
+/* --faint is 3.59:1 and non-essential text only (§1). The × is decorative
+   punctuation and stays; "two of the same" is a fact about the recipe. */
 .combo .cx{color:var(--faint)}
-.combo .cself{font-style:italic;color:var(--faint)}
+.combo .cself{font-style:italic;color:var(--muted)}
 .more{margin:22px auto 0;display:block;background:var(--surface);border:1px solid var(--border-strong);padding:10px 26px;border-radius:var(--r-md);font-weight:600}
 .more:hover{border-color:var(--border-strong);color:var(--text)}
 
@@ -322,7 +324,12 @@ th{position:sticky;top:var(--hh,64px);background:var(--bg);text-align:left;font-
 th:hover{color:var(--text)}
 th .arr{color:var(--accent)}
 .thbtn{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;padding:0}
-td{padding:7px 12px;border-bottom:1px solid var(--border);font-size:var(--fs-md)}
+td{padding:5px 12px;border-bottom:1px solid var(--border);font-size:var(--fs-md)}
+/* The metric column exists only for the phone table, where three columns keep
+   the table inside its container. .tablewrap only becomes a scrollport when it
+   has to pan, and a scrollport is what the sticky <th> resolves against — so
+   panning is what stopped the header sticking at all. */
+th.thmetric,td.tmetric{display:none}
 tbody tr{cursor:pointer}
 tbody tr:hover{background:var(--surface)}
 .tname{display:flex;align-items:center;gap:11px;font-weight:600}
@@ -525,6 +532,42 @@ select#genderSel{padding:10px 12px}
 .rosgrp>summary:hover{color:var(--accent)}
 .rosgrp .cntb{background:var(--raised);border:1px solid var(--border-strong);border-radius:var(--r-full);
   font-size:var(--fs-xs);padding:1px 9px;color:var(--muted);font-weight:600;white-space:nowrap}
+
+/* ---- Paldex gallery ----
+   299 species, every one a distinct art, and 84 of them near-duplicate variant
+   names that only the picture separates. Recognition is the job here, which is
+   what the table is worst at. */
+.dexgrid{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px;
+  grid-template-columns:repeat(auto-fill,minmax(min(88px,100%),1fr))}
+.dexgrid[hidden]{display:none} /* a display: of its own outranks the UA's [hidden] */
+.dextile{position:relative;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-lg);transition:border-color var(--t-fast),background var(--t-fast)}
+.dextile:hover{border-color:var(--border-strong);background:var(--raised)}
+/* owned is a ring and a fill, never a filter on the art: greying out 260 of
+   299 tiles would wreck the recognition this grid exists for (DESIGN.md §7) */
+.dextile.on{border-color:var(--gold-line);background:var(--gold-tint)}
+.dextile-open{display:flex;flex-direction:column;align-items:center;gap:4px;
+  width:100%;background:none;border:0;padding:8px 6px;cursor:pointer;color:var(--text)}
+/* the whole tile is the press target; the star sits above it */
+.dextile-open::after{content:'';position:absolute;inset:0;border-radius:var(--r-lg)}
+.dextile .pico{--ico:52px}
+.dt-name{font-size:var(--fs-sm);font-weight:600;line-height:1.25;text-align:center;
+  overflow-wrap:anywhere;color:var(--text)}
+.dt-meta{font-size:var(--fs-xs);color:var(--muted);text-align:center;line-height:1.3}
+.dt-meta .uq{display:block}
+.dextile .star{position:absolute;top:0;right:0;z-index:1;padding:8px;line-height:1;
+  background:none;border:0;font-size:var(--fs-md)}
+@media (max-width:640px){
+  .dexgrid{grid-template-columns:repeat(auto-fill,minmax(min(72px,100%),1fr));gap:6px}
+  .dextile .pico{--ico:40px}
+  .dextile-open{padding:6px 4px;gap:2px}
+  .dt-name{line-height:1.2}
+}
+
+/* visually hidden but announced. .nativehide is the opposite job — it hides a
+   control from AT while leaving it on screen. */
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
+  clip-path:inset(50%);white-space:nowrap;border:0}
 
 /* ---- a shut section is a tile ---- */
 .rosgrp:not([open]){background:var(--raised);
@@ -1147,6 +1190,20 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .controls>.ctl,.dex-controls>.ctl,
   .dex-controls>.search-inp,.dex-controls>select,.dex-controls>.isel,
   .dex-controls>.toggle,.dex-controls>.segrow{flex:1 1 100%;width:100%;min-width:0;max-width:none}
+  /* Five stacked full-width controls put the first tile 514px down a 740px
+     screen. Two up, with search across the top, halves that. */
+  .dexcontrols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+  .dexcontrols>.ctl{width:auto}
+  /* Show has three words in it and cannot shrink into a half-width column.
+     Kept off :has() deliberately — one unsupported selector in a list drops
+     the whole rule, and that would take the search span down with it. */
+  .dexcontrols>.ctl:first-child,.dexcontrols>.ctlwide,
+  .dexcontrols>.rstats,.dexcontrols>.alink{grid-column:1/-1}
+  .dexcontrols #dexShow button{padding:9px 4px;min-width:0}
+  /* Three columns: star, pal, and whatever the sort is. Anything wider makes
+     .tablewrap pan, and a panning wrap breaks the sticky header. */
+  th[data-s="z"],td.tnum,th[data-s="r"],td.tpow,th[data-s="w"],td.tworks{display:none}
+  th.thmetric,td.tmetric{display:table-cell}
   .search-inp{width:100%}
   .dex-controls .search-inp,.dex-controls select,.dex-controls .isel{max-width:none}
   .ctl .picker,.ctl select,.ctl .search-inp,.ctl .toggle{width:100%;max-width:none;min-width:0}

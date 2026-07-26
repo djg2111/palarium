@@ -822,7 +822,9 @@ const state = readStore('palbreed', {});
 function save() {
   const s = {
     tab: currentTab, a: pickA.get()?.k, b: pickB.get()?.k, t: pickT.get()?.k, l: pickL.get()?.k,
-    ownedOnly, dexOwnedOnly, rdense: typeof denseRows !== 'undefined' && denseRows,
+    ownedOnly, dshow: typeof dexShow !== 'undefined' ? dexShow : 'all',
+    dv: typeof dexView !== 'undefined' ? dexView : 'gallery',
+    rdense: typeof denseRows !== 'undefined' && denseRows,
     pt: pickPT.get()?.k, po: partnerMode, ml: myLevel, ac: avoidCollab, sp: slotPassives, sg: slotGenders,
     dp: desiredPick.get(),
     ro: !!currentRoute, chain: breedChain,
@@ -4284,6 +4286,12 @@ function setComboKind(k, silent) {
     b.classList.toggle('on', on);
     b.setAttribute('aria-pressed', String(on));
   });
+  // the choice explained itself only in title attributes, which touch can't
+  // reach — one visible line describes whichever option is selected
+  document.getElementById('comboKindWhy').textContent =
+    comboKind === 'mix' ? 'Recipes you can plan a route to.'
+    : comboKind === 'self' ? 'Legendaries and sub-species — each needs two of itself.'
+    : 'Every unique recipe in the game.';
   if (!silent) { save(); renderCombos(); }
 }
 comboKindEl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setComboKind(b.dataset.k); });
@@ -4297,7 +4305,7 @@ function renderCombos() {
     .filter(r => !q || r.a.n.toLowerCase().includes(q) || r.b.n.toLowerCase().includes(q) || r.c.n.toLowerCase().includes(q));
   rows.sort((x, y) => x.c.n.localeCompare(y.c.n));
   document.getElementById('comboCount').textContent =
-    rows.length === DATA.combos.length ? DATA.combos.length + ' unique combos' : rows.length + ' of ' + DATA.combos.length + ' combos';
+    rows.length === DATA.combos.length ? DATA.combos.length + ' combos' : rows.length + ' of ' + DATA.combos.length + ' combos';
   for (const r of rows) {
     // Result first, recipe underneath. Three equal pal units on one line left
     // every name truncated to "Azuro…" and read as a wall of same-sized icons;
@@ -4989,9 +4997,17 @@ const dexBody = document.getElementById('dexBody');
 const dexSearch = document.getElementById('dexSearch');
 const dexType = document.getElementById('dexType');
 const dexWork = document.getElementById('dexWork');
-const dexOwnedBtn = document.getElementById('dexOwned');
+const dexSortSel = document.getElementById('dexSort');
+const dexGrid = document.getElementById('dexGrid');
+const dexTableWrap = document.getElementById('dexTableWrap');
 let dexSort = {key: 'z', dir: 1};
-let dexOwnedOnly = false;
+// 'all' | 'owned' | 'missing' — replaces the old dexOwnedOnly boolean
+let dexShow = 'all';
+// 'gallery' | 'table'. Two jobs, measurably different: recognising 299 unique
+// arts to mark what you own, versus comparing seven columns of numbers. The
+// grid cannot do the second and the table is bad at the first.
+let dexView = 'gallery';
+
 for (const t of Object.keys(TYPE_COLORS)) {
   const o = document.createElement('option'); o.value = t; o.textContent = t[0].toUpperCase() + t.slice(1); dexType.appendChild(o);
 }
@@ -5006,76 +5022,254 @@ dexTypeSel.refresh(); dexWorkSel.refresh();
 const rosterPassiveSel = makeIconSelect(rosterPassiveFilter, 'passive',
   v => passiveIconKey(PASSIVES.find(p => p.n === v)));
 rosterPassiveSel.refresh();
+
+// One sort, two ways to set it: the select, and (in table view) the column
+// headers, which mirror it rather than owning it.
+const SORT_OPTS = {z: {key: 'z', dir: 1}, n: {key: 'n', dir: 1}, t: {key: 't', dir: 1},
+  'r-': {key: 'r', dir: -1}, 'r+': {key: 'r', dir: 1},
+  'm-': {key: 'm', dir: -1}, 'm+': {key: 'm', dir: 1},
+  'w-': {key: 'w', dir: -1}, 'w+': {key: 'w', dir: 1}};
+const sortValue = () => Object.keys(SORT_OPTS).find(v =>
+  SORT_OPTS[v].key === dexSort.key && SORT_OPTS[v].dir === dexSort.dir) || 'z';
+function syncSortSel() {
+  dexSortSel.value = sortValue();
+  // the work options name the filtered work, because that is what they sort by
+  const wl = dexWork.value ? WORKS[dexWork.value] : null;
+  for (const o of dexSortSel.options) {
+    if (o.value === 'w-') o.textContent = wl ? `${wl} level (high to low)` : 'Work total (high to low)';
+    if (o.value === 'w+') o.textContent = wl ? `${wl} level (low to high)` : 'Work total (low to high)';
+  }
+}
+
 dexSearch.addEventListener('input', renderDex);
 dexType.addEventListener('change', () => { save(); renderDex(); });
 dexWork.addEventListener('change', () => {
   if (dexWork.value) dexSort = {key: 'w', dir: -1};
   save(); renderDex();
 });
-dexOwnedBtn.addEventListener('click', () => { dexOwnedOnly = !dexOwnedOnly; setSwitch(dexOwnedBtn, dexOwnedOnly); save(); renderDex(); });
+dexSortSel.addEventListener('change', () => {
+  dexSort = {...SORT_OPTS[dexSortSel.value] || SORT_OPTS.z};
+  save(); renderDex();
+});
+document.getElementById('dexShow').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  dexShow = b.dataset.v;
+  setSeg(document.getElementById('dexShow'), dexShow, 'v');
+  save(); renderDex();
+});
+document.getElementById('dexView').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  dexView = b.dataset.v;
+  setSeg(document.getElementById('dexView'), dexView, 'v');
+  save(); renderDex();
+  b.focus();   // the pressed segment survives the re-render; keep focus on it
+});
 function clearDexFilters() {
   dexSearch.value = ''; dexType.value = ''; dexWork.value = '';
   dexTypeSel.sync(); dexWorkSel.sync();      // these two are drawn over, not native
-  dexOwnedOnly = false; setSwitch(dexOwnedBtn, false);
+  dexShow = 'all'; setSeg(document.getElementById('dexShow'), 'all', 'v');
   save(); renderDex();
+  dexSearch.focus();
 }
 document.getElementById('dexClear').addEventListener('click', clearDexFilters);
 document.querySelectorAll('th[data-s]').forEach(th => {
   th.addEventListener('click', () => {
     const k = th.dataset.s;
-    dexSort = {key: k, dir: dexSort.key === k ? -dexSort.dir : (k === 'w' || k === 'own' ? -1 : 1)};
+    dexSort = {key: k, dir: dexSort.key === k ? -dexSort.dir : (k === 'w' ? -1 : 1)};
     save(); renderDex();
   });
 });
+
+// what the active sort is sorting by, so the value you were reading survives
+// a view switch instead of vanishing with the column
+function dexMetric(p, wk) {
+  const k = dexSort.key;
+  if (k === 'r') {
+    const w = document.createElement('span'); w.textContent = p.r;
+    if (p.ic || uniqueChildren.has(p.k)) { const u = document.createElement('span'); u.className = 'uq'; u.textContent = 'unique only'; w.appendChild(u); }
+    return w;
+  }
+  if (k === 'm') { const s = document.createElement('span'); s.textContent = '♂ ' + p.m + '%'; return s; }
+  if (k === 't') return typeChips(p);
+  if (k === 'w') {
+    const s = document.createElement('span');
+    if (wk) s.innerHTML = workImgTag(wk) + (p.w?.[wk] || 0);
+    else s.textContent = 'Work ' + Object.values(p.w || {}).reduce((a, b) => a + b, 0);
+    return s;
+  }
+  const s = document.createElement('span'); s.textContent = zk(p); return s;
+}
+
+function dexStar(p, onToggle) {
+  const star = document.createElement('button');
+  star.className = 'star' + (owned.has(p.k) ? ' on' : '');
+  star.type = 'button';
+  star.textContent = owned.has(p.k) ? '★' : '☆';
+  star.title = 'Mark as owned';
+  star.setAttribute('aria-label', 'Mark ' + p.n + ' as owned');
+  star.setAttribute('aria-pressed', String(owned.has(p.k)));
+  star.addEventListener('click', e => { e.stopPropagation(); onToggle(star); });
+  return star;
+}
+
 function renderDex() {
   const q = dexSearch.value.trim().toLowerCase();
   const ty = dexType.value, wk = dexWork.value;
   const os = ownedSpeciesSet();
-  let rows = PALS.filter(p => (!q || p.n.toLowerCase().includes(q)) && (!ty || p.t.includes(ty)) && (!wk || (p.w && p.w[wk])) && (!dexOwnedOnly || os.has(p.k)));
+  const rows = PALS.filter(p => (!q || p.n.toLowerCase().includes(q)) && (!ty || p.t.includes(ty))
+    && (!wk || (p.w && p.w[wk]))
+    && (dexShow === 'all' || (dexShow === 'owned' ? os.has(p.k) : !os.has(p.k))));
   const {key, dir} = dexSort;
-  const wval = p => wk ? (p.w?.[wk] || 0) : Object.values(p.w || {}).reduce((a,b) => a+b, 0);
+  const wval = p => wk ? (p.w?.[wk] || 0) : Object.values(p.w || {}).reduce((a, b) => a + b, 0);
   rows.sort((a, b) => {
     let va, vb;
     if (key === 't') { va = a.t[0]; vb = b.t[0]; }
     else if (key === 'z') { va = a.z * 10 + (a.zs ? 1 : 0); vb = b.z * 10 + (b.zs ? 1 : 0); }
     else if (key === 'w') { va = wval(a); vb = wval(b); }
-    else if (key === 'own') { va = os.has(a.k) ? 1 : 0; vb = os.has(b.k) ? 1 : 0; }
     else { va = a[key]; vb = b[key]; }
     if (va === vb) { return a.z - b.z; }
     return (va < vb ? -1 : 1) * dir;
   });
+
+  syncSortSel();
+  setSeg(document.getElementById('dexView'), dexView, 'v');
+  setSeg(document.getElementById('dexShow'), dexShow, 'v');
   document.querySelectorAll('th[data-s]').forEach(th => {
     const base = th.dataset.label || (th.dataset.label = th.textContent);
     const active = dexSort.key === th.dataset.s;
-    th.innerHTML = `<button type="button" class="thbtn" aria-label="Sort by ${base === '★' ? 'owned' : base}">${base}` +
+    th.innerHTML = `<button type="button" class="thbtn" aria-label="Sort by ${base}">${base}` +
       (active ? ` <span class="arr" aria-hidden="true">${dexSort.dir > 0 ? '▲' : '▼'}</span>` : '') + '</button>';
     th.setAttribute('aria-sort', active ? (dexSort.dir > 0 ? 'ascending' : 'descending') : 'none');
   });
+
+  const filtering = !!(q || ty || wk || dexShow !== 'all');
   document.getElementById('dexCount').textContent =
-    rows.length === PALS.length ? PALS.length + ' pals' : rows.length + ' of ' + PALS.length + ' pals';
-  // a visible way out of persisted filters ("1 of 299 pals" a week later)
-  document.getElementById('dexClear').hidden = !(q || ty || wk || dexOwnedOnly);
-  dexBody.innerHTML = '';
+    filtering ? `${rows.length} of ${PALS.length} species` : PALS.length + ' species';
+  // a visible way out of persisted filters ("1 of 299" a week later)
+  document.getElementById('dexClear').hidden = !filtering;
+  document.getElementById('dexOwnedCount').textContent = `${os.size} of ${PALS.length} owned`;
+  // said once to someone who has starred nothing, then gone for good
+  document.getElementById('dexIntro').hidden = os.size > 0;
+
+  // the phone table shows one value column; it says which one
+  const SORT_SHORT = {z: '#', n: '#', t: 'Element', r: 'Power', m: '♂', w: 'Work'};
+  document.getElementById('dexMetricTh').textContent = SORT_SHORT[dexSort.key] || '#';
+
+  const gallery = dexView === 'gallery';
+  dexGrid.hidden = !gallery || !rows.length;
+  dexTableWrap.hidden = gallery || !rows.length;
+  dexGrid.innerHTML = ''; dexBody.innerHTML = '';
+
+  const empty = document.getElementById('dexEmpty');
+  empty.innerHTML = '';
+  if (!rows.length) {
+    const h = document.createElement('div'); h.className = 'hint';
+    const act = (label, fn) => { const b = document.createElement('button'); b.className = 'alink'; b.textContent = label; b.addEventListener('click', fn); h.appendChild(b); };
+    const showAll = () => { dexShow = 'all'; setSeg(document.getElementById('dexShow'), 'all', 'v'); save(); renderDex(); };
+    if (dexShow === 'owned' && !os.size) {
+      h.append('You haven’t starred any species yet. Pals in your roster count automatically. ');
+      act('Show all species', showAll);
+    } else if (dexShow === 'missing' && !filtering) {
+      h.append('You own every species that matches. Nice. ');
+      act('Show all species', showAll);
+    } else {
+      h.append('No species match these filters. ');
+      act('Clear filters', clearDexFilters);
+    }
+    empty.appendChild(h);
+    return;
+  }
+
+  if (gallery) emitGallery(rows, wk, os); else emitTable(rows, wk);
+}
+
+function emitGallery(rows, wk, os) {
+  for (const p of rows) {
+    const li = document.createElement('li');
+    li.className = 'dextile' + (os.has(p.k) ? ' on' : '');
+    li.dataset.k = p.k;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'dextile-open'; b.tabIndex = -1;
+    b.setAttribute('aria-label', 'View ' + p.n + ' details');
+    b.appendChild(icon(p, 52, false, true));
+    const nm = document.createElement('span'); nm.className = 'dt-name'; nm.textContent = p.n; b.appendChild(nm);
+    const meta = document.createElement('span'); meta.className = 'dt-meta';
+    meta.appendChild(dexMetric(p, wk)); b.appendChild(meta);
+    b.addEventListener('click', () => openModal(p));
+    li.appendChild(b);
+    li.appendChild(dexStar(p, star => {
+      toggleOwned(p.k); renderReverse();
+      // Show=All keeps the tile, so mutate it in place: a re-render would
+      // destroy the button under the user's finger and drop focus.
+      if (dexShow === 'all') {
+        const now = owned.has(p.k);
+        star.classList.toggle('on', now);
+        star.textContent = now ? '★' : '☆';
+        star.setAttribute('aria-pressed', String(now));
+        li.classList.toggle('on', ownedSpeciesSet().has(p.k));
+        const oc = ownedSpeciesSet();
+        document.getElementById('dexOwnedCount').textContent = `${oc.size} of ${PALS.length} owned`;
+        document.getElementById('dexIntro').hidden = oc.size > 0;
+      } else {
+        // the tile leaves the set; hand focus to whatever takes its place
+        const at = [...dexGrid.children].indexOf(li);
+        renderDex();
+        const next = dexGrid.children[Math.min(at, dexGrid.children.length - 1)];
+        (next ? next.querySelector('.star') : document.querySelector('#dexEmpty .alink') || dexSearch).focus();
+      }
+    }));
+    dexGrid.appendChild(li);
+  }
+  const first = dexGrid.querySelector('.dextile-open');
+  if (first) first.tabIndex = 0;
+}
+
+// The grid is one composite widget, not 299 tab stops: arrows move between
+// species, Tab reaches the focused species' star. Same two-stops-per-item
+// convention the roster's row toolbars use.
+dexGrid.addEventListener('keydown', e => {
+  const cur = e.target.closest('.dextile-open');
+  if (!cur) return;
+  const tiles = [...dexGrid.querySelectorAll('.dextile-open')];
+  const i = tiles.indexOf(cur);
+  const first = dexGrid.querySelector('.dextile');
+  const second = first && first.nextElementSibling;
+  // read the column count off the layout rather than hard-coding a breakpoint
+  const cols = second && second.getBoundingClientRect().top === first.getBoundingClientRect().top
+    ? Math.max(1, Math.round(dexGrid.getBoundingClientRect().width / first.getBoundingClientRect().width)) : 1;
+  let j = null;
+  if (e.key === 'ArrowRight') j = Math.min(i + 1, tiles.length - 1);
+  else if (e.key === 'ArrowLeft') j = Math.max(i - 1, 0);
+  else if (e.key === 'ArrowDown') j = Math.min(i + cols, tiles.length - 1);
+  else if (e.key === 'ArrowUp') j = Math.max(i - cols, 0);
+  else if (e.key === 'Home') j = 0;
+  else if (e.key === 'End') j = tiles.length - 1;
+  else if (e.key === 'PageDown') j = Math.min(i + cols * 4, tiles.length - 1);
+  else if (e.key === 'PageUp') j = Math.max(i - cols * 4, 0);
+  if (j === null) return;
+  e.preventDefault();
+  cur.tabIndex = -1; tiles[j].tabIndex = 0; tiles[j].focus();
+  tiles[j].scrollIntoView({block: 'nearest',
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+});
+
+function emitTable(rows, wk) {
   for (const p of rows) {
     const tr = document.createElement('tr');
     tr.dataset.k = p.k;
     const td0 = document.createElement('td');
-    const star = document.createElement('button'); star.className = 'star' + (owned.has(p.k) ? ' on' : '');
-    star.textContent = owned.has(p.k) ? '★' : '☆'; star.title = 'Mark as owned';
-    star.setAttribute('aria-label', 'Mark ' + p.n + ' as owned'); star.setAttribute('aria-pressed', String(owned.has(p.k)));
-    star.addEventListener('click', e => {
-      e.stopPropagation(); toggleOwned(p.k); renderDex(); renderReverse();
+    td0.appendChild(dexStar(p, () => {
+      toggleOwned(p.k); renderDex(); renderReverse();
       // the re-render destroyed the clicked button — put focus back on its successor
       dexBody.querySelector(`tr[data-k="${p.k}"] .star`)?.focus();
-    });
-    td0.appendChild(star);
-    const td1 = document.createElement('td'); td1.textContent = zk(p);
+    }));
+    const td1 = document.createElement('td'); td1.className = 'tnum'; td1.textContent = zk(p);
     const td2 = document.createElement('td');
-    const nm = document.createElement('div'); nm.className = 'tname'; nm.appendChild(icon(p, 34));
+    const nm = document.createElement('div'); nm.className = 'tname'; nm.appendChild(icon(p, 24, false, true));
     const s = document.createElement('span'); s.textContent = p.n; nm.appendChild(s);
     nm.appendChild(tierBadge(p)); td2.appendChild(nm);
     const td3 = document.createElement('td'); td3.className = 'hn'; td3.appendChild(typeChips(p));
-    const td4 = document.createElement('td'); td4.textContent = p.r;
+    const td4 = document.createElement('td'); td4.className = 'tpow'; td4.textContent = p.r;
     if (p.ic || uniqueChildren.has(p.k)) {
       // a caption rather than inline prose — inline, it wrapped to three lines
       // in the narrow mobile column and made row heights lurch
@@ -5084,24 +5278,17 @@ function renderDex() {
     }
     const td5 = document.createElement('td'); td5.className = 'hn'; td5.textContent = p.m + '%';
     const td6 = document.createElement('td'); td6.className = 'tworks';
-    const parts = Object.entries(p.w || {}).sort((a,b) => b[1]-a[1])
-      .map(([k,v]) => k === wk ? `<b>${workImgTag(k)}${v}</b>` : workImgTag(k) + v);
+    const parts = Object.entries(p.w || {}).sort((a, b) => b[1] - a[1])
+      .map(([k, v]) => k === wk ? `<b>${workImgTag(k)}${v}</b>` : workImgTag(k) + v);
     td6.innerHTML = parts.join(' ');
-    tr.append(td0, td1, td2, td3, td4, td5, td6);
+    // the phone table is three columns; this one carries whatever the sort is
+    const tdm = document.createElement('td'); tdm.className = 'tmetric';
+    tdm.appendChild(dexMetric(p, wk));
+    tr.append(td0, td1, td2, td3, td4, td5, td6, tdm);
     tr.tabIndex = 0;
     tr.setAttribute('aria-label', 'View ' + p.n + ' details');
-    tr.addEventListener('click', () => openModal(p));
+    tr.addEventListener('click', e => { if (e.target.closest('button')) return; openModal(p); });
     tr.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === tr) { e.preventDefault(); openModal(p); } });
-    dexBody.appendChild(tr);
-  }
-  if (!rows.length) {
-    const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 7;
-    const h = document.createElement('div'); h.className = 'hint';
-    h.append('No pals match these filters. ');
-    const b = document.createElement('button'); b.className = 'alink'; b.textContent = '✕ Clear filters';
-    b.addEventListener('click', clearDexFilters);
-    h.appendChild(b);
-    td.appendChild(h); tr.appendChild(td); tr.style.cursor = 'default';
     dexBody.appendChild(tr);
   }
 }
@@ -5112,7 +5299,10 @@ if (state.b && byKey.get(state.b)) pickB.set(byKey.get(state.b), true);
 if (state.t && byKey.get(state.t)) pickT.set(byKey.get(state.t), true);
 if (state.l && byKey.get(state.l)) pickL.set(byKey.get(state.l), true);
 if (state.ownedOnly) { ownedOnly = true; setSwitch(ownedToggle, true); }
-if (state.dexOwnedOnly) { dexOwnedOnly = true; setSwitch(dexOwnedBtn, true); }
+// dexOwnedOnly was a boolean; Show is a three-way. Read the old key for one
+// release so a persisted "owned only" survives the change.
+dexShow = state.dshow || (state.dexOwnedOnly ? 'owned' : 'all');
+if (state.dv === 'table' || state.dv === 'gallery') dexView = state.dv;
 if (state.rdense) { denseRows = true; setSwitch(denseToggle, true); document.getElementById('rosterList').classList.add('dense'); }
 // planner, chain, and filter state
 for (const n of SLOTS) {
@@ -5136,8 +5326,10 @@ if (state.hn) { hatchNewOnly = true; setSwitch(hatchNewBtn, true); }
 if (state.hd === 0 || state.hd === 2) setHatchDepth(state.hd, true);
 if (state.dt) { dexType.value = state.dt; dexTypeSel.sync(); }
 if (state.dw) { dexWork.value = state.dw; dexWorkSel.sync(); }
-if (state.dsort && state.dsort.key) dexSort = state.dsort;
-if (state.ck === 'mix' || state.ck === 'self') setComboKind(state.ck, true);
+if (state.dsort && state.dsort.key && state.dsort.key !== 'own') dexSort = state.dsort;
+// always run it, not just for a restored value — it also writes the visible
+// line describing whichever recipe type is selected
+setComboKind(state.ck === 'mix' || state.ck === 'self' ? state.ck : '', true);
 if (state.sm === 'partner' || state.sm === 'passives') setSkillMode(state.sm, true);
 if (state.chain && Array.isArray(state.chain.steps)
     && state.chain.steps.every(s => byKey.has(s.aK) && byKey.has(s.bK) && byKey.has(s.cK))

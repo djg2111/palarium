@@ -176,40 +176,74 @@
   </section>
 
   <section class="view" id="view-dex">
+    <div class="collhead vhead">
+      <h2>Paldex</h2>
+      <span class="rstats" id="dexOwnedCount"></span>
+      <div class="segrow viewseg" id="dexView" role="group" aria-label="List style">
+        <button type="button" data-v="gallery" class="on" aria-pressed="true">Gallery</button>
+        <button type="button" data-v="table" aria-pressed="false">Table</button>
+      </div>
+    </div>
     <nav class="tabs subtabs" id="dexMode" role="tablist" aria-label="Paldex mode">
-      <button data-m="pals" class="active" role="tab" aria-selected="true">Pals</button>
+      <button data-m="pals" class="active" role="tab" aria-selected="true">Species</button>
       <button data-m="combos" role="tab" aria-selected="false">Unique combos</button>
     </nav>
     <div id="dexPalsBlock">
-    <div class="viewsub">Star ★ a species to mark it as owned — stars power every “Owned” filter across the app. Pals in your Roster count as owned automatically.</div>
-    <div class="dex-controls">
-      <input type="search" class="search-inp" id="dexSearch" placeholder="Search pals…" aria-label="Search pals">
-      <select id="dexType" aria-label="Filter by element"><option value="">Any element</option></select>
-      <select id="dexWork" aria-label="Filter by work suitability"><option value="">Any work</option></select>
-      <button type="button" class="toggle" id="dexOwned" role="switch" aria-checked="false" title="Only show starred pals"><span class="kn"></span>Owned only</button>
+    <div class="viewsub" id="dexIntro">Star ★ a species to mark it as owned — stars power every “Owned” filter across the app. Pals in your Roster count as owned automatically.</div>
+    <div class="dex-controls dexcontrols">
+      <div class="ctl"><label for="dexSearch">Search</label>
+        <input type="search" class="search-inp" id="dexSearch" placeholder="Name…"></div>
+      <div class="ctl"><label for="dexType">Element</label>
+        <select id="dexType"><option value="">Any element</option></select></div>
+      <div class="ctl"><label for="dexWork">Work</label>
+        <select id="dexWork"><option value="">Any work</option></select></div>
+      <div class="ctl"><label for="dexSort">Sort</label>
+        <select id="dexSort">
+          <option value="z">Paldex #</option>
+          <option value="n">Name (A–Z)</option>
+          <option value="t">Element (A–Z)</option>
+          <option value="r-">Breeding power (high to low)</option>
+          <option value="r+">Breeding power (low to high)</option>
+          <option value="m-">♂ chance (high to low)</option>
+          <option value="m+">♂ chance (low to high)</option>
+          <option value="w-">Work total (high to low)</option>
+          <option value="w+">Work total (low to high)</option>
+        </select></div>
+      <div class="ctl ctlwide"><label id="dexShowLbl">Show</label>
+        <div class="segrow" id="dexShow" role="group" aria-labelledby="dexShowLbl">
+          <button type="button" data-v="all" class="on" aria-pressed="true">All</button>
+          <button type="button" data-v="owned" aria-pressed="false">Owned</button>
+          <button type="button" data-v="missing" aria-pressed="false">Missing</button>
+        </div></div>
       <span class="rstats" id="dexCount" aria-live="polite"></span>
       <button type="button" class="alink" id="dexClear" hidden>✕ Clear filters</button>
     </div>
-    <div class="tablewrap">
+    <ul class="dexgrid" id="dexGrid" aria-label="Species" aria-describedby="dexGridHelp"></ul>
+    <p id="dexGridHelp" class="sr-only">Arrow keys move between species. Press Tab to reach the star for the focused species.</p>
+    <div class="tablewrap" id="dexTableWrap" hidden>
     <table>
       <thead><tr>
-        <th data-s="own" title="Owned">★</th>
+        <th class="thstar"><span class="sr-only">Owned</span><span aria-hidden="true">★</span></th>
         <th data-s="z">#</th><th data-s="n">Pal</th><th data-s="t" class="hn">Element</th>
-        <th data-s="r">Breeding power</th><th data-s="m" class="hn">♂ chance</th><th data-s="w">Work suitability</th>
+        <th data-s="r">Breeding power</th><th data-s="m" class="hn">♂ chance</th><th data-s="w">Work suitability</th><th class="thmetric" id="dexMetricTh" aria-hidden="true"></th>
       </tr></thead>
       <tbody id="dexBody"></tbody>
     </table>
     </div>
+    <div id="dexEmpty"></div>
     </div>
     <div id="dexCombosBlock" hidden>
-      <div class="dex-controls">
-        <input type="search" class="search-inp" id="comboSearch" placeholder="Search combos…" aria-label="Search unique combos">
-        <div class="segrow" id="comboKind" role="group" aria-label="Combo type">
-          <button type="button" data-k="" class="on" aria-pressed="true" title="Every unique recipe">All</button>
-          <button type="button" data-k="mix" aria-pressed="false" title="Recipes that need two different species — the ones you can plan a route to">Two species</button>
-          <button type="button" data-k="self" aria-pressed="false" title="Legendaries and sub-species that can only be bred from two of themselves">Two of the same</button>
-        </div>
+      <div class="dex-controls dexcontrols">
+        <div class="ctl"><label for="comboSearch">Search</label>
+          <input type="search" class="search-inp" id="comboSearch" placeholder="Species name…"></div>
+        <div class="ctl ctlwide"><label id="comboKindLbl">Recipe type</label>
+          <div class="segrow" id="comboKind" role="group" aria-labelledby="comboKindLbl">
+            <button type="button" data-k="" class="on" aria-pressed="true">All</button>
+            <button type="button" data-k="mix" aria-pressed="false">Two species</button>
+            <button type="button" data-k="self" aria-pressed="false">Two of the same</button>
+          </div></div>
         <span class="rstats" id="comboCount" aria-live="polite"></span>
+        <p class="sub ctlwide" id="comboKindWhy" aria-live="polite"></p>
       </div>
       <div class="combos" id="comboList"></div>
     </div>

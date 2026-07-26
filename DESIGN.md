@@ -124,6 +124,21 @@ next action), `.warnbox` (inline warning), `.toast` (feedback ≤8s, with Undo f
 destructive), `.pchip` (passive), `.tchip` (pal chip), `.badge` (outcome kinds),
 `.mchip` (meta), `.picker` (pal select), `.ptag` (tag input), `.needrow`, `.rsummary`.
 
+Paldex (two views over one pipeline — recognising 299 distinct arts to mark
+what you own, versus comparing seven columns of numbers; a grid cannot do the
+second and a table is worst at the first):
+
+| Class | Role |
+|---|---|
+| `.dexgrid` / `.dextile` | The species gallery and one species tile. `.dextile.on` is owned. `.dextile-open` is the whole-tile press target (`::after{inset:0}`); the `.star` sits above it as a sibling, never nested. Arrow keys move between tiles (roving `tabindex`), Tab reaches the focused tile's star — the same two-stops-per-item convention as a roster row. |
+| `.sr-only` | Visually hidden, still announced. **`.nativehide` is the opposite job** — it hides a control from AT while leaving it on screen. |
+
+**Ownership is a ring and a fill, never a filter on the art.** The game greys
+out un-captured pals; Palarium does not, because §7 forbids recolouring game
+art and desaturating 260 of 299 tiles would destroy the recognition the grid
+exists for. Owned = `--gold-line` border + `--gold-tint` fill + a filled ★ +
+`aria-pressed`.
+
 Roster list (one layout, always grouped by species — a breeding roster is made of
 siblings, so grouping is the shape of the data, not a preference):
 
@@ -170,10 +185,14 @@ no looping/attention animation, ever.
 - Lexicon (one concept, one name): **species** (a kind of pal) · **pal** (an
   individual) · **owned** (★ or in roster) · **target species** (what you're breeding
   toward — not "target child") · **passives** · **route** (computed) · **plan**
-  (saved route) · **partner** (non-line parent in a step) · **backup** (Palarium's own
+  (saved route) · **partner** (non-line parent in a step) · **missing** (a species
+  you have not starred and do not have in your roster — the complement of
+  *owned*) · **backup** (Palarium's own
   JSON file — you export and restore it) · **save** (the Palworld game file — Palarium
   only ever reads it). Never use the bare word "import" as a button label for either:
   it named two unrelated jobs and told the user nothing about which one they were in.
+- The Paldex counts **species**; the Roster counts **pals**. Never say "pals"
+  for a Paldex count — 299 is a species total, not an individual one.
 - Sentence case for all labels, buttons, and tab names. Title Case is not used.
 - Empty states: 1 sentence of what this is + 1 action button. Errors: what happened +
   the next step, colored `--danger` *plus* text (never color alone).
@@ -246,6 +265,11 @@ recoloring/filters).
   controls that change how the list is **filtered, ordered or presented** (search,
   filter, sort, collapse, density); `.collacts` holds actions on the **data itself**
   (add, read a save, backup & restore). Never mixed.
+- A view-style switch (gallery vs table) is a `.segrow` right-aligned in that
+  view's heading block, so it costs no extra vertical space and reads as a
+  property of the view rather than a filter. `.dexcontrols` becomes a 2-column
+  grid at ≤640px — five full-width stacked controls put the first result 514px
+  down a 740px screen.
 - A control in `.dex-controls` whose purpose isn't obvious from its own text carries
   a visible `.ctl` label. A bare select whose only label is a prefix inside its own
   options ("Sort: Name") is not labelled. A self-describing button ("Collapse all")
@@ -290,8 +314,11 @@ visual claims; contrast ratios computed, not eyeballed.
   Lucide SVGs — 🎮 (Read my save), 🍰 (guide; `items/cake.webp` exists), 🧬 mutation
   marks (`ui/egg/mutation.webp`), 🐣, 🔍, 🗺, 🌙 nocturnal, 🌳 tree button,
   🍖 food stat, ⚠ warnboxes, 🎲 odds, 📦, 📍.
-- View heading inconsistency (Breed / Find parents have no heading block).
+- View heading inconsistency — Breed and Find parents still have no heading block
+  (Paldex now has one).
 - Toggle label grammar varies across views (§4 switch rule).
-- Select conventions: "All elements" vs "Any work suitability". The Roster's "Sort:"
-  option prefixes are gone and its selects now carry visible `.ctl` labels (§9);
-  Paldex and Skills still use bare, unlabelled selects and should follow.
+- Select conventions: the Roster's and Paldex's selects now carry visible `.ctl`
+  labels (§9); **Skills** still uses bare, unlabelled selects and should follow.
+- The picker's `@media(max-width:640px)` block (`.pop .list` / `.pop .row`) is a
+  species tile hard-coded into a popover at one breakpoint. It should be
+  refactored onto `.dexgrid`/`.dextile` so there is one tile implementation.
