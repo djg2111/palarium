@@ -519,7 +519,7 @@ select#genderSel{padding:10px 12px}
 .rosgrp>summary{display:flex;align-items:center;gap:10px;font-weight:700;font-size:var(--fs-md);
   padding:9px 15px;cursor:pointer;list-style:none;border-radius:var(--r-lg)}
 .rosgrp>summary::-webkit-details-marker{display:none}
-.rosgrp>summary::before{content:'▸';color:var(--muted);font-size:var(--fs-sm);
+.rosgrp>summary::before{content:'▸' / '';color:var(--muted);font-size:var(--fs-sm);
   transition:transform var(--t-fast) var(--ease-out);display:inline-block}
 .rosgrp[open]>summary::before{transform:rotate(90deg)}
 .rosgrp>summary:hover{color:var(--accent)}
@@ -1173,12 +1173,15 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .collhead .collacts{margin-left:0;width:100%}
   /* identity + toolbar on line 1, passives on line 2, note on line 3 */
   .rosrow{grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;padding:10px 12px}
-  .rosrow .who{grid-column:1}
-  .rosrow .acts{grid-column:2;grid-row:1;opacity:1}
-  .rosrow .pscol{grid-column:1/-1}
+  /* Full grid-areas, not just grid-column: the <=1000px block above places
+     .pscol at 1/2, and overriding only the column left it in row 1 painting
+     over the name button — a focusable control entirely obscured (2.4.11). */
+  .rosrow .who{grid-area:1/1}
+  .rosrow .acts{grid-area:1/2;opacity:1}
+  .rosrow .pscol{grid-area:2/1/3/-1}
   /* the note has the full width here, so it wraps rather than ellipsising into
      a title attribute touch users can never open (DESIGN.md §8) */
-  .rosrow .note{grid-column:1/-1;white-space:normal}
+  .rosrow .note{grid-area:3/1/4/-1;white-space:normal}
   /* thumb-sized targets without changing how the buttons look */
   .rosrow .acts button{min-width:32px;min-height:32px}
   .rosgrp[open]>summary{min-height:44px}
