@@ -41,6 +41,12 @@ All user data (roster, plans, owned list) lives in the browser's localStorage �
 - One field is still inherited from the pre-1.0 dataset: partner-skill *rank* tables (`ps.rl`/`ps.re`). The values exist in `DT_PassiveSkill_Main` but the pal→skill linkage isn't in any data table — see [`tools/README.md`](tools/README.md). It only feeds a display table on the pal card; nothing about breeding depends on it.
 - The breeding engine is a faithful port of the in-game logic: unique combos first, else the species whose breeding power is closest to `floor((A + B + 1) / 2)`, ties broken by higher `combiDuplicatePriority`; `ignoreCombi` pals and unique-combo children are excluded as averaging results.
 - The game files also contain 28 unreleased pals that are deliberately excluded — importing them would add phantom species. Documented in [`docs/unreleased-pals.md`](docs/unreleased-pals.md).
+
+### Reading your save file
+
+Roster → **Read my save** fills the roster from `Level.sav`. The save is parsed **in your browser and nowhere else** — the site is static, has no backend, and never uploads or transmits the file. It is read-only; your save is never modified.
+
+Palworld 1.0 saves are **Oodle**-compressed (magic `PlM`), not zlib (`PlZ`) as they were before 0.6, which is why older community tooling can't open them. The format, and what is and isn't mapped so far, is written down in [`docs/save-format.md`](docs/save-format.md); [`docs/save-reverse-engineering.md`](docs/save-reverse-engineering.md) is the playbook for mapping the rest.
 - Palworld and all pal names/images © Pocketpair, Inc. This is an unaffiliated fan tool.
 
 ## Structure
@@ -52,12 +58,14 @@ js/data.js      generated dataset (pals, combos, passives) — window.PALDATA
 js/mapdata.js   generated map markers, regions + layer bounds — window.MAPDATA
 js/spawndata.js generated wild spawn zones (loaded on demand) — window.SPAWNDATA
 js/app.js       all app logic (vanilla JS, no dependencies)
+js/savparse.js  Palworld save reader — runs in a Web Worker (Oodle + GVAS)
 assets/pals/    pal icons (299, lossless WebP)
 assets/map/     map tile pyramid (170 lossless WebP tiles, z0–z3)
 assets/ui/      element, work, map-marker, passive-skill and egg icons (lossless WebP)
 assets/items/   inventory item icons for drops and recipes (lossless WebP)
+tests/          synthetic save fixtures (no personal data) — see tools/make-fixture.js
 tools/          extraction + generation pipeline (not part of the site)
-docs/           notes on the extracted data
+docs/           notes on the extracted data and the save format
 ```
 
 The site itself still has **no build step** — `tools/` is only run by hand when the game updates. See [`tools/README.md`](tools/README.md) for the full runbook.

@@ -2,10 +2,19 @@
 // OodleSharp (MIT, managed, arrives via CUE4Parse) to give js/savparse.js a
 // byte-exact target written by someone else. tools/sav-check.js consumes it.
 //
-//   dotnet run -- <in.sav> <out.gvas>
+//   dotnet run -- <in.sav> <out.gvas>     decompress to a reference .gvas
+//   dotnet run -- --oracle                 stdin/stdout decode oracle
+//   dotnet run -- --patch <sav> <ref.gvas> byte-patcher, reports first changed output offset
 using System;using System.IO;using System.IO.Compression;using OodleSharp;
 class P{static int Main(string[] a){
-  if(a.Length<2){Console.Error.WriteLine("usage: oodleref <in.sav> <out.gvas>");return 2;}
+  // Reverse-engineering instruments. See docs/save-reverse-engineering.md.
+  if(a.Length==1&&a[0]=="--oracle"){Oracle.Run();return 0;}
+  if(a.Length==3&&a[0]=="--patch"){Patch.Run(a[1],a[2]);return 0;}
+  if(a.Length<2){
+    Console.Error.WriteLine("usage: oodleref <in.sav> <out.gvas>   decompress with the reference decoder");
+    Console.Error.WriteLine("       oodleref --oracle              feed it '<uncompressedSize> <hexOodleStream>' lines");
+    Console.Error.WriteLine("       oodleref --patch <sav> <ref>   feed it '<offset> <byte>[,...]' lines");
+    return 2;}
   var b=File.ReadAllBytes(a[0]);
   uint un=BitConverter.ToUInt32(b,0), co=BitConverter.ToUInt32(b,4);
   string magic=System.Text.Encoding.ASCII.GetString(b,8,3); byte type=b[11];
