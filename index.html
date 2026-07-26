@@ -26,6 +26,7 @@
     <button data-v="roster" role="tab" aria-selected="false">Roster</button>
     <span class="sep" aria-hidden="true"></span>
     <button data-v="dex" role="tab" aria-selected="false">Paldex</button>
+    <button data-v="skills" role="tab" aria-selected="false">Skills</button>
     <button data-v="map" role="tab" aria-selected="false">Map</button>
     <button data-v="guide" role="tab" aria-selected="false">Guide</button>
   </nav>
@@ -206,6 +207,59 @@
     </div>
   </section>
 
+  <section class="view" id="view-skills">
+    <nav class="tabs subtabs" id="skillMode" role="tablist" aria-label="Skill catalog section">
+      <button data-m="auras" class="active" role="tab" aria-selected="true">Base auras</button>
+      <button data-m="partner" role="tab" aria-selected="false">Partner skills</button>
+      <button data-m="passives" role="tab" aria-selected="false">Passives</button>
+    </nav>
+
+    <div id="skillAurasBlock">
+      <div class="viewsub">A <b>base aura</b> is a partner skill that pays out while the pal is <b>assigned to a base</b>, not while it's in your party — most of them buff <b>every other pal there</b>. One of each is usually all you want: nearly all of them say “does not stack”.</div>
+      <div id="auraGroups"></div>
+    </div>
+
+    <div id="skillPartnerBlock" hidden>
+      <div class="viewsub">Every pal's partner skill, filterable by what it actually does. Pick an effect to see every pal that grants it — then open the card to find one in the wild. Rank values carry a unit only where the in-game description spells one out; the rest are printed exactly as the game stores them.</div>
+      <div class="dex-controls">
+        <input type="search" class="search-inp" id="psSearch" placeholder="Search skills…" aria-label="Search partner skills">
+        <select id="psTag" aria-label="Filter by effect"><option value="">Any effect</option></select>
+        <button type="button" class="toggle" id="psOwned" role="switch" aria-checked="false" title="Only pals you've starred or added to your roster"><span class="kn"></span>Owned only</button>
+        <span class="rstats" id="psCount" aria-live="polite"></span>
+        <button type="button" class="alink" id="psClear" hidden>✕ Clear filters</button>
+      </div>
+      <div class="segrow psfam" id="psFamily" role="group" aria-label="Effect family">
+        <button type="button" data-f="" class="on" aria-pressed="true">All</button>
+        <button type="button" data-f="base" aria-pressed="false" title="Effects that apply while the pal is assigned to a base">Base</button>
+        <button type="button" data-f="work" aria-pressed="false" title="Gathering, crafting, mining and the other job speeds">Work</button>
+        <button type="button" data-f="combat" aria-pressed="false" title="Attack, defense and damage modifiers">Combat</button>
+        <button type="button" data-f="travel" aria-pressed="false" title="Mounts, movement and carry weight">Travel</button>
+        <button type="button" data-f="loot" aria-pressed="false" title="Capture rate, drops and item pickup">Catch &amp; loot</button>
+        <button type="button" data-f="status" aria-pressed="false" title="Resistances and status ailments">Status</button>
+      </div>
+      <div class="skillgrid" id="psList"></div>
+      <button class="more" id="psMore" hidden>Show more</button>
+    </div>
+
+    <div id="skillPassivesBlock" hidden>
+      <div class="viewsub">All 115 passive skills with their real numbers — what to breed <b>for</b>, and what to breed <b>out</b>. Passives you already have somewhere in your roster are marked.</div>
+      <div class="dex-controls">
+        <input type="search" class="search-inp" id="pvSearch" placeholder="Search passives…" aria-label="Search passive skills">
+        <select id="pvCat" aria-label="Filter by effect type"><option value="">Any effect type</option></select>
+        <button type="button" class="toggle" id="pvOwned" role="switch" aria-checked="false" title="Only passives carried by a pal in your roster"><span class="kn"></span>In my roster</button>
+        <span class="rstats" id="pvCount" aria-live="polite"></span>
+        <button type="button" class="alink" id="pvClear" hidden>✕ Clear filters</button>
+      </div>
+      <div class="segrow psfam" id="pvSign" role="group" aria-label="Passive kind">
+        <button type="button" data-g="" class="on" aria-pressed="true">All</button>
+        <button type="button" data-g="good" aria-pressed="false" title="Every effect is an upside">Purely good</button>
+        <button type="button" data-g="mixed" aria-pressed="false" title="A worthwhile passive that also carries a downside">Mixed</button>
+        <button type="button" data-g="bad" aria-pressed="false" title="The 15 passives worth breeding out">Detrimental</button>
+      </div>
+      <div id="pvList"></div>
+    </div>
+  </section>
+
   <section class="view" id="view-map">
     <div class="dex-controls mapbar">
       <div class="segrow" id="mapLayer" role="group" aria-label="Map layer">
@@ -314,6 +368,7 @@
             <li>Classic workflow: combine 2 desired passives on one parent, 2 on the other → hatch until a child has 3–4 → use that child as a new parent. Passives have no gender, so any keeper can pair with any opposite-gender partner of the right species chain.</li>
             <li>Popular combat set: <b>Legend</b> (from legendaries — yes, it inherits!), <b>Musclehead</b>, <b>Ferocious</b>, <b>element +20%</b>. Work set: <b>Artisan</b>, <b>Serious</b>, <b>Lucky</b>, <b>Work Slave</b>.</li>
             <li>Endgame: the <b>Special Cake</b> (Tech 74) sharply raises how much of the parents' pool carries over. The odds shown in this app assume a regular Cake — treat them as a floor once you're baking Special Cakes.</li>
+            <li>Which passives are worth the effort — and which 15 are worth breeding <i>out</i> — is the <b>Skills</b> tab, with every effect in numbers. <button type="button" class="alink gjump" data-nav="skills">Browse every passive</button></li>
           </ul>
         </div></details>
 
@@ -362,6 +417,7 @@
   <button data-v="hatch" type="button">Breedable now</button>
   <button data-v="roster" type="button">Roster</button>
   <button data-v="dex" type="button">Paldex</button>
+  <button data-v="skills" type="button">Skills</button>
   <button data-v="map" type="button">Map</button>
   <button data-v="guide" type="button">Guide</button>
 </div>

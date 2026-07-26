@@ -356,9 +356,18 @@ tbody tr:hover{background:var(--surface)}
 .pskill .psn{font-weight:700;color:var(--gold);font-size:var(--fs-base)}
 .pskill .pst{display:flex;gap:6px;flex-wrap:wrap;margin:7px 0}
 .pskill .psd{color:var(--text-2);font-size:var(--fs-md)}
-.ranktbl{margin-top:10px;width:100%;font-size:var(--fs-sm)}
-.ranktbl th{position:static;background:none;padding:4px 8px;font-size:var(--fs-xs);cursor:default}
-.ranktbl td{padding:4px 8px;border-bottom:1px solid var(--border)}
+.pskill .psn .badge{margin-left:8px;vertical-align:1px}
+/* The rank table can be wider than a phone card; it pans inside itself rather
+   than pushing the page sideways (same deal as .tablewrap in the Paldex). */
+.ranktbl{margin-top:10px;width:100%;font-size:var(--fs-sm);border-collapse:collapse}
+.ranktbl caption{caption-side:top;text-align:left;color:var(--muted);font-size:var(--fs-xs);padding-bottom:4px}
+.ranktbl th{position:static;background:none;padding:4px 8px;font-size:var(--fs-xs);cursor:default;white-space:nowrap}
+.ranktbl thead th{color:var(--muted)}
+.ranktbl tbody th{text-align:left;font-weight:600;color:var(--text-2);font-size:var(--fs-sm)}
+.ranktbl td{padding:4px 8px;border-bottom:1px solid var(--border);text-align:right;font-variant-numeric:tabular-nums}
+.ranktbl tbody th{border-bottom:1px solid var(--border)}
+/* rank 5 is the one people are deciding whether to pay for */
+.ranktbl td:last-child{color:var(--text);font-weight:600}
 .rosentry{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 16px;display:flex;flex-direction:column;gap:8px}
 .rosentry .row1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .rosentry .row1 .g{font-size:var(--fs-base)}
@@ -859,6 +868,73 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
 .mapinfo .iacts{display:flex;gap:8px;margin-top:12px}
 .mapinfo .iacts .alink{flex:1;text-align:center;padding:7px 8px;font-size:var(--fs-sm)}
 .mapfoot{margin:12px 0 0}
+
+/* ===================== skills catalog =====================
+   Two indexes and the base-aura group. Everything here is a card grid, so the
+   shared shape lives in .auracard/.skillcard/.pvcard and the differences are
+   only in what each card leads with. */
+.psfam{flex-wrap:wrap;margin:-6px 0 18px}
+.psfam button{flex:1 1 auto;min-width:88px}
+/* a section heading inside a view — smaller than the page h1, with its count
+   trailing it rather than sitting in a separate row */
+.aurasec,.pvsec{margin-bottom:26px}
+.aurasec h2,.pvsec h2{font-size:var(--fs-h2);font-weight:700;margin-bottom:6px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.aurasec h2 .rstats,.pvsec h2 .rstats{font-weight:400}
+.aurasec .viewsub{max-width:78ch}
+.pvsec.bad h2{color:var(--danger)}
+.auragrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:10px}
+.auracard,.skillcard,.pvcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:13px 15px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.auracard:hover,.skillcard:hover,.pvcard:hover{border-color:var(--border-strong)}
+.ahead,.shead,.pvhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.atitle{font-weight:700;font-size:var(--fs-lg);color:var(--text)}
+/* the work auras are the headline fact of the whole tab — the icon leads */
+.auracard .ahead .uii{filter:none}
+.askill{color:var(--gold);font-weight:600;font-size:var(--fs-md)}
+.aclause,.skillcard .psd{color:var(--text-2);font-size:var(--fs-md);margin:0}
+.rankstrip{display:flex;flex-direction:column;gap:3px;font-size:var(--fs-sm);color:var(--muted);
+  border-top:1px solid var(--border);padding-top:7px;margin-top:auto}
+.rankstrip .rscap{font-size:var(--fs-xs);color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
+.rankstrip .rk{display:flex;gap:8px;justify-content:space-between;align-items:baseline}
+.rankstrip .rk b{color:var(--text-2);font-weight:600}
+.rankstrip .rk span{white-space:nowrap;font-variant-numeric:tabular-nums}
+/* pal name + icon as one control, wherever a card points back at a pal card */
+.palref{display:inline-flex;align-items:center;gap:8px;font-weight:600;color:var(--text);
+  border:1px solid transparent;border-radius:var(--r-full);padding:2px 10px 2px 2px;max-width:100%}
+.palref>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.palref:hover{border-color:var(--border-strong);background:var(--raised)}
+.badge.nostack{background:var(--raised);color:var(--muted);border:1px solid var(--border);text-transform:none;letter-spacing:0}
+.badge.aura{background:var(--success-tint);color:var(--success);border:1px solid var(--success-line)}
+.badge.mut{background:var(--accent-tint);color:var(--accent);border:1px solid var(--accent-line);text-transform:none;letter-spacing:0}
+.badge.have{background:var(--gold-tint);color:var(--gold);border:1px solid var(--gold-line);text-transform:none;letter-spacing:0}
+button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
+/* an effect tag is a filter you can click from any pal card */
+.mchip.tagbtn:hover{color:var(--text);border-color:var(--accent)}
+.skillgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:10px;align-items:start}
+.skillcard .psn{font-weight:700;color:var(--gold);font-size:var(--fs-base)}
+.skillcard .pst{display:flex;gap:6px;flex-wrap:wrap}
+.skillcard .flatnote{color:var(--muted);font-size:var(--fs-sm)}
+/* a number the game's own description ships without — see psDesc */
+.phold{display:inline-block;min-width:1.1em;text-align:center;color:var(--muted);
+  background:var(--raised);border:1px dashed var(--border-strong);border-radius:var(--r-sm);
+  font-size:var(--fs-sm);line-height:1.3;cursor:help}
+.rankdet{border-top:1px solid var(--border);padding-top:6px;margin-top:auto}
+.rankdet summary{color:var(--accent);font-size:var(--fs-sm);font-weight:600;cursor:pointer;list-style:none;
+  display:inline-flex;align-items:center;gap:6px;border-radius:var(--r-sm)}
+.rankdet summary::-webkit-details-marker{display:none}
+.rankdet summary::before{content:'▸';color:var(--muted);transition:transform var(--t-fast)}
+.rankdet[open] summary::before{transform:rotate(90deg)}
+.rankdet .ranktbl{margin-top:6px;display:block;overflow-x:auto}
+.pvgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(270px,100%),1fr));gap:10px}
+.pvcard{gap:6px}
+.pvn{font-weight:700;font-size:var(--fs-base);flex:1;min-width:0}
+.pvrank{margin-left:auto;letter-spacing:1px;color:var(--gold);border-color:var(--gold-line)}
+.pvcard.s-bad .pvrank{color:var(--danger);border-color:var(--danger-line)}
+.pvcard.s-bad{border-color:var(--danger-line)}
+.pvfx{list-style:none;display:flex;flex-direction:column;gap:2px;font-size:var(--fs-md);color:var(--text-2)}
+.pvfx .up::before{content:'▲';color:var(--success);font-size:9px;margin-right:6px;vertical-align:1px}
+.pvfx .dn::before{content:'▼';color:var(--danger);font-size:9px;margin-right:6px;vertical-align:1px}
+.pvfx li:not(.up):not(.dn)::before{content:'•';color:var(--muted);margin-right:6px}
+.pvfoot{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
 
 /* ===================== phones (≤640px) =====================
    Desktop lays these views out as wrap-when-needed flex rows. At phone width
