@@ -553,7 +553,7 @@ tbody tr:hover{background:var(--surface)}
 .pcard>.sub{color:var(--muted);font-size:var(--fs-md);margin-bottom:16px}
 .addrow{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}
 .ptag{position:relative;flex:1;min-width:220px;max-width:360px}
-.ptag .taginp{width:100%;background:var(--raised);border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 14px;outline:none}
+.ptag .taginp{width:100%;background:var(--raised);border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 14px}
 .ptag .taginp:focus{border-color:var(--accent)}
 .ptag .tpop{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:60;background:var(--overlay);border:1px solid var(--border-strong);border-radius:var(--r-lg);box-shadow:0 12px 40px rgba(0,0,0,.5);max-height:260px;overflow-y:auto;display:none}
 .ptag.open .tpop{display:block}
@@ -823,7 +823,10 @@ select#genderSel{padding:10px 12px}
 /* shared small ghost button: roster actions, plan delete, step-open, chain nav */
 .acts button,.rospanel .pclose,.stepopen,.planhead .del,.chainhead .nav button{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:4px 10px;font-size:var(--fs-sm);font-weight:600;color:var(--muted)}
 .acts button:hover,.rospanel .pclose:hover,.stepopen:hover,.planhead .del:hover,.chainhead .nav button:hover:not(:disabled){color:var(--text);border-color:var(--border-strong)}
-.planhead .del.danger:hover{color:var(--danger);border-color:var(--danger)}
+/* the destructive tier at REST, not only on hover: on touch it was
+   indistinguishable from the Tree disclosure beside it (DESIGN.md section 4) */
+.planhead .del.danger{color:var(--danger);border-color:var(--danger-line)}
+.planhead .del.danger:hover{background:var(--danger-tint);border-color:var(--danger)}
 /* the stack spans the viewport and centres its toasts, rather than starting at
    the 50% mark — anchored there, a toast could never be wider than half the
    screen, so on a 320px phone every message over a few words became a column
@@ -1009,7 +1012,12 @@ select#genderSel{padding:10px 12px}
 .planhead .pushr{margin-left:auto}
 .plan{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:12px}
 .plan .rstep{background:var(--surface);cursor:default}
-.plan .rstep.done{opacity:.45;transition:opacity var(--t-base)}
+/* .45 is this app's DISABLED recipe (button:disabled), and at that alpha a
+   done step's names computed 4.01:1 - below AA for the very content the
+   checklist exists to show, on a row whose controls are still operable. */
+.plan .rstep.done{transition:opacity var(--t-base)}
+.plan .rstep.done .unit .nm{color:var(--muted);text-decoration:line-through}
+.plan .rstep.done .badge,.plan .rstep.done .carrier,.plan .rstep.done .pico{opacity:.55}
 /* one checkbox recipe, used by the plan's step ticks and the roster's selection
    mode. Promoted from .plan .rstep .chk rather than forked (DESIGN.md §4). */
 .plan .rstep .chk,.rchk{appearance:none;-webkit-appearance:none;width:22px;height:22px;margin:0;border-radius:var(--r-sm);background:var(--raised);border:1px solid var(--border-strong);cursor:pointer;flex-shrink:0;transition:background var(--t-fast),border-color var(--t-fast)}
@@ -1019,7 +1027,9 @@ select#genderSel{padding:10px 12px}
 .rchk:indeterminate{border-color:var(--accent);background:var(--accent) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 8h8" fill="none" stroke="%230d1117" stroke-width="2.5" stroke-linecap="round"/></svg>') center/14px no-repeat}
 /* 22px box in a >=24px hit area, bought with padding and taken back with margin
    so nothing moves (DESIGN.md §8) */
-.rchk{padding:0;outline-offset:1px;box-sizing:content-box;border-width:1px}
+/* 22px box in a >=24px target. The plan's tick is the stated purpose of Saved
+   plans and got left at 22 when its roster twin was fixed (2.5.8). */
+.plan .rstep .chk,.rchk{padding:1px;outline-offset:1px;box-sizing:content-box;border-width:1px}
 .rosrow .rchk,.rosband .rchk,.rosselall .rchk{margin:1px}
 
 /* ---------- roster: bulk selection ---------- */

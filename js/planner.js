@@ -4,7 +4,8 @@ const slotPassives = {1: [], 2: [], 3: [], 4: []};
 const slotGenders = {1: null, 2: null, 3: null, 4: null};
 const pickS = {}, slotPass = {};
 // one string for the empty-route state, wherever it's shown
-const ROUTE_HINT = '<div class="hint">Pick at least Start pal 1 and a target species — the route appears here automatically.</div>';
+const ROUTE_HINT_TEXT = 'Pick at least Start pal 1 and a target species — the route appears here automatically.';
+const ROUTE_HINT = '<div class="hint">' + ROUTE_HINT_TEXT + '</div>';
 // recompute automatically (debounced) once a starter and target are both set
 let autoTimer = null;
 function scheduleAuto() {
@@ -14,7 +15,7 @@ function scheduleAuto() {
     if (pickPT.get() && SLOTS.some(n => pickS[n].get())) computeRoute();
     else if (currentRoute) { // inputs no longer complete — drop the stale route
       currentRoute = null;
-      document.getElementById('routeOut').innerHTML = ROUTE_HINT;
+      document.getElementById('routeOut').innerHTML = ROUTE_HINT; setPlanStatus(ROUTE_HINT_TEXT);
       save();
     }
   }, 600);
@@ -53,7 +54,7 @@ document.getElementById('clearSlots').addEventListener('click', () => {
   for (const n of SLOTS) { pickS[n].set(null, true); slotPassives[n] = []; slotGenders[n] = null; }
   pickPT.set(null, true); desiredPick.clear();
   currentRoute = null; renderSlotChips();
-  document.getElementById('routeOut').innerHTML = ROUTE_HINT;
+  document.getElementById('routeOut').innerHTML = ROUTE_HINT; setPlanStatus(ROUTE_HINT_TEXT);
   save();
   if (had) toast('Planner inputs cleared', () => {
     for (const n of SLOTS) { pickS[n].set(snap.slots[n - 1], true); slotPassives[n] = snap.sp[n - 1]; slotGenders[n] = snap.sg[n - 1]; }
@@ -431,7 +432,7 @@ function computeRoute() {
   const t = pickPT.get();
   const starters = [];
   for (const n of SLOTS) { const p = pickS[n].get(); if (p) starters.push({k: p.k, ps: slotPassives[n], g: slotGenders[n]}); }
-  if (!starters.length || !t) { out.innerHTML = ROUTE_HINT; return; }
+  if (!starters.length || !t) { out.innerHTML = ROUTE_HINT; setPlanStatus(ROUTE_HINT_TEXT); return; }
   // "In the wild" is the one route option that needs the 124 KB spawn table,
   // and choosing it is a deliberate act — so it pays for the load here, in
   // front of the user, rather than every planner visit paying for it silently.
@@ -453,7 +454,7 @@ function computeRoute() {
     return;
   }
   const pool = partnerPool();
-  if (partnerMode === 'mine' && pool.length < 2) { out.innerHTML = '<div class="hint">Your owned pool is too small — star more pals or switch chain partners off "Only mine".</div>'; return; }
+  if (partnerMode === 'mine' && pool.length < 2) { out.innerHTML = '<div class="hint">Your owned pool is too small — star more species or switch chain partners off "Only mine".</div>'; return; }
   const carried = [...new Set(starters.flatMap(s => s.ps))];
   const desired = desiredPick.get();
   const goal = desired.length ? desired : carried;
@@ -598,7 +599,7 @@ function stepEl(s, opts = {}) {
     // a button, not a tooltip-only span: touch users have no hover
     const o = document.createElement('button'); o.type = 'button'; o.className = 'odds';
     o.append(lucide('percent', 13), `≈${Math.max(1, Math.round(opts.odds.p * 100))}%/egg`);
-    const expl = `≈${Math.round(opts.odds.p * 100)}% per egg to inherit all ${opts.odds.keep} tracked passive${opts.odds.keep === 1 ? '' : 's'} (pool of ${opts.odds.pool}). Expect ≈${Math.max(1, Math.round(1 / opts.odds.p))} eggs. ${opts.odds.rp ? 'Partner passives from your roster are included.' : 'Assumes a passive-free partner.'} Assumes a regular Cake — a Special Cake improves the odds. Community-measured.`;
+    const expl = `≈${Math.round(opts.odds.p * 100)}% per egg to inherit all ${opts.odds.keep} tracked passive${opts.odds.keep === 1 ? '' : 's'} (pool of ${opts.odds.pool}). Expect ≈${Math.max(1, Math.round(1 / opts.odds.p))} egg${Math.max(1, Math.round(1 / opts.odds.p)) === 1 ? '' : 's'}. ${opts.odds.rp ? 'Partner passives from your roster are included.' : 'Assumes a passive-free partner.'} Assumes a regular Cake — a Special Cake improves the odds. Community-measured.`;
     o.title = expl;
     o.setAttribute('aria-expanded', 'false');
     o.addEventListener('click', () => {
@@ -950,17 +951,22 @@ function walkOdds(steps, starters, goal) {
   const carry = steps.length ? lineage.get(steps[steps.length - 1].cK) || [] : [];
   return {odds, carry};
 }
+// The view's one sentence, in the markup and only ever updated in place.
+function setPlanStatus(txt) {
+  const el = document.getElementById('planStatus');
+  if (el.textContent !== txt) el.textContent = txt;
+}
 function renderRoute(out, steps, target, carried, ropts = {}) {
   out.innerHTML = '';
   if (steps === null) {
     const h = document.createElement('div'); h.className = 'hint';
     const narrowed = partnerMode === 'mine' ? ' with only your pals'
       : partnerMode === 'wild' ? ' with only catchable partners' : '';
-    h.textContent = (target.ic || uniqueChildren.has(target.k))
-      ? `${target.n} can only come from its unique combo — no averaging chain reaches it${narrowed}. Check its pairs in Find Parents.`
+    setPlanStatus(h.textContent = (target.ic || uniqueChildren.has(target.k))
+      ? `${target.n} can only come from its unique combo — no averaging chain reaches it${narrowed}. Check its pairs in Find parents.`
       : `No route found${partnerMode === 'mine' ? ' using only your pals — try switching chain partners to “In the wild” or “Any species”'
         : partnerMode === 'wild' ? ' using only catchable partners — try switching chain partners to “Any species”'
-        : avoidCollab ? ' without collab partners — try turning off “No Terraria collab partners”' : ' within 8 steps'}.`;
+        : avoidCollab ? ' without collab partners — try turning off “No Terraria collab partners”' : ' within 8 steps'}.`);
     out.appendChild(h); return;
   }
   if (!steps.length) {
@@ -969,6 +975,7 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
   const stepOdds = ropts.stepOdds || [];
   const sum = document.createElement('div'); sum.className = 'rsummary';
   const cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = `${steps.length} step${steps.length === 1 ? '' : 's'} to ${target.n}`;
+  setPlanStatus(cnt.textContent + (carried.length ? ', carrying ' + carried.join(', ') + '.' : '.'));
   sum.appendChild(cnt);
   if (carried.length) { const sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = ropts.label || 'carrying:'; sum.appendChild(sub); sum.appendChild(passiveChips(carried)); }
   out.appendChild(sum);

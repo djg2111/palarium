@@ -157,12 +157,12 @@
     <div id="planNewBlock">
     <div class="pcard">
       <h2>Plan a breeding route</h2>
-      <div class="sub">Pick starting pal(s) and a target species — the planner finds the shortest breeding chain and tracks the passives you want to carry along it.</div>
+      <div class="sub">Pick a starting pal (up to four) and a target species — the planner finds the shortest breeding chain and tracks the passives you want to carry along it.</div>
       <details class="moredet plannerhow"><summary>How the planner works</summary>
-        <div><p>Pick up to four starting pals (from your roster, or any species — add the passives each one carries under its slot). The planner merges your starters into one line, trying every merge order, then finds the shortest chain of partners to reach the target. At every step, hatch until a child inherited the passives you're carrying, then continue with that child. Set <b>desired passives</b> on the target to track a specific goal set — the route steps show the approximate odds per egg.</p></div>
+        <div><p>Pick up to four starting pals (from your roster, or any species — add the passives each one carries under its slot). The planner merges your starters into one line, trying every merge order, then finds the shortest chain of partners to reach the target. At every step, hatch until a child inherits the passives you're carrying, then continue with that child. Set <b>desired passives</b> on the target to track a specific goal set — the route steps show the approximate odds per egg.</p></div>
       </details>
       <div class="plansec">1 · Starting pals<button class="alink" id="clearSlots" title="Clear all start slots and the target">✕ Clear inputs</button></div>
-      <div class="quicklb">Quick add from your roster — click a pal to fill the next free slot:</div>
+      <div class="quicklb">Quick add from your roster</div>
       <div class="strip" id="rosterStrip"></div>
       <div class="slotgrid">
         <div class="slot"><div class="slotlb">Start pal 1</div><div id="pickS1"></div><div id="passS1"></div></div>
@@ -191,6 +191,10 @@
         </div>
       </div>
       <div class="plansec">3 · Route</div>
+      <!-- The route computes itself 600ms after any input change, so nothing a
+           user pressed correlates to it appearing. Persistent and never rebuilt,
+           like Breed's .resline — renderRoute's innerHTML='' would destroy it. -->
+      <p class="resline" id="planStatus" aria-live="polite" aria-atomic="true"></p>
       <div class="routewrap" id="routeOut"><div class="hint">Pick at least Start pal 1 and a target species — the route appears here automatically.</div></div>
     </div>
     </div>

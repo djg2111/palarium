@@ -184,6 +184,23 @@ so a Find parents badge column read `UNIQUE` on every row or nothing on every ro
 but one. It belongs in the status line, and the one exception (`SAME SPECIES`)
 says itself once the names stop truncating.
 
+Planner (a form that computes itself, so the result has no press to correlate it to):
+
+| Class | Role |
+|---|---|
+| `.plansec` | A numbered section band ("1 · Starting pals"). Uppercase, `--accent`, trailing rule. |
+| `.slot` / `.slotlb` | One dashed form slot and its micro-label. Start slots reveal progressively: only the next empty one shows, and a slot's passive input only once its species is chosen. |
+| `.rstep` | One route step — the skeleton Breed's chain card shares. Its `×` and `→` are `aria-hidden` with spoken "and"/"make" beside them. |
+| `.wildinfo` family | The catch panel behind `Where?`, with its own `.accb` difficulty tier. |
+| `.resline` `#planStatus` | The view's one sentence, **in the markup and never rebuilt**. The route computes 600ms after the last input change, so nothing the user pressed correlates to it appearing — without this the whole result arrived silently. Says the step count and what is carried, the no-route sentence, or the empty-form prompt. |
+
+The passive tag input (`makePassivePicker`, five instances in this view alone) is a
+**declared combobox**: `role="combobox"` + `aria-expanded` + `aria-controls` on the
+input, `role="listbox"` on the popup, `role="option"` + `aria-activedescendant` on
+the rows. Its rows and the popup itself are `tabIndex=-1` — arrows and Enter drive
+the list, and with 30 real tab stops the close-on-blur timer destroyed whichever
+row a user had just tabbed onto, dropping focus on `<body>` on the way out.
+
 Other canon components: `.pcard` (view card), `.hint` (empty state — must include a
 next action; **a view with a persistent status line puts its empty-state sentence
 there instead**, or the sentence is announced twice — Breed does this), `.warnbox` (inline warning), `.toast` (feedback ≤8s, with Undo for
@@ -497,6 +514,32 @@ Measure claims (getBoundingClientRect / getComputedStyle); screenshot evidence f
 visual claims; contrast ratios computed, not eyeballed.
 
 ## 11 · Known-clunky backlog (ux-designer: start here)
+
+- **The Planner's start slots reflow every time one is revealed.** `.slotgrid` is
+  `auto-fit`, and `[hidden]` slots collapse their tracks — so slot 1 alone is a
+  1076px species picker at 1366, and filling it halves the width of the control
+  under the user's cursor. Fixed `repeat(4,…)` tracks would hold the row still and
+  advertise how many starters the planner takes; needs a look at 768–900 first.
+- **The Planner's Target card is a quarter empty** (75px of 288px at 1366) under
+  the row's only `--accent` border, while Route options beside it has 1px of slack.
+  Either `align-items:flex-start`, or move `My level` into the target card — it
+  describes catches, and the target card is where the goal lives.
+- **`.spal` and `.strip` duplicate `.tchip` and `.chiprow`** to within 1–1.5px, and
+  `.prog` duplicates `.mchip`. Now that the strip is a roving toolbar it is doing
+  `.chiprow`'s documented job under a second name.
+- **"passive carrier line" renders on every step of a carrying route** — it is a
+  property of the route, not the step, which §4 already settles for Find parents'
+  badge column. `.rsummary` says it once. A per-row signal would have to be one
+  that varies, e.g. only the steps where the odds actually drop.
+- **The route tree eats vertical swipes at 360**: `.tvp` is `touch-action:none` and
+  23% of the viewport height, sitting in the scroll path. `pan-y` would keep page
+  scroll and the horizontal pan these trees actually need.
+- **`Clear inputs` sits in section 1 and clears section 2 as well.** Its own title
+  admits the wider scope; the placement doesn't.
+- **`.accb.mid` / `.accb.alpha` carry three raw `rgba()`s** outside §1's two-alpha
+  tint recipe, and use `--neutral`/`--dark` (an *element* colour) for catch
+  difficulty. Computed 6.33:1 and 6.15:1, so this is token discipline, not
+  contrast — wants `--neutral-tint/line` and `--dark-tint/line` and two matrix rows.
 
 - **Find parents is dominated by Terraria collab species, with no way to filter
   them.** Measured over the full pair lists: **22 of Lamball's 30 pairs (73%)**
