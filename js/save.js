@@ -771,11 +771,12 @@ function renderSavePreview() {
       const seg = document.createElement('div'); seg.className = 'segrow confseg';
       seg.setAttribute('role', 'group');
       seg.setAttribute('aria-label', 'What to do with your ' + p.n + ' entry');
-      for (const [val, label, title] of [
+      const OPTS = [
         ['combine', 'Combine', 'One entry: the save’s stats with the nickname and note you typed. Nothing is lost.'],
         ['mine', 'Keep mine', 'Leave your entry exactly as it is and don’t import the save’s copy.'],
         ['save', 'Use the save’s', 'Replace your entry with the save’s — your nickname and note on it are discarded.'],
-      ]) {
+      ];
+      for (const [val, label, title] of OPTS) {
         const b = document.createElement('button'); b.type = 'button';
         b.textContent = label; b.title = title;
         b.dataset.v = val; b.id = 'confbtn' + ci + '-' + val;
@@ -785,6 +786,14 @@ function renderSavePreview() {
         seg.appendChild(b);
       }
       row.appendChild(seg);
+      // Three words decided whether a nickname survived, and the sentence saying
+      // which only existed in a title — which touch never shows. Same fix as the
+      // backup flow's #smBackupEffect: state the consequence of the selection in
+      // visible text. Not a live region: recomputePlan rebuilds this whole row,
+      // and a re-inserted polite region announces unreliably (DESIGN.md §4).
+      const eff = document.createElement('p'); eff.className = 'sub confeff';
+      eff.textContent = (OPTS.find(o => o[0] === c.choice) || OPTS[0])[2];
+      row.appendChild(eff);
     } else {
       // More than one pal in the save fits. Never auto-pick one of N.
       const sp = document.createElement('div'); sp.className = 'confsave amb';

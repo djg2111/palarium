@@ -904,7 +904,10 @@ select#genderSel{padding:10px 12px}
 .tvp-hint{position:absolute;left:12px;bottom:12px;font-size:var(--fs-xs);color:var(--muted);pointer-events:none}
 .tchip.cur{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .stepopen{margin-left:auto;flex-shrink:0}
-.chaincard{width:min(760px,100%);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:16px 18px}
+/* spans the zone: at min(760px,100%) inside grid-column:1/-1 its right edge
+   landed 140px past the answer column and 116px into the rail, aligned with
+   nothing (DESIGN.md §11) */
+.chaincard{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:16px 18px}
 .chainhead{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
 .chainhead .ttl{font-weight:700;font-size:var(--fs-md)}
 .chainhead .nav{margin-left:auto;display:flex;gap:6px}
@@ -1279,6 +1282,8 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 .confsave.amb{color:var(--muted);font-style:italic}
 .conflab{display:block;font-size:var(--fs-xs);color:var(--muted);margin:8px 0 4px}
 .confseg,#smMode{margin-top:8px}
+/* the consequence of the selected option, in visible text — touch has no hover */
+.confeff{font-size:var(--fs-sm);color:var(--muted);margin:6px 0 0;line-height:1.45}
 /* the way out to the other import path — quiet, but always in the same place
    at the foot of both entry screens */
 .smxlink{margin-top:22px;padding-top:14px;border-top:1px solid var(--border)}

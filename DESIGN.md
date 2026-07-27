@@ -183,6 +183,13 @@ there instead**, or the sentence is announced twice — Breed does this), `.warn
 destructive), `.pchip` (passive), `.tchip` (pal chip), `.badge` (outcome kinds),
 `.mchip` (meta), `.picker` (pal select), `.ptag` (tag input), `.needrow`, `.rsummary`.
 
+**A segmented choice whose options differ in consequence carries one visible line
+under it, naming the consequence of the selection** — `#smBackupEffect` for restore
+mode, `.confeff` for a save-reader conflict. A `title` per option is not enough:
+touch has no hover, and these are the controls deciding whether a nickname
+survives. The line is **not** a live region where its own renderer rebuilds it —
+a re-inserted polite region announces unreliably (same reason as `.resline`).
+
 `.worldlist` / `.worldbtn` — a vertical stack of **choice rows**. One row is a title
 (`.wname`, optional leading 18px Lucide icon), a consequence line (`.wsub`), an
 optional second `.wsub` caveat in `--muted`, and an optional faint detail (`.wpath`,
@@ -441,11 +448,6 @@ visual claims; contrast ratios computed, not eyeballed.
 
 ## 11 · Known-clunky backlog (ux-designer: start here)
 
-- **The save reader's conflict segrow** (`js/save.js`, `renderSavePreview`): Combine /
-  Keep mine / Use the save's explain themselves only in `title` attributes. On touch
-  that is three unexplained words deciding whether a nickname survives. Wants one
-  visible line under the segrow describing the selected option — the same fix the
-  backup flow's `#smBackupEffect` already uses.
 - **`#smPick`'s two choice rows are the quietest "forward" on any view**: fill 1.10:1
   and border 1.36:1 against the dialog surface, since a route-choice view carries no
   primary button (§4). Legal — the rows are identified by their text, and hover
@@ -471,9 +473,6 @@ visual claims; contrast ratios computed, not eyeballed.
   4"; focus stays on the nav button, so a screen-reader user never hears which step
   they are on. Wants the step count in the status sentence while a chain is active —
   which is a change to §4's one-sentence-answer contract, so it needs a spec first.
-- **The chain card's right edge aligns with nothing** at ≥900px: `width:min(760px,100%)`
-  inside `grid-column:1/-1` stops it 140px past the answer column and 116px into the
-  rail. Either span the zone or clamp it to the answer column.
 - The picker's `@media(max-width:640px)` block (`.pop .list` / `.pop .row`) is a
   species tile hard-coded into a popover at one breakpoint. It should be
   refactored onto `.dexgrid`/`.dextile` so there is one tile implementation.
