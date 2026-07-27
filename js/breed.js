@@ -43,10 +43,19 @@ function focusResult() {
              document.querySelector('#breedResult .linkrow button');
   if (el) el.focus(); else focusPicker(pickA);
 }
-function appendChainCard(zone, a, b) {
-  if (!breedChain) return;
+// The step the chain is on, or null once the pair on screen stops being that
+// step — changing a picker mid-chain ends the chain. This has to be answered
+// BEFORE the status sentence is written, not after: the check used to live in
+// appendChainCard, which runs last, so a "Step 2 of 4:" prefix would announce a
+// step the pickers had already left.
+function chainStep(a, b) {
+  if (!breedChain) return null;
   const st = breedChain.steps[breedChain.idx];
-  if (!st || !a || !b || pairKey(a.k, b.k) !== pairKey(st.aK, st.bK)) { breedChain = null; return; }
+  if (!st || !a || !b || pairKey(a.k, b.k) !== pairKey(st.aK, st.bK)) { breedChain = null; return null; }
+  return st;
+}
+function appendChainCard(zone, a, b) {
+  if (!chainStep(a, b)) return;
   const n = breedChain.steps.length;
   const target = byKey.get(breedChain.steps[n - 1].cK);
   const card = document.createElement('div'); card.className = 'chaincard';
@@ -196,15 +205,23 @@ function renderBreed() {
   const one = kids.length === 1 ? kids[0].pal : null;
 
   // ---- the answer, in one sentence ----
+  // Inside a chain the answer only means something relative to the step, and the
+  // step count has nowhere else to be announced: #chainTtl is the card's
+  // accessible name, not a live region, and focus deliberately stays on the nav
+  // button after a step. So the one sentence carries it (DESIGN.md §4).
+  // A colon, not a dash — the unique kind already ends in an em-dash clause.
+  // No prefix on a one-step chain: a position that cannot change is noise.
+  const stepN = chainStep(a, b) && breedChain.steps.length > 1
+    ? `Step ${breedChain.idx + 1} of ${breedChain.steps.length}: ` : '';
   if (res.kind === 'gender') {
     // species, not pals — one egg hatches one pal; what varies is which species
-    setBreedStatus(pairPhrase(a, b), ' hatches one of two species.');
+    setBreedStatus(stepN, pairPhrase(a, b), ' hatches one of two species.');
   } else if (res.kind === 'same') {
-    setBreedStatus('Two ' + a.n + ' hatch ', strongName(one.n), '.');
+    setBreedStatus(stepN + 'Two ' + a.n + ' hatch ', strongName(one.n), '.');
   } else if (res.kind === 'unique') {
-    setBreedStatus(pairPhrase(a, b), ' hatches ', strongName(one.n), ' — a unique combo.');
+    setBreedStatus(stepN, pairPhrase(a, b), ' hatches ', strongName(one.n), ' — a unique combo.');
   } else {
-    setBreedStatus(pairPhrase(a, b), ' hatches ', strongName(one.n), '.');
+    setBreedStatus(stepN, pairPhrase(a, b), ' hatches ', strongName(one.n), '.');
   }
 
   // ---- the card, or two of them ----

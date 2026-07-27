@@ -122,27 +122,96 @@ const SMOOTH = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' :
 
 // ---------- toasts (aria-live region) & switch helper ----------
 const toastsEl = document.getElementById('toasts');
-function toast(msg, undoFn, action) {
+// The stack is a landmark only while it holds something. An empty labelled
+// region is a dead end for landmark navigation, and the landmark is the whole
+// point: it gives a screen-reader user the one-key route their software already
+// has (NVDA D, JAWS R, VO rotor) to a control that is otherwise dozens of tab
+// stops away at the end of <body>.
+function syncToastRegion() {
+  if (toastsEl.firstChild) {
+    toastsEl.setAttribute('role', 'region');
+    toastsEl.setAttribute('aria-label', 'Notifications');
+  } else {
+    toastsEl.removeAttribute('role');
+    toastsEl.removeAttribute('aria-label');
+  }
+}
+let toastReturn = null;                  // where focus was when Alt+Z was pressed
+function restoreFromToast() {
+  const next = toastsEl.lastElementChild;
+  const btn = next && next.querySelector('.undo, .tx');
+  if (btn) { btn.focus(); return; }
+  if (toastReturn && document.contains(toastReturn)) { toastReturn.focus(); return; }
+  // last resort: the current tab button, which always exists
+  document.querySelector('#tabs button.active')?.focus();
+}
+// opts.ms overrides the dwell — a bulk Undo covers more than one record and
+// needs longer to notice, read and reach (DESIGN.md §4)
+function toast(msg, undoFn, action, opts = {}) {
   const t = document.createElement('div'); t.className = 'toast';
   const s = document.createElement('span'); s.textContent = msg; t.appendChild(s);
+  const ms = opts.ms || (undoFn || action ? 8000 : 3500);
   let timer;
-  const dismiss = () => { clearTimeout(timer); t.remove(); };
+  const close = () => {
+    clearTimeout(timer);
+    const held = t.contains(document.activeElement);
+    t.remove(); syncToastRegion();
+    if (held) restoreFromToast();
+  };
+  // A toast the user has just reached must not expire under their hands (2.2.1).
+  // Full duration on leave rather than the remainder: they were reading it.
+  const arm = () => { clearTimeout(timer); timer = setTimeout(close, ms); };
+  t.addEventListener('mouseenter', () => clearTimeout(timer));
+  t.addEventListener('mouseleave', arm);
+  t.addEventListener('focusin', () => clearTimeout(timer));
+  t.addEventListener('focusout', e => { if (!t.contains(e.relatedTarget)) arm(); });
+  // A callback may place focus itself — the roster's undo re-renders and
+  // re-focuses a row. Only take focus back if it left it on the dying toast.
+  const fire = fn => () => {
+    fn();
+    const stray = document.activeElement === document.body || t.contains(document.activeElement);
+    clearTimeout(timer); t.remove(); syncToastRegion();
+    if (stray) restoreFromToast();
+  };
   if (undoFn) {
     const u = document.createElement('button'); u.className = 'undo'; u.textContent = 'Undo';
-    u.addEventListener('click', () => { undoFn(); dismiss(); });
+    u.addEventListener('click', fire(undoFn));
     t.appendChild(u);
   }
   if (action) {
     const a = document.createElement('button'); a.className = 'undo'; a.textContent = action.label;
-    a.addEventListener('click', () => { action.fn(); dismiss(); });
+    a.addEventListener('click', fire(action.fn));
     t.appendChild(a);
   }
   const x = document.createElement('button'); x.className = 'tx'; x.textContent = '✕'; x.setAttribute('aria-label', 'Dismiss notification');
-  x.addEventListener('click', dismiss);
+  x.addEventListener('click', close);
   t.appendChild(x);
-  timer = setTimeout(dismiss, undoFn || action ? 8000 : 3500);
-  toastsEl.appendChild(t);
+  t.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+  arm();
+  toastsEl.appendChild(t); syncToastRegion();
 }
+// Alt+Z moves focus to the newest toast's first action; pressed again inside the
+// stack it walks to the next one, newest first. It focuses rather than fires:
+// the third argument carries non-undo actions ("Un-star Cattiva", "Edit it"), so
+// a key that "does the action" would do something different on every toast.
+// Alt, not Ctrl+Z — this app has a search box, a nickname field and a note field.
+document.addEventListener('keydown', e => {
+  if (!e.altKey || e.ctrlKey || e.metaKey || (e.key !== 'z' && e.key !== 'Z')) return;
+  const toasts = [...toastsEl.children];
+  // no toast: no preventDefault either, or Option+Z stops typing Ω on macOS
+  if (!toasts.length) return;
+  // a modal traps Tab; pulling focus outside the trap would break it. The live
+  // region still announces.
+  if (overlay.classList.contains('open') || roverlay.classList.contains('open')
+      || document.getElementById('soverlay').classList.contains('open')) return;
+  e.preventDefault();
+  const inside = toastsEl.contains(document.activeElement);
+  if (!inside) toastReturn = document.activeElement;
+  const order = toasts.reverse();                    // newest sits last in the DOM
+  const cur = inside ? order.indexOf(document.activeElement.closest('.toast')) : -1;
+  const btn = order[(cur + 1) % order.length].querySelector('.undo, .tx');
+  if (btn) btn.focus();
+});
 function setSwitch(el, on) { el.classList.toggle('on', on); el.setAttribute('aria-checked', String(on)); }
 
 // ---------- first-run setup checklist ----------

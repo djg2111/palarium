@@ -148,7 +148,7 @@ never the shape):
 
 | Class | Role |
 |---|---|
-| `.resline` | The one-sentence answer, in the heading block beside the `h2`, and the view's `aria-live="polite"` region. **Lives in `index.html` and is never rebuilt** — `renderBreed`'s `zone.innerHTML=''` would destroy the live region, and a re-inserted one announces unreliably. Update it with `replaceChildren`. |
+| `.resline` | The one-sentence answer, in the heading block beside the `h2`, and the view's `aria-live="polite"` region. **Lives in `index.html` and is never rebuilt** — `renderBreed`'s `zone.innerHTML=''` would destroy the live region, and a re-inserted one announces unreliably. Update it with `replaceChildren`. While a breeding chain is active **and has more than one step**, the sentence carries a leading `Step N of M: ` clause — inside a chain the answer only means something relative to the step, and the step count has nowhere else to be announced (`#chainTtl` is the card's accessible name, not a live region, and focus deliberately stays on the nav button after a step). A second live region on the card was rejected: two polite regions changing on the same press are read as two disconnected utterances. Whether the chain is still live must be answered **before** the sentence is written — `chainStep(a, b)` — or a picker change announces a step the pickers have already left. |
 | `.resrail` | The secondary column beside the answer: `.slotlb` "why" label, `.sub` reasoning, `.linkrow` next steps, then the footnote. Two columns above 900px, stacked below. |
 | `.result-zone` / `.result-zone.two` | The answer grid. `.two` is the gender kind — two equal card columns with the rail spanning `1/-1` beneath. |
 | `.cardopen` | A whole-card press target laid **over** the card (`position:absolute;inset:0`), never wrapped around it. `role="button"` on the card itself made its `aria-label` replace every heading and chip inside, and buried an `h3` in a button. Same idea as `.dextile-open`, different family. It must be `pointer-events:none` with the click handler on the **card** — as the only positioned descendant it otherwise hit-tests above every chip, silently killing their tooltips and text selection. Keyboard activation of the button bubbles a click to the card, so both routes still work. |
@@ -180,7 +180,9 @@ says itself once the names stop truncating.
 Other canon components: `.pcard` (view card), `.hint` (empty state — must include a
 next action; **a view with a persistent status line puts its empty-state sentence
 there instead**, or the sentence is announced twice — Breed does this), `.warnbox` (inline warning), `.toast` (feedback ≤8s, with Undo for
-destructive), `.pchip` (passive), `.tchip` (pal chip), `.badge` (outcome kinds),
+destructive; **12s when one Undo covers more than one record**, and the dwell
+pauses while the toast has hover or focus so a toast you have just reached
+cannot expire under your hands), `.pchip` (passive), `.tchip` (pal chip), `.badge` (outcome kinds),
 `.mchip` (meta), `.picker` (pal select), `.ptag` (tag input), `.needrow`, `.rsummary`.
 
 **A segmented choice whose options differ in consequence carries one visible line
@@ -386,7 +388,17 @@ recoloring/filters).
 - Tooltips (`title`) are enhancement only — any load-bearing information also exists
   inline, on tap, or in visible text (touch has no hover).
 - `aria-live="polite"` on counts/status that change from filtering; toasts live in the
-  existing polite region.
+  existing polite region. `#toasts` is also a `role="region"` labelled
+  *Notifications* **while it holds something** — an empty labelled landmark is a
+  dead end — so a screen reader's own landmark key reaches Undo. `Alt+Z` moves
+  focus to the newest toast's first action and cycles on repeat; it **focuses
+  rather than fires**, because `toast()`'s third argument carries non-undo actions
+  and a key that "does the action" would do something different every time. A
+  toast never takes focus on its own. Rejected on the way here: `role="alertdialog"`
+  (a dialog that self-destructs after 8s while holding focus is a trap that
+  empties), F6 (a browser-chrome key — overriding it removes the route to the
+  address bar), and moving `.toasts` earlier in `<body>` (same distance, opposite
+  direction).
 
 ## 9 · Layout & structure
 
@@ -466,9 +478,6 @@ visual claims; contrast ratios computed, not eyeballed.
   a dozen duds; that is a dozen separate ✕ presses and a dozen toasts. Wants a
   checkbox column and one bulk action bar with a single Undo. New selection model, so
   it did not belong in the layout pass.
-- **Toast Undo is far from the keyboard**: `.toasts` sits at the end of `<body>` and
-  is never focused, so reaching Undo means tabbing past the whole page. App-wide, not
-  specific to one view.
 - **Emoji migration (§7) — done.** Every pictographic emoji in the UI is now a game
   asset or a Lucide SVG. The only survivors are in `WORKS` (a `<select>` option
   can't hold an image) and in code comments describing the change. Two mechanical
@@ -477,8 +486,3 @@ visual claims; contrast ratios computed, not eyeballed.
   where a stroke icon does not), and a **repeated** emoji is never a bar chart —
   the food stat drew up to eight 🍖 and announced "cut of meat" eight times, in
   the one stat tile out of eight that hid its own number.
-- **A chain step announces the pair, not the step.** Pressing Next step updates
-  `#breedStatus` to the new pair and silently changes the chain title to "step 2 of
-  4"; focus stays on the nav button, so a screen-reader user never hears which step
-  they are on. Wants the step count in the status sentence while a chain is active —
-  which is a change to §4's one-sentence-answer contract, so it needs a spec first.

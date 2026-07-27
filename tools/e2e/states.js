@@ -88,6 +88,25 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await focusSane(page, 'Escape hands focus back to the picker button');
   }
 
+  // the chain card is a Breed state reachable only through the Planner
+  console.log('\nBREED CHAIN — arriving from the Planner, and stepping');
+  await nav(page, '#/plan/SheepBall+ElecCat/Anubis', 900);
+  if (await reach(page, async () => {
+    await page.click('#view-plan .stepopen');
+    await page.waitForSelector('.chaincard', {timeout: 3000});
+  }, 'the breeding chain card')) {
+    await audit(page, 'breed chain, step 1');
+    await overflow(page, 'breed chain');
+    await focusSane(page, 'arriving from the Planner lands on the chain card');
+    await page.click('.chaincard .nav button[data-d="1"]');
+    await page.waitForTimeout(350);
+    await audit(page, 'breed chain, after Next step');
+    await focusSane(page, 'stepping keeps focus on the nav');
+    const said = await page.evaluate(() => document.getElementById('breedStatus').textContent);
+    if (/^Step [0-9]+ of [0-9]+: /.test(said)) console.log('  ✓ the status sentence names the step: ' + JSON.stringify(said.slice(0, 40)));
+    else { console.log('  ✗ the status sentence lost its step prefix: ' + JSON.stringify(said)); fail(); }
+  }
+
   console.log('\nPAL MODAL');
   await nav(page, '#/pal/Anubis', 500);
   if (await reach(page, () => page.waitForSelector('#overlay.open', {timeout: 3000}), 'the pal modal')) {

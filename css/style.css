@@ -807,6 +807,9 @@ select#genderSel{padding:10px 12px}
    of one-word lines. The container ignores pointer events; the toasts don't. */
 .toasts{position:fixed;bottom:18px;left:0;right:0;z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
 .toast{pointer-events:auto;display:flex;align-items:center;gap:14px;background:var(--overlay);border:1px solid var(--border-strong);border-radius:var(--r-lg);padding:11px 16px;box-shadow:0 10px 34px rgba(0,0,0,.55);font-size:var(--fs-md);animation:pop var(--t-base) var(--ease-out);max-width:min(480px,92vw)}
+/* both measured under the 24px floor of WCAG 2.2 2.5.8 — the Undo at 36×21 and
+   the dismiss at 23×25 — on the one control the whole Alt+Z route exists to reach */
+.toast .undo,.toast .tx{min-width:24px;min-height:24px;display:inline-flex;align-items:center;justify-content:center}
 .toast .undo{color:var(--accent);font-weight:700}
 .toast .undo:hover{text-decoration:underline}
 .toast .tx{color:var(--muted);padding:2px 6px;border-radius:var(--r-sm)}
