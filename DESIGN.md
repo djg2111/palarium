@@ -205,6 +205,15 @@ This is a deliberate reading of "one primary per view" as *at most* one, not at
 least one: two `.alink.big` buttons side by side made the second look like a
 lesser fallback, when it is simply the other route.
 
+The picker's `@media(max-width:640px)` grid is a **second density of the species
+tile, not a copy of `.dextile`** — measured, the two share three declarations
+(column flex, centred art, centred name) and disagree on every other one. The
+popover caps itself at `min(340px, 100vw - 24px)`, so its fixed `repeat(4,1fr)`
+yields 74–85px tiles from 320 all the way up, which is what `auto-fill` would
+compute anyway; and `.dextile`'s card border and `--surface` fill would be a card
+drawn on an `--overlay` popover. Keep them separate, and keep the shared idea —
+art over a centred name — reading the same at both densities.
+
 Paldex (two views over one pipeline — recognising 299 distinct arts to mark
 what you own, versus comparing seven columns of numbers; a grid cannot do the
 second and a table is worst at the first):
@@ -473,6 +482,3 @@ visual claims; contrast ratios computed, not eyeballed.
   4"; focus stays on the nav button, so a screen-reader user never hears which step
   they are on. Wants the step count in the status sentence while a chain is active —
   which is a change to §4's one-sentence-answer contract, so it needs a spec first.
-- The picker's `@media(max-width:640px)` block (`.pop .list` / `.pop .row`) is a
-  species tile hard-coded into a popover at one breakpoint. It should be
-  refactored onto `.dexgrid`/`.dextile` so there is one tile implementation.
