@@ -479,11 +479,21 @@
 
     <h3 class="smh3">From my Palworld save</h3>
     <p class="sub">Fills your roster with the pals you actually own — species, gender, IVs, passives and level. Your nicknames and notes are never overwritten.</p>
-    <div class="smchoose">
-      <button type="button" class="alink primary big" id="smChooseDir">Choose my save folder…</button>
-      <button type="button" class="alink big" id="smChoose">Pick one Level.sav instead…</button>
+    <div class="worldlist" id="smPickList" role="list">
+      <div class="worldrow" role="listitem">
+        <button type="button" class="worldbtn" id="smChooseDir" aria-labelledby="smDirName" aria-describedby="smDirWhy smDirUp">
+          <span class="wname" id="smDirName"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Choose my save folder…</span>
+          <span class="wsub" id="smDirWhy">Palarium lists the worlds inside by world and character name, so you don’t guess.</span>
+          <span class="wsub" id="smDirUp">Your browser will ask to confirm and will say “upload”. Nothing is uploaded.</span>
+        </button>
+      </div>
+      <div class="worldrow" role="listitem">
+        <button type="button" class="worldbtn" id="smChoose" aria-labelledby="smFileName" aria-describedby="smFileWhy">
+          <span class="wname" id="smFileName"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>Choose one Level.sav…</span>
+          <span class="wsub" id="smFileWhy">For when you already know which file you want — it skips the world list.</span>
+        </button>
+      </div>
     </div>
-    <p class="sub" id="smDirHint">Pick the folder your worlds live in and Palarium lists them by name, so you don’t have to work out which folder is which. Your browser will ask you to confirm and will use the word <b>“upload”</b> — that is just the wording browsers use for folder access. Nothing is uploaded.</p>
     <details class="moredet"><summary>Where is my save file?</summary>
       <div>
         <p>Your worlds live under this folder — paste it into the address bar of File Explorer:</p>

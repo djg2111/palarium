@@ -2059,13 +2059,29 @@ function renderRoster() {
     // describe two different populations.
     const gi = speciesGenderInfo(k);
     if (gi) {
+      // A one-sided roster blocks exactly one thing: pairing two of THESE.
+      // Any ♂ breeds with any ♀ whatever the species, so the old "No ♀ to
+      // breed with" was flatly untrue — it read as "these pals are unusable"
+      // when only same-species pairing (how you make more of this species)
+      // is off the table. The tally stays either way; a warning that eats
+      // the number it is warning about leaves nothing to act on.
       const oneSided = gi.n >= 2 && !gi.U && (!gi.M || !gi.F);
       const chip = document.createElement('span');
       chip.className = 'mchip' + (oneSided ? ' warn' : '');
       const tally = [gi.M ? gi.M + '♂' : '', gi.F ? gi.F + '♀' : '', gi.U ? gi.U + ' ?' : ''].filter(Boolean).join(' · ');
-      chip.appendChild(genderize(oneSided
-        ? `No ${gi.M ? '♀' : '♂'} to breed with`
-        : entries.length < total ? `of all ${total}: ${tally}` : tally));
+      const counts = entries.length < total ? `of all ${total}: ${tally}` : tally;
+      // The reason wraps to four lines in a 97px tile and adds ~35px to every
+      // row of the board, so a tile states the fact and the panel states why.
+      // Sighted: the plain tally has no chip chrome, the warning keeps it, so
+      // shape carries it as well as hue. AT gets the words either way.
+      chip.appendChild(genderize(!oneSided ? counts
+        : tile ? `all ${gi.n} ${gi.M ? '♂' : '♀'}`
+        : `${counts} · can’t pair with each other`));
+      if (oneSided && tile) {
+        const sr = document.createElement('span'); sr.className = 'sr-only';
+        sr.textContent = ' — can’t pair with each other';
+        chip.appendChild(sr);
+      }
       wrap.appendChild(chip);
     }
     return wrap;
@@ -2634,7 +2650,7 @@ async function useFolder(files) {
   const worlds = worldsFromFiles(files);
   if (!worlds.length) {
     smFail('No Level.sav in that folder. Pick the folder your worlds live in — ' + SAVE_PATH +
-      ' — or use “Pick one Level.sav instead…”. Nothing was changed.');
+      ' — or use “Choose one Level.sav…”. Nothing was changed.');
     return;
   }
   bar.style.width = '55%';

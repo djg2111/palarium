@@ -89,7 +89,8 @@ function buildBig(sizeMB, npals) {
   await page.waitForTimeout(300);
 
   const heap0 = await metric('JSHeapUsedSize');
-  await page.click('#savereadBtn');
+  // #savereadBtn went away in 08459ea when the two import buttons became one
+  await page.click('#importBtn');
   const t0 = Date.now();
   await page.setInputFiles('#saveFile', file);
   let peak = heap0;

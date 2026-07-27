@@ -204,14 +204,20 @@ async function focusSane(page, label) {
     await page.setViewportSize({width: 320, height: 900}); await page.waitForTimeout(300);
     await page.screenshot({path: path.join(__dirname, 'shot-roster-320.png')});
     await page.setViewportSize({width: 1280, height: 900}); await page.waitForTimeout(200);
-    // the roster is always grouped now; audit the two states the user can
-    // reach from the controls — compact rows, and every section collapsed
+    // The roster is always grouped; audit the three states the controls reach.
+    // #denseToggle is disabled in Tiles with nothing open (js/app.js renderRoster),
+    // and #collapseAll went away with the Tiles/Rows switch — clicking either
+    // where they used to be threw and this suite never reached its last states.
+    await page.click('#rosterView button[data-v="rows"]'); await page.waitForTimeout(400);
+    await audit(page, 'roster in rows after an import');
+    await overflow(page, 'roster in rows');
     await page.click('#denseToggle'); await page.waitForTimeout(400);
     await audit(page, 'roster in compact rows after an import');
     await overflow(page, 'roster in compact rows');
-    await page.click('#collapseAll'); await page.waitForTimeout(400);
-    await audit(page, 'roster with every species collapsed');
-    await overflow(page, 'roster collapsed');
+    await page.click('#rosterView button[data-v="tiles"]'); await page.waitForTimeout(400);
+    await page.click('#rosterList .rostile'); await page.waitForTimeout(400);
+    await audit(page, 'roster tiles with a species panel open');
+    await overflow(page, 'roster tiles with a panel open');
   } else console.log('  (skipped — no real save available)');
 
   const probs = problems(h);

@@ -468,7 +468,9 @@ tbody tr:hover{background:var(--surface)}
    board — measured +97px across the old 1024 seam. Phones keep a smaller
    track because 120px would drop them to two columns. */
 .roster.tileview{grid-template-columns:repeat(auto-fill,minmax(min(120px,100%),1fr))}
-.roster.rowview{grid-template-columns:1fr}
+/* minmax(0,1fr), not 1fr: a bare 1fr floors the track at the widest section's
+   min-content, so one long passive chip row pushed the whole page past 320px */
+.roster.rowview{grid-template-columns:minmax(0,1fr)}
 @media (max-width:640px){.roster.tileview{grid-template-columns:repeat(auto-fill,minmax(min(96px,100%),1fr));gap:8px}}
 .rospanel,.roster>.hint{grid-column:1/-1}
 .strip{display:flex;flex-wrap:wrap;gap:8px}
@@ -616,6 +618,11 @@ select#genderSel{padding:10px 12px}
 .rostile .tname{font-size:var(--fs-sm);font-weight:600;line-height:1.25;overflow-wrap:anywhere}
 .rostile .chiprow{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;min-width:0;max-width:100%}
 .rostile .chiprow .mchip{flex-wrap:wrap;justify-content:center;row-gap:0;max-width:100%}
+/* The tally drops its chip chrome, the warning keeps it — at EVERY width, not
+   just on phones. The tile's warn text is a bare count ("all 3 ♂"), so without
+   this the two chips are geometrically identical and hue is the only signal. */
+.rostile .chiprow .mchip:not(.warn){background:none;border:0;padding:0;
+  font-size:var(--fs-xs);color:var(--muted)}
 /* a persistent, non-hover-gated "this opens" cue */
 .tchev{position:absolute;bottom:4px;right:6px;color:var(--muted);
   transition:transform var(--t-fast) var(--ease-out)}
@@ -629,9 +636,6 @@ select#genderSel{padding:10px 12px}
   .rospanel .rosband .chiprow{order:3;flex:1 1 100%}
   .rostile{padding:8px 6px 16px;gap:2px}
   .rostile .pico{--ico:44px}
-  /* the tally drops its chip chrome here; the warning keeps it */
-  .rostile .chiprow .mchip:not(.warn){background:none;border:0;padding:0;
-    font-size:var(--fs-xs);color:var(--muted)}
 }
 
 /* ---- the expanding panel ---- */
@@ -680,6 +684,9 @@ select#genderSel{padding:10px 12px}
 }
 /* a meta chip that carries a warning — never colour alone, it says the words */
 .mchip.warn{color:var(--danger);border-color:var(--danger-line);background:var(--danger-tint)}
+/* A pink ♀ inside a pink chip reads as chip text, not as a gender colour — the
+   glyph's shape already carries the gender, so let it join the warning. */
+.mchip.warn .g{color:inherit}
 .rosband .pico{--ico:28px}
 /* compact: the same row, less air. Scoped to open sections — a tile is
    already the dense presentation of a species, which keeps "Compact rows"
@@ -1186,10 +1193,18 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 .worldbtn{display:block;width:100%;text-align:left;background:var(--raised);border:1px solid var(--border);
   border-radius:var(--r-lg);padding:12px 15px;cursor:pointer;color:var(--text);transition:border-color var(--t-fast),background var(--t-fast)}
 .worldbtn:hover{border-color:var(--accent);background:var(--surface)}
-.worldbtn .wname{display:block;font-weight:600;font-size:var(--fs-md);margin-bottom:2px}
+/* flex, not block, so a leading icon sits beside the title */
+.worldbtn .wname{display:flex;align-items:center;gap:8px;font-weight:600;font-size:var(--fs-md);margin-bottom:2px}
+.worldbtn .wname svg{flex:none;width:18px;height:18px;color:var(--muted)}
 .worldbtn .wsub{display:block;color:var(--text-2);font-size:var(--fs-sm);line-height:1.45}
+/* a second caption is a caveat, not the value — one rank quieter than the first */
+.worldbtn .wsub + .wsub{color:var(--muted);margin-top:2px}
 .worldbtn .wpath{display:block;color:var(--muted);font-size:var(--fs-xs);margin-top:3px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* the disclosure is the same width, radius and border as a choice row — without
+   this it sits closer to the stack than the rows sit to each other, and reads
+   as a third route */
+.worldlist + .moredet{margin-top:var(--sp-3)}
 
 /* ===================== phones (≤640px) =====================
    Desktop lays these views out as wrap-when-needed flex rows. At phone width

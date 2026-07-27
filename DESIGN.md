@@ -129,6 +129,21 @@ next action), `.warnbox` (inline warning), `.toast` (feedback ≤8s, with Undo f
 destructive), `.pchip` (passive), `.tchip` (pal chip), `.badge` (outcome kinds),
 `.mchip` (meta), `.picker` (pal select), `.ptag` (tag input), `.needrow`, `.rsummary`.
 
+`.worldlist` / `.worldbtn` — a vertical stack of **choice rows**. One row is a title
+(`.wname`, optional leading 18px Lucide icon), a consequence line (`.wsub`), an
+optional second `.wsub` caveat in `--muted`, and an optional faint detail (`.wpath`,
+single-line, ellipsised). The whole row is the press target. The name and captions
+reach AT either through `aria-labelledby`/`aria-describedby` (`#smPickList`, where the
+copy is authored in the markup) or through a composed `aria-label` (`#smWorldList`,
+where the caption is generated). Used for the two ways into the save reader and for
+the worlds a folder produces — the same shape twice, so both screens read alike.
+
+**A view whose whole job is choosing a route has no primary button** — the first
+choice row is the recommendation. `#smPick` and `#smWorlds` are both this shape.
+This is a deliberate reading of "one primary per view" as *at most* one, not at
+least one: two `.alink.big` buttons side by side made the second look like a
+lesser fallback, when it is simply the other route.
+
 Paldex (two views over one pipeline — recognising 299 distinct arts to mark
 what you own, versus comparing seven columns of numbers; a grid cannot do the
 second and a table is worst at the first):
@@ -161,11 +176,20 @@ siblings, so grouping is the shape of the data, not a preference):
 | `.rostile` | One species in **Tiles** view: a `<button aria-expanded aria-controls="rosPanel">` carrying art, a count badge on the art, the name and the gender tally. The whole tile is the press target. |
 | `.rospanel` | The expanding panel. A `<section role="region" aria-labelledby>` spanning `1/-1`, placed as a real sibling **after the last tile of the open tile's visual row** — so grid auto-placement puts it on its own row, the board resumes underneath, and DOM order stays visual order. `grid-auto-flow:dense` remains **forbidden**, and is not needed. |
 | `.rosband` | The species header band. One implementation, two homes: a Rows section and the panel header. |
-| `.roster` | The grid. `.tileview` auto-fills a **single 120px track** above 640px and 96px below; `.rowview` is a single column. One track, not a ladder — every extra breakpoint steps the tile up and the column count down, so a wider window produces a *taller* board. |
+| `.roster` | The grid. `.tileview` auto-fills a **single 120px track** above 640px and 96px below; `.rowview` is a single `minmax(0,1fr)` column. One track, not a ladder — every extra breakpoint steps the tile up and the column count down, so a wider window produces a *taller* board. **`minmax(0,1fr)`, never a bare `1fr`**: `1fr` floors the track at the widest section's min-content, so one long passive chip row pushed the whole page to 356px and broke 1.4.10 Reflow at 320. |
 | `.chiprow` | The chip line inside a header band or a tile. |
 | `.roslist` / `.rosrow` | The section's `<ul>` and one pal per `<li>`. Fixed grid tracks (identity · passives · note · actions) so columns align down the whole section. Replaces the former `.rospal` **and** `.gentry`. |
-| `.mchip.warn` | A meta chip carrying a warning — `--danger` text, tint fill, `--danger-line` border. Always states the warning in words; colour is never the only signal. |
+| `.mchip.warn` | A meta chip carrying a warning — `--danger` text, tint fill, `--danger-line` border. It keeps its pill where the plain `.mchip` beside it does not, so shape and not only hue separates them. States the warning in words wherever the width allows, and in an `.sr-only` tail where it does not — never in colour alone. Gender glyphs inside it inherit `--danger` rather than `--male`/`--female`: a pink ♀ on a pink chip stops reading as a gender colour, and the pairing lands on 4.50. |
 | `.rentacts` | The full, named action set for one entry, inside its pal card. Row toolbars stay to three glyphs; everything else lives here at comfortable size. |
+
+**The gender chip states a same-species limit, never a breeding limit.** In Palworld
+any ♂ pairs with any ♀ whatever the species, so a roster of three ♂ Lamball is only
+barred from *pairing with each other* — which is how you make more Lamball. Say that
+and nothing wider. The chip has two lengths because the reason wraps to four lines in
+a 97px tile and adds ~35px to **every** row of the board: a tile shows `all 3 ♂` with
+the reason in an `.sr-only` tail, while the header band and the open panel show
+`3♂ · can’t pair with each other` outright. Both keep the tally — a warning that eats
+the number it is warning about leaves nothing to act on.
 
 **Grid boards are one tab stop.** `.roster.tileview` and `.dexgrid` both use a
 roving `tabindex` over their items. Vertical movement should be **geometric** —
@@ -343,6 +367,14 @@ visual claims; contrast ratios computed, not eyeballed.
   that is three unexplained words deciding whether a nickname survives. Wants one
   visible line under the segrow describing the selected option — the same fix the
   backup flow's `#smBackupEffect` already uses.
+- **`.odds.wild` ("📍 Where?") is 70.9×20.5 CSS px** at both 1366 and 360 — under the
+  24px of 2.5.8, and it was not established whether the spacing exception clears it.
+  Off every surface the roster/save work touched, so it was not fixed there.
+- **`#smPick`'s two choice rows are the quietest "forward" on any view**: fill 1.10:1
+  and border 1.36:1 against the dialog surface, since a route-choice view carries no
+  primary button (§4). Legal — the rows are identified by their text, and hover
+  (7.66:1) and focus (14.64:1) both clear 3:1 — but if any route-choice view ever
+  grows past two options, the resting affordance needs revisiting first.
 - **Port the roster's geometric grid navigation to `.dexgrid`** (§4). The Paldex
   still uses `index ± columns`, so on any width where 299 % columns ≠ 0, ArrowUp
   off the short last row returns to a column you were never in.

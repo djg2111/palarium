@@ -38,6 +38,10 @@ const SAVE = process.argv[2] || path.join(__dirname, '..', 'saves', 'Level.sav')
   if (pick && opts.includes(pick.name)) {
     await page.selectOption('#rosterPassiveFilter', pick.name);
     await page.waitForTimeout(300);
+    // Tiles is the default view and shows one tile per species, so a per-pal
+    // count only exists in Rows. Counting .rosrow in Tiles reported 0 forever.
+    await page.click('#rosterView button[data-v="rows"]');
+    await page.waitForTimeout(300);
     const shown = await page.$$eval('#rosterList .rosrow', els => els.length);
     console.log(`filter "${pick.name}": storage says ${pick.n}, roster shows ${shown}`, shown === pick.n ? 'MATCH ✓' : 'MISMATCH ✗');
   } else console.log('passive filter: could not pick a common passive', pick);
