@@ -111,6 +111,7 @@
         </div>
         <div class="collacts">
           <button class="alink primary" id="rosterOpenAdd">+ Add pal</button>
+          <button class="alink" id="rosterSelect" hidden>Select pals</button>
           <button class="alink savebtn" id="importBtn" title="Fill your roster from your Palworld save file. Your save is never changed."><svg class="sicon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>Read my save</button>
           <button class="alink" id="exportBtn">Backup &amp; restore</button>
           <input type="file" id="importFile" accept="application/json,.json" style="display:none">
@@ -135,7 +136,14 @@
         <div class="ctl"><label aria-hidden="true">&nbsp;</label>
           <button type="button" class="toggle" id="denseToggle" role="switch" aria-checked="false"><span class="kn"></span>Compact rows</button></div>
       </div>
-      <div class="roster" id="rosterList"></div>
+            <!-- DOM-placed before the list it summarises so one Shift+Tab reaches it
+           from any row; rendered fixed at the bottom of the viewport. -->
+      <div class="bulkbar" id="bulkbar" hidden>
+        <span class="cnt" id="bulkCount" aria-live="polite" aria-atomic="true"></span>
+        <button type="button" class="alink danger" id="bulkRemove" disabled>Remove</button>
+        <button type="button" class="tx" id="bulkDone">Done</button>
+      </div>
+<div class="roster" id="rosterList"></div>
     </div>
   </section>
 

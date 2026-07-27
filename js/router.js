@@ -26,6 +26,9 @@ function save() {
 let currentTab = 'breed';
 const tabsEl = document.getElementById('tabs');
 function showTab(v) {
+  // A selection you cannot see is a trap, and the bulk bar is viewport-fixed so
+  // it would otherwise follow you onto another tab.
+  if (v !== 'roster' && typeof selecting !== 'undefined' && selecting) exitSelect(false);
   if (v === 'roster') setTimeout(placeRosterPanel, 0);   // tracks resolve once .active lands
   currentTab = v;
   document.querySelectorAll('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));

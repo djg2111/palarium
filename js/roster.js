@@ -276,6 +276,13 @@ let autoOpened = false;   // the open panel came from a filter, not a press
 // two states of one thing.
 let rosterView = 'tiles';      // 'tiles' | 'rows'
 let openSpecies = null;        // session only; never written to palbreed
+// ---------- bulk selection ----------
+// Session only, like openSpecies. Entry ids, not indices: a re-sort or an edit
+// must not move the selection to a different pal.
+let selecting = false;
+let selected = new Set();
+let preSelectView = null;      // the view and panel to restore on exit
+let lastToggledId = null;      // anchor for Shift+click / Shift+Arrow ranges
 const rosterList = document.getElementById('rosterList');
 const rosterViewEl = document.getElementById('rosterView');
 const denseToggle = document.getElementById('denseToggle');
@@ -292,6 +299,47 @@ rosterViewEl.addEventListener('click', e => {
   save(); renderRoster();
   b.focus();   // the pressed segment survives its own re-render
 });
+
+const bulkBar = document.getElementById('bulkbar');
+const bulkCount = document.getElementById('bulkCount');
+const bulkRemove = document.getElementById('bulkRemove');
+const bulkDone = document.getElementById('bulkDone');
+const rosterSelectBtn = document.getElementById('rosterSelect');
+// Selection lives in Rows only. Tiles shows one tile per SPECIES and no pals at
+// all, so a checkbox there would either mean "all 6 Lamball" — conflating a
+// species with a pal (§6) — or be a second focusable inside a board that §4
+// keeps to one tab stop. Entering forces Rows and hides the view switch for the
+// duration, the same way §9 hides a view switch over a pane that isn't showing.
+function enterSelect() {
+  if (selecting || !roster.length) return;
+  selecting = true;
+  selected.clear(); lastToggledId = null;
+  preSelectView = {view: rosterView, open: openSpecies};
+  rosterView = 'rows'; openSpecies = null;
+  document.body.classList.add('selecting');
+  renderRoster();
+  const first = rosterList.querySelector('.rchk');
+  if (first) first.focus();
+}
+function exitSelect(refocus = true) {
+  if (!selecting) return;
+  selecting = false;
+  selected.clear(); lastToggledId = null;
+  document.body.classList.remove('selecting');
+  if (preSelectView) { rosterView = preSelectView.view; openSpecies = preSelectView.open; preSelectView = null; }
+  renderRoster();
+  // §9: the button hides itself on entry, so it has to be back on screen
+  // before it can be the thing focus returns to. renderRoster just did that.
+  if (refocus && !rosterSelectBtn.hidden) rosterSelectBtn.focus();
+}
+// the bar's height feeds the list's bottom padding and the toast offset, so a
+// wrapped count line can never hide the last row or the Undo
+new ResizeObserver(() => {
+  document.documentElement.style.setProperty('--bulkbar-h', Math.round(bulkBar.getBoundingClientRect().height) + 'px');
+}).observe(bulkBar);
+rosterSelectBtn.addEventListener('click', enterSelect);
+bulkDone.addEventListener('click', () => exitSelect());
+bulkRemove.addEventListener('click', () => removeEntries([...selected]));
 
 // ---------- the expanding panel ----------
 // The panel is a real sibling placed after the last tile of the open tile's
@@ -332,6 +380,7 @@ function closePanel(refocus = true) {
 // Arrowing across the board never opens or closes anything — this is a set of
 // disclosures, not a menu. Only Enter, Space, click, ✕ and Escape do that.
 rosterList.addEventListener('keydown', e => {
+  if (selecting) { selectKeys(e); return; }
   if (e.key === 'Escape' && openSpecies && rosterList.contains(e.target)) {
     e.stopPropagation(); closePanel(); return;
   }
@@ -357,6 +406,99 @@ rosterList.addEventListener('keydown', e => {
   tiles[j].scrollIntoView({block: 'nearest',
     behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
 });
+// The rows a filter is currently showing, in render order — what "select all"
+// and a band checkbox act on. Selecting is done AFTER narrowing, which is why
+// filtering must never clear the selection; the bar states the discrepancy.
+function shownRows() {
+  return [...rosterList.querySelectorAll('.rosrow')].map(li => li.dataset.id);
+}
+function toggleRow(id, on, range) {
+  const ids = shownRows();
+  // Shift extends from the last toggled row to this one, setting all to the new
+  // state. A pointer/modifier convenience only — every row is reachable alone.
+  if (range && lastToggledId && lastToggledId !== id) {
+    const a = ids.indexOf(lastToggledId), b = ids.indexOf(id);
+    if (a >= 0 && b >= 0) for (const k of ids.slice(Math.min(a, b), Math.max(a, b) + 1)) on ? selected.add(k) : selected.delete(k);
+  } else on ? selected.add(id) : selected.delete(id);
+  lastToggledId = id;
+  syncSelectUI();
+}
+// null = every shown row; a species key = that section's shown rows
+function toggleGroup(k, on) {
+  for (const li of rosterList.querySelectorAll('.rosrow')) {
+    if (k && li.closest('.rosgrp')?.dataset.k !== k) continue;
+    on ? selected.add(li.dataset.id) : selected.delete(li.dataset.id);
+  }
+  syncSelectUI();
+}
+// Repaint the checkboxes and the bar without re-rendering the list: a full
+// re-render on every tick would throw away focus mid-selection.
+function syncSelectUI() {
+  if (!selecting) return;
+  const shown = shownRows();
+  for (const li of rosterList.querySelectorAll('.rosrow')) {
+    const on = selected.has(li.dataset.id);
+    li.classList.toggle('on', on);
+    const cb = li.querySelector('.rchk'); if (cb) cb.checked = on;
+  }
+  const tri = (cb, ids) => {
+    const n = ids.filter(id => selected.has(id)).length;
+    cb.checked = n > 0 && n === ids.length;
+    cb.indeterminate = n > 0 && n < ids.length;
+  };
+  for (const sec of rosterList.querySelectorAll('.rosgrp')) {
+    const cb = sec.querySelector('.rosband .rchk'); if (!cb) continue;
+    tri(cb, [...sec.querySelectorAll('.rosrow')].map(li => li.dataset.id));
+  }
+  const allCb = rosterList.querySelector('.rosselall .rchk');
+  if (allCb) tri(allCb, shown);
+
+  const n = selected.size;
+  const hidden = [...selected].filter(id => !shown.includes(id)).length;
+  // hidden-ness outranks "all of them": a selection you cannot see is the fact
+  // that changes what Remove will do
+  bulkCount.textContent = !n ? 'Pick the pals you want to remove.'
+    : hidden === n ? `${n} selected — none shown`
+    : hidden ? `${n} selected — ${hidden} not shown`
+    : n === roster.length ? `${n} selected — all of them`
+    : `${n} selected`;
+  bulkRemove.textContent = n ? 'Remove ' + n : 'Remove';
+  bulkRemove.disabled = !n;
+}
+// The list is one tab stop in selection mode: arrows walk the flat sequence of
+// checkboxes (check-all, band, rows, band, rows…), Tab leaves. Same convention
+// as the grid boards, and gridStep degrades to ±1 in a single column.
+function selectKeys(e) {
+  if (e.key === 'Escape') { e.stopPropagation(); exitSelect(); return true; }
+  const boxes = [...rosterList.querySelectorAll('.rchk')];
+  const cur = e.target.closest('.rchk');
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A') && rosterList.contains(e.target)) {
+    e.preventDefault();
+    const shown = shownRows();
+    toggleGroup(null, !shown.every(id => selected.has(id)));
+    return true;
+  }
+  if (!cur) return false;
+  const i = boxes.indexOf(cur);
+  let j = null;
+  if (e.key === 'ArrowDown') j = gridStep(boxes, cur, 1);
+  else if (e.key === 'ArrowUp') j = gridStep(boxes, cur, -1);
+  else if (e.key === 'Home') j = 0;
+  else if (e.key === 'End') j = boxes.length - 1;
+  else if (e.key === 'PageDown') j = Math.min(i + 10, boxes.length - 1);
+  else if (e.key === 'PageUp') j = Math.max(i - 10, 0);
+  if (j === null) { if (e.key.startsWith('Arrow')) e.preventDefault(); return true; }
+  e.preventDefault();
+  // Shift+Arrow paints the box it passes over with the anchor's state
+  if (e.shiftKey && boxes[j].dataset.kind === 'row' && cur.dataset.kind === 'row') {
+    toggleRow(boxes[j].dataset.key, cur.checked, false);
+  }
+  boxes.forEach(b => { b.tabIndex = -1; });
+  boxes[j].tabIndex = 0; boxes[j].focus();
+  boxes[j].scrollIntoView({block: 'nearest', behavior: SMOOTH});
+  return true;
+}
+
 // One pal, two places to act on it — the Roster row and the pal card. Both go
 // through these, so a duplicate always stars its species and a removal always
 // offers the same Undo and the same "species still ★ owned" follow-up.
@@ -375,6 +517,50 @@ function duplicateEntry(r) {
     if (i >= 0) roster.splice(i, 1);
     saveRoster(); renderRoster(); renderDex(); renderReverse();
   }, {label: 'Edit it', fn: () => { const e2 = roster.find(x => x.id === copy.id); if (e2) openRosterEditor(e2); }});
+}
+// One Undo for the whole batch. Capture in ascending original index, splice
+// descending so earlier indices stay valid, and restore ascending so positions
+// and the "Newest first" sort come back exactly as they were.
+function removeEntries(ids) {
+  const set = new Set(ids);
+  const taken = [];
+  roster.forEach((r, i) => { if (set.has(r.id)) taken.push({i, entry: r}); });
+  if (!taken.length) return;
+  // exactly one falls through to the single-entry path, so the two can never
+  // disagree about wording or about the still-starred follow-up
+  if (taken.length === 1) { selected.delete(taken[0].entry.id); removeEntry(taken[0].entry); renderRoster(); return; }
+  const speciesGone = [...new Set(taken.map(t => t.entry.k))]
+    .filter(k => !roster.some(r => r.k === k && !set.has(r.id)) && owned.has(k));
+  for (let i = taken.length - 1; i >= 0; i--) roster.splice(taken[i].i, 1);
+  selected.clear(); lastToggledId = null;
+  saveRoster(); renderRoster(); renderDex(); renderReverse();
+  const undo = () => {
+    for (const t of taken) roster.splice(Math.min(t.i, roster.length), 0, t.entry);
+    saveRoster(); renderRoster(); renderDex(); renderReverse();
+    const chk = rosterList.querySelector('.rchk'); if (chk) chk.focus();
+  };
+  const n = taken.length;
+  const all = !roster.length;
+  let msg = all ? `Removed all ${n} pals from your roster` : `Removed ${n} pals from your roster`;
+  let action = null;
+  if (!all && speciesGone.length) {
+    msg = speciesGone.length === 1
+      ? `Removed ${n} pals — ${byKey.get(speciesGone[0]).n} is still ★ owned`
+      : `Removed ${n} pals — ${speciesGone.length} species are still ★ owned`;
+    action = {
+      label: speciesGone.length === 1 ? 'Un-star ' + byKey.get(speciesGone[0]).n : 'Un-star ' + speciesGone.length + ' species',
+      fn: () => {
+        for (const k of speciesGone) if (owned.has(k)) toggleOwned(k);
+        renderDex(); renderReverse();
+        toast('Un-starred ' + speciesGone.length + ' species');
+      },
+    };
+  }
+  // 12s, not 8: undoing a batch is the highest-stakes reversal in the app and
+  // 8s is not enough to notice it, read it and reach it (DESIGN.md §4)
+  toast(msg, undo, action, {ms: 12000});
+  if (!roster.length) exitSelect();
+  else { const chk = rosterList.querySelector('.rchk'); if (chk) chk.focus(); }
 }
 function removeEntry(r) {
   const idx = roster.findIndex(x => x.id === r.id);
@@ -434,7 +620,13 @@ function renderRoster() {
   // hand it back afterwards — DESIGN.md §7. Every caller gets this for free.
   const ae = document.activeElement;
   let restore = null;
-  if (ae && list.contains(ae)) {
+  // In selection mode the list is one roving tab stop, so the successor is a
+  // checkbox index, not a row's named action. Captured separately, and the
+  // legacy path below is skipped — it would hunt for a .nm this mode doesn't
+  // render and drop focus on the header's Add button instead.
+  let chkIdx = selecting && ae && list.contains(ae) && ae.classList.contains('rchk')
+    ? [...list.querySelectorAll('.rchk')].indexOf(ae) : -1;
+  if (ae && list.contains(ae) && !selecting) {
     const row = ae.closest('.rosrow');
     const tile = ae.closest('.rostile');
     const band = ae.closest('.rosband');
@@ -463,7 +655,11 @@ function renderRoster() {
 
   const controls = document.querySelector('.roscontrols');
   if (controls) controls.hidden = !roster.length;
-  rosterViewEl.hidden = !roster.length;
+  // the view switch is hidden while selecting: selection only exists in Rows,
+  // so a control offering the other view would offer to lose the selection
+  rosterViewEl.hidden = !roster.length || selecting;
+  rosterSelectBtn.hidden = !roster.length || selecting;
+  bulkBar.hidden = !selecting;
   // nothing for it to compact until a panel or the Rows view supplies rows
   denseToggle.disabled = rosterView === 'tiles' && !openSpecies;
   setSeg(rosterViewEl, rosterView, 'v');
@@ -508,8 +704,26 @@ function renderRoster() {
     list.appendChild(h);
     // an early return is still a re-render — focus must not land on <body>
     if (restore) (h.querySelector('button') || document.getElementById('rosterOpenAdd')).focus();
+    // …and the bar still has to describe a selection this filter now hides,
+    // or it keeps announcing a count from before the filter was typed
+    if (selecting) syncSelectUI();
     renderRosterStrip(); return;
   }
+
+  // ---- selection helpers ----
+  // A native checkbox throughout: it is the only HTML control that exposes
+  // `mixed`, which the two tristate levels (band, check-all) need for 4.1.2.
+  const mkChk = (kind, key) => {
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.className = 'rchk'; cb.tabIndex = -1;
+    cb.dataset.kind = kind; if (key != null) cb.dataset.key = key;
+    if (kind === 'row') cb.checked = selected.has(key);
+    cb.addEventListener('change', e => {
+      if (kind === 'row') toggleRow(key, cb.checked, e.shiftKey);
+      else toggleGroup(kind === 'all' ? null : key, cb.checked);
+    });
+    return cb;
+  };
 
   // ---- one row's action cluster: a single tab stop, arrows move inside ----
   const mkActs = r => {
@@ -539,10 +753,53 @@ function renderRoster() {
   const mkRow = r => {
     const p = byKey.get(r.k);
     const li = document.createElement('li');
-    li.className = 'rosrow' + (r.id === editingId ? ' editing' : '');
+    li.className = 'rosrow' + (r.id === editingId ? ' editing' : '') + (selecting ? ' selectable' : '');
     li.dataset.id = r.id;
 
+    // In selection mode the row's own name button and its action toolbar are not
+    // rendered: Edit and Duplicate are the wrong verbs while you are operating
+    // on a set. So a row costs ZERO tab stops, not three — the whole list is one
+    // stop with a roving tabindex, like the grid boards (DESIGN.md §4).
+    if (selecting) {
+      const cb = mkChk('row', r.id);
+      // aria-label, so gender goes in as a word: a label prunes the subtree and
+      // a gEl glyph inside it would never be announced. Level and passives are
+      // what a dud is judged on, so they are what tells six rows apart.
+      const bits = [r.g === 'M' ? 'male ' : r.g === 'F' ? 'female ' : '', r.nick ? '“' + r.nick + '”' : (r.gname ? '“' + r.gname + '”' : p.n)];
+      let lbl = 'Select ' + bits.join('');
+      if (!r.g) lbl += ', gender not recorded';
+      if (r.lv) lbl += ', level ' + r.lv;
+      lbl += ' — ' + (r.ps.length ? r.ps.join(', ') : 'no passives');
+      cb.setAttribute('aria-label', lbl);
+      li.appendChild(cb);
+      // the whole row is a pointer target too; the checkbox stays the real
+      // control, so nothing is pointer-gated
+      li.addEventListener('click', e => {
+        if (e.target.closest('.rchk')) return;
+        toggleRow(r.id, !selected.has(r.id), e.shiftKey);
+      });
+    }
+
     const who = document.createElement('div'); who.className = 'who';
+    if (selecting) {
+      // static identity: same information, no controls
+      const n2 = document.createElement('span'); n2.className = 'nm';
+      if (r.g) { n2.appendChild(gEl(gsymR(r.g))); n2.append(' '); }
+      else { const u = document.createElement('span'); u.className = 'gu'; u.textContent = '?'; u.setAttribute('aria-hidden', 'true'); n2.appendChild(u); n2.append(' '); }
+      n2.append(r.nick ? '“' + r.nick + '”' : (r.gname ? '“' + r.gname + '”' : p.n));
+      who.appendChild(n2);
+      if (r.lv) { const lc = document.createElement('span'); lc.className = 'lvchip'; lc.textContent = 'Lv ' + r.lv; who.appendChild(lc); }
+      if (r.iv) { const ivc = document.createElement('span'); ivc.className = 'ivchip'; ivc.textContent = 'IV ' + r.iv.map(v => v === null ? '–' : v).join('·'); who.appendChild(ivc); }
+      li.appendChild(who);
+      const pc2 = document.createElement('div'); pc2.className = 'pscol';
+      if (r.ps.length) pc2.appendChild(passiveChips(r.ps));
+      else { const none = document.createElement('span'); none.className = 'nops'; none.textContent = 'No passives'; pc2.appendChild(none); }
+      li.appendChild(pc2);
+      const nt2 = document.createElement('div'); nt2.className = 'note';
+      if (r.note) { nt2.textContent = r.note; nt2.title = r.note; }
+      li.appendChild(nt2);
+      return li;
+    }
     const nm = document.createElement('button');
     nm.type = 'button'; nm.className = 'thbtn nm'; nm.dataset.act = 'name';
     // The accessible name has to contain what the button visibly says, or
@@ -674,6 +931,13 @@ function renderRoster() {
   const band = (p, entries, total) => {
     const h = document.createElement('h3');
     h.className = 'rosband';
+    if (selecting) {
+      const cb = mkChk('band', p.k);
+      // no visible text of its own, so it has to say what it selects
+      cb.setAttribute('aria-label', entries.length === 1
+        ? 'Select ' + p.n : `Select all ${entries.length} ${p.n}`);
+      h.prepend(cb);
+    }
     const ic = icon(p, 28, false, true);
     ic.style.removeProperty('--ico');
     h.appendChild(ic);
@@ -682,6 +946,21 @@ function renderRoster() {
     h.appendChild(chipsFor(p.k, entries, total));
     return {h, nm};
   };
+
+  if (selecting) {
+    // A control, not a heading: an <h3> here would inject a phantom section into
+    // the document outline. Reuses .rosband's padding and its lead column so all
+    // three checkbox levels line up on one vertical rule.
+    const sa = document.createElement('div'); sa.className = 'rosselall';
+    const cb = mkChk('all');
+    const lb = document.createElement('span'); lb.className = 'salb';
+    lb.textContent = filtering ? `Select all ${rows.length} shown` : `Select all ${rows.length}`;
+    // The label never flips to "Clear selection" — the tristate box carries that
+    cb.setAttribute('aria-label', lb.textContent);
+    sa.append(cb, lb);
+    sa.addEventListener('click', e => { if (!e.target.closest('.rchk')) { cb.checked = !cb.checked; toggleGroup(null, cb.checked); } });
+    list.appendChild(sa);
+  }
 
   if (rosterView === 'rows') {
     for (const [k, entries] of sections) {
@@ -794,6 +1073,13 @@ function renderRoster() {
     if (target && target.scrollIntoView) target.scrollIntoView({block: 'nearest'});
   }
 
+  if (selecting) {
+    const boxes = [...rosterList.querySelectorAll('.rchk')];
+    const keep = chkIdx >= 0 ? Math.min(chkIdx, boxes.length - 1) : 0;
+    boxes.forEach((b2, n) => { b2.tabIndex = n === keep ? 0 : -1; });
+    if (chkIdx >= 0 && boxes[keep]) boxes[keep].focus();
+    syncSelectUI();
+  }
   renderRosterStrip();
 }
 function renderRosterStrip() {

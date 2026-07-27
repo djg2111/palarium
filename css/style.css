@@ -985,9 +985,44 @@ select#genderSel{padding:10px 12px}
 .plan{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:12px}
 .plan .rstep{background:var(--surface);cursor:default}
 .plan .rstep.done{opacity:.45;transition:opacity var(--t-base)}
-.plan .rstep .chk{appearance:none;-webkit-appearance:none;width:22px;height:22px;margin:0;border-radius:var(--r-sm);background:var(--raised);border:1px solid var(--border-strong);cursor:pointer;flex-shrink:0;transition:background var(--t-fast),border-color var(--t-fast)}
-.plan .rstep .chk:hover{border-color:var(--muted)}
-.plan .rstep .chk:checked{border-color:var(--success);background:var(--success) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="%230d1117" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>') center/14px no-repeat}
+/* one checkbox recipe, used by the plan's step ticks and the roster's selection
+   mode. Promoted from .plan .rstep .chk rather than forked (DESIGN.md §4). */
+.plan .rstep .chk,.rchk{appearance:none;-webkit-appearance:none;width:22px;height:22px;margin:0;border-radius:var(--r-sm);background:var(--raised);border:1px solid var(--border-strong);cursor:pointer;flex-shrink:0;transition:background var(--t-fast),border-color var(--t-fast)}
+.plan .rstep .chk:hover,.rchk:hover{border-color:var(--muted)}
+.plan .rstep .chk:checked,.rchk:checked{border-color:var(--success);background:var(--success) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="%230d1117" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>') center/14px no-repeat}
+/* the third state the two tristate levels need: a dash, not a tick */
+.rchk:indeterminate{border-color:var(--accent);background:var(--accent) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 8h8" fill="none" stroke="%230d1117" stroke-width="2.5" stroke-linecap="round"/></svg>') center/14px no-repeat}
+/* 22px box in a >=24px hit area, bought with padding and taken back with margin
+   so nothing moves (DESIGN.md §8) */
+.rchk{padding:0;outline-offset:1px;box-sizing:content-box;border-width:1px}
+.rosrow .rchk,.rosband .rchk,.rosselall .rchk{margin:1px}
+
+/* ---------- roster: bulk selection ---------- */
+.rosselall{display:flex;align-items:center;gap:12px;padding:9px 15px;background:var(--surface);
+  border-bottom:1px solid var(--border);font-size:var(--fs-sm);font-weight:700;color:var(--muted);cursor:pointer}
+.rosselall .salb{letter-spacing:.4px;text-transform:uppercase}
+.rosrow.selectable{cursor:pointer;grid-template-columns:28px minmax(140px,240px) minmax(200px,1fr) minmax(0,220px)}
+.rosrow.selectable:hover{background:var(--raised)}
+.rosrow.selectable.on{background:var(--accent-tint)}
+.rosband .rchk{margin-right:2px}
+/* Same surface recipe as a toast — --overlay, a hairline, the same shadow — so
+   the bottom of the viewport reads as one family. z-index under .toasts (300)
+   and over the mobile tab bar (90). */
+.bulkbar{position:fixed;left:0;right:0;bottom:0;z-index:250;min-height:56px;
+  display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;
+  padding:var(--sp-2) var(--sp-4);background:var(--overlay);border-top:1px solid var(--border-strong);
+  box-shadow:0 -10px 34px rgba(0,0,0,.45)}
+.bulkbar .cnt{font-size:var(--fs-md);color:var(--text-2);font-weight:600;min-width:0;flex:1}
+/* .tx is a text button and measured 36x23 here — under the 2.5.8 floor */
+.bulkbar .tx{min-height:24px;padding:4px 10px;border-radius:var(--r-md);color:var(--muted)}
+.bulkbar .tx:hover{color:var(--text);background:var(--raised)}
+/* not .alink.primary: a solid --accent fill on a destructive default invites the
+   mis-press this whole mode exists to make safe. The view's primary stays +Add. */
+.bulkbar .alink.danger{color:var(--danger);border-color:var(--danger-line)}
+.bulkbar .alink.danger:hover:not(:disabled){background:var(--danger-tint);border-color:var(--danger)}
+/* the last row must be able to scroll clear of the bar (2.4.11) */
+body.selecting #rosterList{padding-bottom:var(--bulkbar-h,72px)}
+body.selecting .toasts{bottom:calc(var(--bulkbar-h,72px) + 18px)}
 footer{max-width:1200px;margin:0 auto;padding:0 20px 30px;color:var(--muted);font-size:var(--fs-sm);text-align:center}
 footer code{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:0 5px;font-family:Consolas,monospace}
 @media(pointer:coarse){.kbdonly{display:none}}
@@ -1416,6 +1451,13 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
          margin-left:auto, and a row stacks into three lines --- */
   .collhead .collacts{margin-left:0;width:100%}
   /* identity + toolbar on line 1, passives on line 2, note on line 3 */
+  .bulkbar{bottom:calc(76px + env(safe-area-inset-bottom))}
+  body.selecting .toasts{bottom:calc(76px + env(safe-area-inset-bottom) + var(--bulkbar-h,64px) + 12px)}
+  .rosrow.selectable{grid-template-columns:28px minmax(0,1fr)}
+  .rosrow.selectable .who{grid-area:1/2}
+  .rosrow.selectable .pscol{grid-area:2/2/3/-1}
+  .rosrow.selectable .note{grid-area:3/2/4/-1}
+  .rosrow.selectable .rchk{grid-area:1/1}
   .rosrow{grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;padding:10px 12px}
   /* Full grid-areas, not just grid-column: the <=1000px block above places
      .pscol at 1/2, and overriding only the column left it in row 1 painting

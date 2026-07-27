@@ -253,6 +253,9 @@ siblings, so grouping is the shape of the data, not a preference):
 | `.roslist` / `.rosrow` | The section's `<ul>` and one pal per `<li>`. Fixed grid tracks (identity · passives · note · actions) so columns align down the whole section. Replaces the former `.rospal` **and** `.gentry`. |
 | `.mchip.warn` | A meta chip carrying a warning — `--danger` text, tint fill, `--danger-line` border. It keeps its pill where the plain `.mchip` beside it does not, so shape and not only hue separates them. States the warning in words wherever the width allows, and in an `.sr-only` tail where it does not — never in colour alone. Gender glyphs inside it inherit `--danger` rather than `--male`/`--female`: a pink ♀ on a pink chip stops reading as a gender colour, and the pairing lands on 4.50. |
 | `.rentacts` | The full, named action set for one entry, inside its pal card. Row toolbars stay to three glyphs; everything else lives here at comfortable size. |
+| `.bulkbar` | The action bar over a transient selection. Fixed to the bottom of the viewport on the **toast surface recipe** — `--overlay`, a hairline, the same shadow — so the bottom of the screen reads as one family; `z-index` under `.toasts` and over the mobile tab bar. **DOM-placed immediately before `#rosterList`**, which renders it as the list's header for 1.3.2 and puts it one Shift+Tab from any row; the alternative measured 38 Tab presses. Its `Remove` is **not** `.alink.primary` — a solid accent fill on a destructive default invites the mis-press the mode exists to prevent. |
+| `.rosselall` | The check-all row at the head of the list. Reuses `.rosband`'s padding and its 28px lead column so all three checkbox levels sit on one vertical rule, but is a `<div>`, not an `<h3>`: it is a control, and a heading here would inject a phantom section into the outline. |
+| `.chk` / `.rchk` | One checkbox recipe, shared by the plan's step ticks and the roster's selection. Native `<input type="checkbox">` throughout — the only HTML control that exposes `mixed`, which the two tristate levels need for 4.1.2. `:indeterminate` is a dash, not a tick. |
 
 **The gender chip states a same-species limit, never a breeding limit.** In Palworld
 any ♂ pairs with any ♀ whatever the species, so a roster of three ♂ Lamball is only
@@ -274,7 +277,18 @@ way, stay put" and must still `preventDefault`, or the page scrolls instead.
 
 **Row action toolbars** use `role="toolbar"` with roving `tabindex` (arrows/Home/End
 move within, Tab leaves), so a row costs **two** tab stops — its name and its
-toolbar — not one per action. Actions are revealed on hover only under
+toolbar — not one per action. **Except in the roster's selection mode**, where
+neither is rendered — Edit and Duplicate are the wrong verbs while you are
+operating on a set — so a row costs **zero**, and the whole list is one stop with
+a roving `tabindex` like the grid boards. Measured on a 36-pal roster: 82 stops
+in Rows, 10 while selecting. Selection lives in Rows **only**, and entering hides
+the `.viewseg` for the duration: Tiles shows one tile per *species* and no pals,
+so a checkbox there would either mean "all 6 Lamball" (§6 — a species is not a
+pal) or be a second focusable inside a one-stop board. A filter never clears a
+selection — narrow-then-pick is the whole workflow — and the bar states the
+discrepancy in words (`12 selected — 4 not shown`) rather than resolving it
+silently. Leaving the Roster tab does clear it: a selection you cannot see is a
+trap, and the bar is viewport-fixed. Actions are revealed on hover only under
 `@media (hover:hover)`; under `@media (hover:none)` they are always visible, and the
 gutter is reserved in both cases so nothing shifts.
 
@@ -345,7 +359,13 @@ Priority order — always exhaust a tier before falling to the next:
    tree/branch, settings, chevrons.
 3. **Emoji — last resort only.** Acceptable as a temporary placeholder during
    development; flagged for replacement before the work is called done. Never in new
-   polished UI.
+   polished UI. **The migration is complete** — the only emoji left in the app are
+   in `WORKS`, because a `<select>` option cannot hold an image. Two rules came out
+   of finishing it: a container that swaps an emoji for an icon has to become
+   `inline-flex` (a glyph sits on the text baseline where a stroke icon does not),
+   and a **repeated** emoji is never a bar chart — the food stat drew up to eight
+   🍖, announced "cut of meat" eight times, and was the one stat tile in eight
+   that hid its own number.
 
 JS-built Lucide icons go through `lucide(name, size, cls)` in `js/core.js` — add the
 shapes to the `LU` table beside it, so the repo carries only the icons it draws (an
@@ -474,15 +494,3 @@ visual claims; contrast ratios computed, not eyeballed.
   primary button (§4). Legal — the rows are identified by their text, and hover
   (7.66:1) and focus (14.64:1) both clear 3:1 — but if any route-choice view ever
   grows past two options, the resting affordance needs revisiting first.
-- **Bulk select & remove in the roster**: after reading a save you often want to drop
-  a dozen duds; that is a dozen separate ✕ presses and a dozen toasts. Wants a
-  checkbox column and one bulk action bar with a single Undo. New selection model, so
-  it did not belong in the layout pass.
-- **Emoji migration (§7) — done.** Every pictographic emoji in the UI is now a game
-  asset or a Lucide SVG. The only survivors are in `WORKS` (a `<select>` option
-  can't hold an image) and in code comments describing the change. Two mechanical
-  rules came out of it and hold for new work: an emoji swapped into a chip or box
-  needs that container to become `inline-flex` (a glyph sits on the text baseline
-  where a stroke icon does not), and a **repeated** emoji is never a bar chart —
-  the food stat drew up to eight 🍖 and announced "cut of meat" eight times, in
-  the one stat tile out of eight that hid its own number.

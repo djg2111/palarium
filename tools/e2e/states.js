@@ -158,6 +158,33 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await focusSane(page, 'closing the editor restores focus');
   }
 
+  // selection mode: empty, partial, everything, and a selection the filter hides
+  if (await reach(page, async () => {
+    await page.evaluate(() => { location.hash = '#/roster'; });
+    await page.waitForTimeout(300);
+    await page.click('#rosterSelect');
+    await page.waitForSelector('.rosselall', {timeout: 3000});
+  }, 'roster selection mode')) {
+    await audit(page, 'roster selecting, nothing picked');
+    await overflow(page, 'roster selecting');
+    await focusSane(page, 'entering selection mode lands on the check-all');
+    await page.evaluate(() => { const b = [...document.querySelectorAll('.rosrow .rchk')]; if (b[0]) b[0].click(); });
+    await page.waitForTimeout(200);
+    await audit(page, 'roster selecting, one picked');
+    await page.evaluate(() => { const a = document.querySelector('.rosselall .rchk'); a.checked = true; a.dispatchEvent(new Event('change')); });
+    await page.waitForTimeout(200);
+    await audit(page, 'roster selecting, all picked');
+    await page.evaluate(() => { rosterSearch.value = 'zzzz'; renderRoster(); });
+    await page.waitForTimeout(250);
+    const said = await page.evaluate(() => document.getElementById('bulkCount').textContent);
+    if (/none shown|not shown/.test(said)) console.log('  ✓ the bar states the hidden selection: ' + JSON.stringify(said));
+    else { console.log('  ✗ the bar hid a selection silently: ' + JSON.stringify(said)); fail(); }
+    await audit(page, 'roster selecting, filter hides the selection');
+    await page.evaluate(() => { rosterSearch.value = ''; renderRoster(); document.getElementById('bulkDone').click(); });
+    await page.waitForTimeout(300);
+    await focusSane(page, 'leaving selection mode returns focus');
+  }
+
   console.log('\nPLANNER — computed route, odds explanation, saved plan with tree');
   await nav(page, '#/plan/SheepBall+ElecCat/Anubis', 900);
   await audit(page, 'planner with a computed route');
