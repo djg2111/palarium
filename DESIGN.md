@@ -61,6 +61,9 @@ not in this table needs a computed ratio before merge:
 | `--female` | 6.20 | 5.67 | 5.17 | 4.66 | AA all sizes |
 | `--ink` on `--accent` | — | 8.38 | — | — | AA — the solid-primary pairing |
 | `--faint` | 3.59 | 3.28 | 2.99 | 2.70 | **Below AA — non-essential text only.** Placeholders and decorative hints. A fact the user needs (an absent value, a count, a state) must be `--muted` or better. |
+| `--text` on `--accent-tint` over `--raised` | — | — | 12.80 | — | AA/AAA — the open roster tile |
+| `--muted` on `--accent-tint` over `--raised` | — | — | 5.16 | — | AA |
+| `--female` on `--accent-tint` over `--raised` | — | — | 4.96 | — | AA — the tightest pairing in the app |
 | `--text` on `--gold-tint` over `--surface` | — | 14.15 | — | — | AA — the owned Paldex tile |
 | `--muted` on `--gold-tint` over `--surface` | — | 5.70 | — | — | AA — a tinted fill costs ~0.2 against the plain surface |
 | `--border-strong` | 1.99 | 1.82 | 1.66 | 1.50 | **Decorative only** — a border below 3:1 must never be the sole indicator of a control's boundary or state; pair with a fill, icon, or text change |
@@ -158,18 +161,20 @@ siblings, so grouping is the shape of the data, not a preference):
 | `.rostile` | One species in **Tiles** view: a `<button aria-expanded aria-controls="rosPanel">` carrying art, a count badge on the art, the name and the gender tally. The whole tile is the press target. |
 | `.rospanel` | The expanding panel. A `<section role="region" aria-labelledby>` spanning `1/-1`, placed as a real sibling **after the last tile of the open tile's visual row** — so grid auto-placement puts it on its own row, the board resumes underneath, and DOM order stays visual order. `grid-auto-flow:dense` remains **forbidden**, and is not needed. |
 | `.rosband` | The species header band. One implementation, two homes: a Rows section and the panel header. |
-| `.roster` | The grid. `.tileview` auto-fills 168px tracks (148 ≤1023px, 96 ≤640px); `.rowview` is a single column. |
-| `.tilebody` / `.chiprow` | Layout wrappers inside a header band. |
+| `.roster` | The grid. `.tileview` auto-fills a **single 120px track** above 640px and 96px below; `.rowview` is a single column. One track, not a ladder — every extra breakpoint steps the tile up and the column count down, so a wider window produces a *taller* board. |
+| `.chiprow` | The chip line inside a header band or a tile. |
 | `.roslist` / `.rosrow` | The section's `<ul>` and one pal per `<li>`. Fixed grid tracks (identity · passives · note · actions) so columns align down the whole section. Replaces the former `.rospal` **and** `.gentry`. |
 | `.mchip.warn` | A meta chip carrying a warning — `--danger` text, tint fill, `--danger-line` border. Always states the warning in words; colour is never the only signal. |
 | `.rentacts` | The full, named action set for one entry, inside its pal card. Row toolbars stay to three glyphs; everything else lives here at comfortable size. |
 
 **Grid boards are one tab stop.** `.roster.tileview` and `.dexgrid` both use a
-roving `tabindex` over their items. Vertical movement is **geometric** — find the
-adjacent row by `getBoundingClientRect().top`, then the nearest column by centre
-x — never `index ± columns`, which clamps to the last item when a row is short
-and strands you somewhere you were never focused, and cannot see a full-width
-panel splitting the board into rows of unequal length.
+roving `tabindex` over their items. Vertical movement should be **geometric** —
+find the adjacent row by `getBoundingClientRect().top`, then the nearest column
+by centre x — never `index ± columns`, which clamps to the last item when a row
+is short and strands you somewhere you were never focused, and cannot see a
+full-width panel splitting the board into rows of unequal length.
+`.roster.tileview` does this; **`.dexgrid` still uses index arithmetic** and is
+listed in §11.
 
 **Row action toolbars** use `role="toolbar"` with roving `tabindex` (arrows/Home/End
 move within, Tab leaves), so a row costs **two** tab stops — its name and its
@@ -332,6 +337,9 @@ visual claims; contrast ratios computed, not eyeballed.
   that is three unexplained words deciding whether a nickname survives. Wants one
   visible line under the segrow describing the selected option — the same fix the
   backup flow's `#smBackupEffect` already uses.
+- **Port the roster's geometric grid navigation to `.dexgrid`** (§4). The Paldex
+  still uses `index ± columns`, so on any width where 299 % columns ≠ 0, ArrowUp
+  off the short last row returns to a column you were never in.
 - **Bulk select & remove in the roster**: after reading a save you often want to drop
   a dozen duds; that is a dozen separate ✕ presses and a dozen toasts. Wants a
   checkbox column and one bulk action bar with a single Undo. New selection model, so

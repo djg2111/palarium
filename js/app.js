@@ -1590,8 +1590,20 @@ function closeRosterEditor() {
   editingId = null; carried = null;
   roverlay.classList.remove('open');
   document.body.style.overflow = '';
+  // renderRoster() destroys whatever opened the editor, so document.contains
+  // always failed here and focus fell to <body>. Remember what it was, then
+  // find its replacement in the freshly built list.
+  const row = lastFocusEditor && lastFocusEditor.closest ? lastFocusEditor.closest('.rosrow') : null;
+  const want = row ? {id: row.dataset.id, act: lastFocusEditor.dataset.act || 'name'} : null;
+  const wasBody = !lastFocusEditor || lastFocusEditor === document.body;
   renderRoster();
-  if (lastFocusEditor && document.contains(lastFocusEditor)) lastFocusEditor.focus();
+  let back = null;
+  if (lastFocusEditor && document.contains(lastFocusEditor)) back = lastFocusEditor;
+  else if (want) {
+    const r = document.querySelector(`#rosterList .rosrow[data-id="${CSS.escape(want.id)}"]`);
+    back = r && (r.querySelector(`[data-act="${want.act}"]`) || r.querySelector('.nm'));
+  }
+  (back || (wasBody ? null : document.getElementById('rosterOpenAdd')) || document.getElementById('rosterOpenAdd')).focus();
   lastFocusEditor = null;
 }
 // keep Tab cycling inside whichever dialog is open
@@ -1677,6 +1689,7 @@ rosterSort.addEventListener('change', renderRoster);
 let denseRows = false;
 let lastSections = [];
 let lastCount = -1;   // section count at the previous render
+let autoOpened = false;   // the open panel came from a filter, not a press
 // Two views, not one disclosure with two skins. Opening a species used to turn
 // its tile into a full-width block, which broke the board — and made the
 // collapse control unrecognisable, because nobody reads a board and a list as
@@ -1887,6 +1900,8 @@ function renderRoster() {
   const controls = document.querySelector('.roscontrols');
   if (controls) controls.hidden = !roster.length;
   rosterViewEl.hidden = !roster.length;
+  // nothing for it to compact until a panel or the Rows view supplies rows
+  denseToggle.disabled = rosterView === 'tiles' && !openSpecies;
   setSeg(rosterViewEl, rosterView, 'v');
   list.classList.toggle('tileview', rosterView === 'tiles');
   list.classList.toggle('rowview', rosterView !== 'tiles');
@@ -2082,7 +2097,9 @@ function renderRoster() {
   // A filter that leaves one species has nothing to choose between, so open it.
   // Only at the render where that becomes true — reopening it every render
   // would fight a user who then closed it.
-  if (sections.length === 1 && filtering && lastCount !== 1) openSpecies = sections[0][0];
+  if (sections.length === 1 && filtering && lastCount !== 1) { openSpecies = sections[0][0]; autoOpened = true; }
+  // the user never chose this one, so it goes when the filter that caused it does
+  if (autoOpened && !filtering) { openSpecies = null; autoOpened = false; }
   lastCount = sections.length;
   // the open species may have just been filtered or removed away
   if (openSpecies && !lastSections.includes(openSpecies)) openSpecies = null;
@@ -2124,7 +2141,7 @@ function renderRoster() {
       const tile = document.createElement('button');
       tile.type = 'button'; tile.className = 'rostile'; tile.dataset.k = k;
       tile.tabIndex = -1;
-      tile.setAttribute('aria-controls', 'rosPanel');
+      if (openSpecies === k) tile.setAttribute('aria-controls', 'rosPanel');
       tile.setAttribute('aria-expanded', String(openSpecies === k));
       const art = document.createElement('span'); art.className = 'tart';
       const ic = icon(p, 44, false, true); ic.style.removeProperty('--ico');
@@ -2147,9 +2164,12 @@ function renderRoster() {
         const t = list.querySelector(`.rostile[data-k="${CSS.escape(k)}"]`);
         if (t) { seedTiles(t); t.focus(); }
         const pn = document.getElementById('rosPanel');
-        // scroll the panel, never the tile — the tile is already under the finger
-        if (pn && pn.getBoundingClientRect().top > innerHeight - 80) {
-          pn.scrollIntoView({block: 'nearest',
+        // Anchor on the tile, not the panel. A panel taller than the viewport
+        // aligns its own top to y=0 under 'nearest', which scrolls the tile
+        // off-screen and parks the band behind the sticky header — leaving a
+        // bare list of pals, the exact confusion this rework removed.
+        if (t && pn && pn.getBoundingClientRect().top > innerHeight - 120) {
+          t.scrollIntoView({block: 'start',
             behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
         }
       });

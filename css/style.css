@@ -55,6 +55,11 @@ button:not(:disabled):active{transform:translateY(1px)}
 button:disabled{opacity:.45;cursor:default}
 input{font:inherit;color:inherit}
 header{position:sticky;top:0;z-index:50;background:rgba(13,17,23,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+/* The header is sticky at every width and syncHeaderHeight() keeps --hh
+   current, so sequential focus navigation clears it instead of parking a
+   control underneath (WCAG 2.4.11). Forward Tab never exposes this; only
+   reverse traversal does. */
+html{scroll-padding-top:calc(var(--hh, 64px) + 8px)}
 .hwrap{max-width:1200px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 /* The wordmark is artwork, not text — outlined to paths so it needs no webfont
    and looks identical everywhere. Kept inside the h1 so the page still has a
@@ -453,9 +458,12 @@ tbody tr:hover{background:var(--surface)}
    DOM order stays visual order, and grid-auto-flow:dense stays forbidden
    (and unnecessary). */
 .roster{display:grid;gap:10px;margin-top:16px}
-.roster.tileview{grid-template-columns:repeat(auto-fill,minmax(min(168px,100%),1fr))}
+/* One track above 640, not a ladder. Every extra breakpoint stepped the tile
+   size up and the column count down, so a wider window produced a TALLER
+   board — measured +97px across the old 1024 seam. Phones keep a smaller
+   track because 120px would drop them to two columns. */
+.roster.tileview{grid-template-columns:repeat(auto-fill,minmax(min(120px,100%),1fr))}
 .roster.rowview{grid-template-columns:1fr}
-@media (max-width:1023px){.roster.tileview{grid-template-columns:repeat(auto-fill,minmax(min(148px,100%),1fr))}}
 @media (max-width:640px){.roster.tileview{grid-template-columns:repeat(auto-fill,minmax(min(96px,100%),1fr));gap:8px}}
 .rospanel,.roster>.hint{grid-column:1/-1}
 .strip{display:flex;flex-wrap:wrap;gap:8px}
@@ -522,8 +530,51 @@ select#genderSel{padding:10px 12px}
 /* a view-style switch sits at the far end of its heading block, so it reads as
    a property of the view rather than another filter */
 .collhead .viewseg{margin-left:auto;flex:0 0 auto}
+/* .collacts also has margin-left:auto; two autos share the slack and leave the
+   switch stranded mid-header. Give the pair a fixed gap so the one auto on
+   .viewseg absorbs everything and both sit flush right, matching the Paldex. */
+@media (min-width:641px){.collhead .viewseg + .collacts{margin-left:var(--sp-3)}}
 .segrow[hidden]{display:none}
 /* ---- roster: one species section, one pal per row ---- */
+
+.sub{color:var(--muted);font-size:var(--fs-md);line-height:1.5}
+
+/* ---- Paldex gallery ----
+   299 species, every one a distinct art, and 84 of them near-duplicate variant
+   names that only the picture separates. Recognition is the job here, which is
+   what the table is worst at. */
+.dexgrid{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px;
+  grid-template-columns:repeat(auto-fill,minmax(min(88px,100%),1fr))}
+.dexgrid[hidden]{display:none} /* a display: of its own outranks the UA's [hidden] */
+.dextile{position:relative;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-lg);transition:border-color var(--t-fast),background var(--t-fast)}
+.dextile:hover{border-color:var(--border-strong);background:var(--raised)}
+/* owned is a ring and a fill, never a filter on the art: greying out 260 of
+   299 tiles would wreck the recognition this grid exists for (DESIGN.md §7) */
+.dextile.on{border-color:var(--gold-line);background:var(--gold-tint)}
+.dextile-open{display:flex;flex-direction:column;align-items:center;gap:4px;
+  width:100%;background:none;border:0;padding:8px 6px;cursor:pointer;color:var(--text)}
+/* the whole tile is the press target; the star sits above it */
+.dextile-open::after{content:'';position:absolute;inset:0;border-radius:var(--r-lg)}
+.dextile .pico{--ico:52px}
+.dt-name{font-size:var(--fs-sm);font-weight:600;line-height:1.25;text-align:center;
+  overflow-wrap:anywhere;color:var(--text)}
+.dt-meta{font-size:var(--fs-xs);color:var(--muted);text-align:center;line-height:1.3}
+.dt-meta .uq{display:block}
+.dextile .star{position:absolute;top:0;right:0;z-index:1;padding:11px;margin:0;line-height:1;
+  background:none;border:0;font-size:var(--fs-md)}
+/* 36x36, not the 44 §8 prefers for a primary mobile action: at 44 the star's
+   hit box covers a quarter of an 80px tile and overlaps the art, stealing
+   presses from the tile itself. Both are real targets here. */
+/* owned through the roster rather than starred here — same gold, lighter weight */
+.star.viaroster{color:var(--gold);opacity:.75}
+@media (max-width:640px){
+  .dexgrid{grid-template-columns:repeat(auto-fill,minmax(min(72px,100%),1fr));gap:6px}
+  .dextile .pico{--ico:40px}
+  .dextile-open{padding:6px 4px;gap:2px}
+  .dt-name{line-height:1.2}
+}
+
 /* visually hidden but announced. .nativehide is the opposite job — it hides a
    control from AT while leaving it on screen. */
 .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
@@ -541,13 +592,14 @@ select#genderSel{padding:10px 12px}
 .rosband .pclose{margin-left:auto}
 
 /* ---- Tiles view: one species per tile ---- */
-.rostile{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;
+.rostile{scroll-margin-top:64px;position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;
   background:var(--raised);border:1px solid var(--border);border-radius:var(--r-lg);
   padding:12px 8px 20px;cursor:pointer;color:var(--text);text-align:center;
   transition:border-color var(--t-fast),background var(--t-fast)}
 @media (hover:hover){.rostile:hover{border-color:var(--border-strong);background:var(--overlay)}}
 .rostile:active{background:var(--raised);transform:scale(.98)}
 .rostile[aria-expanded="true"]{border-color:var(--accent);background:var(--accent-tint)}
+@media (hover:hover){.rostile[aria-expanded="true"]:hover{border-color:var(--accent-hover)}}
 .rostile[aria-expanded="true"]::after{content:'';position:absolute;left:50%;bottom:-9px;
   transform:translateX(-50%);width:0;height:0;border:5px solid transparent;border-top-color:var(--accent)}
 .rostile .tart{position:relative;display:block;line-height:0}
@@ -564,6 +616,12 @@ select#genderSel{padding:10px 12px}
   transition:transform var(--t-fast) var(--ease-out)}
 .rostile[aria-expanded="true"] .tchev{transform:rotate(180deg);color:var(--accent)}
 @media (max-width:640px){
+  /* the ✕ takes ~32px and .gname2 is the only shrinkable child, so the name
+     was ellipsised to "Lam…" — give it the first line to itself */
+  .rospanel .rosband{flex-wrap:wrap;row-gap:4px}
+  .rospanel .rosband .gname2{flex:1 1 auto}
+  .rospanel .rosband .pclose{order:2}
+  .rospanel .rosband .chiprow{order:3;flex:1 1 100%}
   .rostile{padding:8px 6px 16px;gap:2px}
   .rostile .pico{--ico:44px}
   /* the tally drops its chip chrome here; the warning keeps it */
@@ -572,7 +630,7 @@ select#genderSel{padding:10px 12px}
 }
 
 /* ---- the expanding panel ---- */
-.rospanel{background:var(--bg);border:1px solid var(--accent);border-radius:var(--r-lg);
+.rospanel{scroll-margin-top:64px;background:var(--bg);border:1px solid var(--accent);border-radius:var(--r-lg);
   overflow:hidden;animation:panelin .15s var(--ease-out)}
 @keyframes panelin{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.rospanel{animation:none}}
@@ -1211,7 +1269,6 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   /* thumb-sized targets without changing how the buttons look */
   .rosrow .acts button{min-width:32px;min-height:32px}
   .rosband{min-height:44px}
-  .roster{grid-template-columns:repeat(auto-fill,minmax(min(148px,100%),1fr));gap:8px}
   .roster.dense .rosrow{padding:7px 12px}
 
   /* --- add-pal dialog: three buttons in one row collapsed the primary to a
