@@ -35,6 +35,11 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+/* The UA's [hidden] rule is a bare attribute selector, so ANY class that sets
+   its own display outranks it and the element stays on screen. That has now
+   bitten three separate controls; make it structural instead of remembering
+   to write .cls[hidden] every time. */
+[hidden]{display:none!important}
 ::selection{background:rgba(88,182,234,.35);color:var(--text)}
 ::placeholder{color:var(--muted);opacity:1}
 select option{background:var(--surface);color:var(--text)}

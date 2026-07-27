@@ -4989,7 +4989,16 @@ psFamilyEl.addEventListener('click', e => { const b = e.target.closest('button')
 psOwnedBtn.addEventListener('click', () => {
   psOwnedOnly = !psOwnedOnly; setSwitch(psOwnedBtn, psOwnedOnly); psShown = 60; renderPS();
 });
-psMoreBtn.addEventListener('click', () => { psShown += 60; renderPS(); psMoreBtn.focus(); });
+psMoreBtn.addEventListener('click', () => {
+  const from = psShown;          // index of the first card about to appear
+  psShown += 60; renderPS();
+  if (!psMoreBtn.hidden) { psMoreBtn.focus(); return; }
+  // The last press hides this button, so focus would fall to <body>. Land on
+  // the first newly revealed skill instead — that is what the press asked for.
+  const cards = document.querySelectorAll('#psList .skillcard');
+  const c = cards[from] || cards[cards.length - 1];
+  ((c && c.querySelector('.palref')) || psSearch).focus();
+});
 document.getElementById('psClear').addEventListener('click', () => {
   psSearch.value = ''; psTagSel.value = ''; psTagIsel.sync();
   psOwnedOnly = false; setSwitch(psOwnedBtn, false);
@@ -5032,8 +5041,9 @@ function renderPS() {
     return;
   }
   for (const p of rows.slice(0, psShown)) list.appendChild(psCard(p));
-  psMoreBtn.hidden = rows.length <= psShown;
-  psMoreBtn.textContent = 'Show more (' + (rows.length - psShown) + ' left)';
+  const left = Math.max(0, rows.length - psShown);
+  psMoreBtn.hidden = !left;
+  psMoreBtn.textContent = 'Show more (' + left + ' left)';
 }
 function psCard(p) {
   const card = document.createElement('div'); card.className = 'skillcard';

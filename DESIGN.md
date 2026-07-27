@@ -182,8 +182,11 @@ toolbar — not one per action. Actions are revealed on hover only under
 `@media (hover:hover)`; under `@media (hover:none)` they are always visible, and the
 gutter is reserved in both cases so nothing shifts.
 
-A `[hidden]` element whose class sets its own `display` needs an explicit
-`.cls[hidden]{display:none}` — the UA rule loses to any class rule.
+`[hidden]{display:none!important}` is set globally in the reset. The UA's own
+rule is a bare attribute selector, so **any** class that sets `display` outranks
+it and the element stays on screen — which shipped three separate visible-but-
+"hidden" controls before this was made structural. Don't rely on writing
+`.cls[hidden]` per class, and don't remove the global rule.
 
 Pal art sizes from a `--ico` custom property set by `icon()`, so a rule can
 resize it per presentation. Never write an inline `width`/`height` **or an
@@ -282,6 +285,9 @@ recoloring/filters).
 - Mobile (≤640px): no horizontal page scroll ever — wide content scrolls inside its
   own container. Primary actions within thumb reach where feasible. The tab bar fades
   its clipped edge (`fadeL/fadeR`).
+- A control that hides itself when its work is done must not also be the thing
+  focus returns to. Check `.hidden` after the re-render and hand focus to what
+  the press actually revealed.
 - A `<details>` rebuilt by a renderer echoes a `toggle` event for every section
   that opens, and the event is a queued task — a timing flag cannot catch it.
   Distinguish the renderer's own output from a user press by comparing the new
