@@ -139,6 +139,25 @@ never the shape):
 Write `×` between two pal names as a visible `aria-hidden` glyph plus an `.sr-only`
 "and": NVDA reads U+00D7 as "times", which turns a sentence into arithmetic.
 
+Find parents:
+
+| Class | Role |
+|---|---|
+| `.pgroup` | One parent and every partner that pairs with it. A `<li>` holding an `.anchor` button (opens that species' card) and a `role="toolbar"` `.chiprow` of `.tchip` partner buttons (each opens that pair in Breed). **Two tab stops per row**, as a roster row. Replaces one `.pair` per combination, which repeated the same left parent up to 21 rows running and carried a badge that stole width from both names. Groups are cut by greedy set cover — take the species covering the most remaining pairs — with ties broken on Paldex order so the same roster always renders the same. |
+| `<h3 class="slotlb">` band | The ownership tier: `Breed now` · `Blocked by gender` · `One parent missing` · `Both parents missing`, each carrying its pair count and, when truncated, `showing N of M parents`. Bands render only when two or more tiers are non-empty. This replaces a sort that was real but invisible, and announced only in prose. **A pair whose genders can't work is not in `Breed now`** — owning both species isn't the same as being able to breed them, and counting them together made the headline sentence false. |
+| `.tchip.warn` | A partner chip whose pair is blocked — `--danger` text, tint fill, `--danger-line` border, a `.wglyph` triangle, and the reason in **visible** `.why` text. The reason also goes in the chip's `aria-label`, and must **not** be an `.sr-only` child: `aria-label` prunes the subtree, so a hidden span in there is never announced. The pal art stays (§7 tier 1) — swapping it for the triangle cost the recognition the row is scanned by, and made warn chips 3px shorter than their siblings. |
+| `.pgroup .x` | The `×` between anchor and chips, `aria-hidden`. **Hidden at ≤640**, where the chips wrap to their own line and it parks in the card's top-right corner reading as a close button. |
+
+`.pgroup .tchip` fills `--raised` — the only `.tchip` in the app lighter than its
+parent, because here the parent is a `--surface` card and §1's ladder is
+bg → surface → raised. Don't "fix" it back to the `--bg` base.
+
+**A badge that is constant across a list is a property of the result set, not of a
+row.** Measured over all 299 targets: no target mixes `avg` with `unique`/`gender`,
+so a Find parents badge column read `UNIQUE` on every row or nothing on every row
+but one. It belongs in the status line, and the one exception (`SAME SPECIES`)
+says itself once the names stop truncating.
+
 Other canon components: `.pcard` (view card), `.hint` (empty state — must include a
 next action; **a view with a persistent status line puts its empty-state sentence
 there instead**, or the sentence is announced twice — Breed does this), `.warnbox` (inline warning), `.toast` (feedback ≤8s, with Undo for
@@ -193,7 +212,7 @@ siblings, so grouping is the shape of the data, not a preference):
 | `.rospanel` | The expanding panel. A `<section role="region" aria-labelledby>` spanning `1/-1`, placed as a real sibling **after the last tile of the open tile's visual row** — so grid auto-placement puts it on its own row, the board resumes underneath, and DOM order stays visual order. `grid-auto-flow:dense` remains **forbidden**, and is not needed. |
 | `.rosband` | The species header band. One implementation, two homes: a Rows section and the panel header. |
 | `.roster` | The grid. `.tileview` auto-fills a **single 120px track** above 640px and 96px below; `.rowview` is a single `minmax(0,1fr)` column. One track, not a ladder — every extra breakpoint steps the tile up and the column count down, so a wider window produces a *taller* board. **`minmax(0,1fr)`, never a bare `1fr`**: `1fr` floors the track at the widest section's min-content, so one long passive chip row pushed the whole page to 356px and broke 1.4.10 Reflow at 320. |
-| `.chiprow` | The chip line inside a header band or a tile. |
+| `.chiprow` | The chip line inside a header band, a tile, or a Find parents group. A low-specificity global base rule. It sets `flex-wrap:wrap`, which `.rostile` re-declares but `.rosband` did **not** — so the base rule silently gave the roster's species band wrapping it never had, +28px per section at 360. `.rosband .chiprow` now pins `nowrap`. When you add a property to a shared base, check every variant re-declares it; inheriting one is how a component in another view grows. |
 | `.roslist` / `.rosrow` | The section's `<ul>` and one pal per `<li>`. Fixed grid tracks (identity · passives · note · actions) so columns align down the whole section. Replaces the former `.rospal` **and** `.gentry`. |
 | `.mchip.warn` | A meta chip carrying a warning — `--danger` text, tint fill, `--danger-line` border. It keeps its pill where the plain `.mchip` beside it does not, so shape and not only hue separates them. States the warning in words wherever the width allows, and in an `.sr-only` tail where it does not — never in colour alone. Gender glyphs inside it inherit `--danger` rather than `--male`/`--female`: a pink ♀ on a pink chip stops reading as a gender colour, and the pairing lands on 4.50. |
 | `.rentacts` | The full, named action set for one entry, inside its pal card. Row toolbars stay to three glyphs; everything else lives here at comfortable size. |
@@ -253,7 +272,9 @@ no looping/attention animation, ever.
 - Lexicon (one concept, one name): **species** (a kind of pal) · **pal** (an
   individual) · **owned** (★ or in roster) · **target species** (what you're breeding
   toward — not "target child") · **passives** · **route** (computed) · **plan**
-  (saved route) · **partner** (non-line parent in a step) · **missing** (a species
+  (saved route) · **pair** (two parent species that produce a target — never
+  "combination", which the Paldex owns for its fixed unique-combo list) ·
+  **partner** (non-line parent in a step) · **missing** (a species
   you have not starred and do not have in your roster — the complement of
   *owned*) · **backup** (Palarium's own
   JSON file — you export and restore it) · **save** (the Palworld game file — Palarium
@@ -416,8 +437,11 @@ visual claims; contrast ratios computed, not eyeballed.
   footnote now links straight to it, so one keypress goes tier-1 icon → emoji for
   the same concept — the Guide "Deep dive" heading, the passive picker's mark
   (`js/app.js`) and the Skills "Mutation only" badge.
-- View heading inconsistency — Find parents still has no heading block (Breed and
-  Paldex now have one).
+- **`.hatchpanel .pair` still calls `icon(pal, 32, true)`** — the art is a second,
+  mouse-only action inside a button, unreachable by keyboard and never announced.
+  Find parents took the fix (a real anchor button); Breedable now still needs it.
+- **`class="collhead vhead"` on `#view-dex`** — `.vhead` is defined nowhere in
+  `css/style.css`.
 - Toggle label grammar varies across views (§4 switch rule).
 - Select conventions: the Roster's and Paldex's selects now carry visible `.ctl`
   labels (§9); **Skills** still uses bare, unlabelled selects and should follow.

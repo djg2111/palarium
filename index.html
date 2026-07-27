@@ -60,13 +60,22 @@
   </section>
 
   <section class="view" id="view-reverse">
+    <div class="collhead">
+      <h2>Find parents</h2>
+      <!-- Persistent, never rebuilt: renderReverse's zone.innerHTML='' would
+           destroy the live region, and a re-inserted one announces unreliably. -->
+      <span class="resline" id="reverseStatus" aria-live="polite" aria-atomic="true">Pick a target species to see every pair that makes it.</span>
+    </div>
     <div class="controls">
       <div class="ctl"><label>Target species</label><div id="pickT"></div></div>
-      <div class="ctl"><label>Must include parent (optional)</label><div id="pickL"></div></div>
-      <div class="ctl"><label for="pairFilter">Filter pairs</label><input type="search" class="search-inp" id="pairFilter" placeholder="Type a parent name…"></div>
-      <div class="ctl"><label aria-hidden="true">&nbsp;</label><button type="button" class="toggle" id="ownedToggle" role="switch" aria-checked="false" title="Only show pairs where you own both parents (star pals in the Paldex or add them to your roster)"><span class="kn"></span>Pairs I can make</button></div>
+      <div class="ctl"><label>Only pairs with</label><div id="pickL"></div></div>
+      <div class="ctl"><label aria-hidden="true">&nbsp;</label><button type="button" class="toggle" id="ownedToggle" role="switch" aria-checked="false" title="Hide every pair that needs a species you don’t have"><span class="kn"></span>Pairs I can make</button></div>
     </div>
-    <div id="reverseResult"><div class="hint">Pick a target pal to list every parent combination that produces it.</div></div>
+    <!-- Outside the live region deliberately: in #reverseStatus this would be
+         re-announced on every filter change. Touch has no hover, so the row's
+         two actions need saying somewhere visible. -->
+    <p class="sub revhow" id="reverseHow" hidden>Tap a partner for Breed, or a name for its card.</p>
+    <div id="reverseResult"></div>
   </section>
 
   <section class="view" id="view-hatch">

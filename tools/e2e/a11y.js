@@ -19,6 +19,11 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 let failures = 0;
 
 async function audit(page, label) {
+  // .modal animates in from opacity:0 (@keyframes pop, since ffe460f). axe
+  // sampling mid-fade composites every label over the scrim and reports
+  // colour-contrast failures on text that passes when still — which made this
+  // suite flake 1-2 violations a run. Settle first, then measure.
+  await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
   await page.evaluate(AXE);
   const res = await page.evaluate(tags => axe.run(document, {runOnly: {type: 'tag', values: tags}})
     .then(r => r.violations.map(v => ({id: v.id, impact: v.impact, n: v.nodes.length,

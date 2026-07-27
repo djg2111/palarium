@@ -226,7 +226,7 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .resrail .sub b{color:var(--text);font-weight:600}
 /* every state starts at the same edge — the empty and one-parent link rows are
    direct children of the zone, so scoping this to .resrail left them centred */
-.result-zone .linkrow{margin-top:var(--sp-2);justify-content:flex-start}
+.result-zone .linkrow,#reverseResult .linkrow{margin-top:var(--sp-2);justify-content:flex-start}
 /* spacing is the tier break — a rule would read as a section boundary. The
    4px indent .gjump carries for inline use in the Guide reads as misalignment
    when it is the last item in a start-aligned column. */
@@ -293,6 +293,51 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .pair .own{font-size:var(--fs-sm);color:var(--gold)}
 .pair .x{color:var(--muted)}
 .pair .badge{margin-left:auto;flex-shrink:0}
+
+/* ---------- find parents: one parent, then every partner that works with it ----------
+   Measured: the same left parent repeated up to 21 rows in a row, each with its
+   own 32px portrait, and the one row that carried a badge was the one row whose
+   two names both ellipsised. Grouping costs one row instead of 21, and chips
+   wrap where a name would have truncated — the call .combo already made. */
+/* wrap, don't stack: a two-partner group stretched across 1160px is the same
+   dead column the Breed answer had. Groups size to content, so short ones
+   share a row and a long one takes the row to itself. */
+#reverseResult .pairs{display:flex;flex-wrap:wrap;gap:var(--sp-2);list-style:none;margin:0;padding:0}
+/* flex-basis, not min-width: `1 1 auto` sizes each item to its content and THEN
+   shares the free space, so the content difference survives into the rendered
+   width and the interior seam wandered ~96px down the page. */
+.pgroup{display:flex;align-items:center;gap:var(--sp-2);flex:1 1 min(430px,100%);
+  max-width:100%;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--sp-2) var(--sp-4)}
+/* Two 430px columns need 908px of viewport, so 641-907 got one stretched card
+   with more than half of it empty. A smaller basis buys the second column back;
+   don't apply it wider, where it produces a ragged three. */
+@media (min-width:721px) and (max-width:907px){.pgroup{flex-basis:min(340px,100%)}}
+.pgroup .anchor{display:flex;align-items:center;gap:var(--sp-2);flex:0 0 auto;
+  max-width:min(280px,40%);min-width:0;background:none;border:0;padding:var(--sp-1) 0;color:var(--text)}
+.pgroup .anchor .pico{--ico:28px}
+.pgroup .anchor .nm{font-weight:600;font-size:var(--fs-md);min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pgroup .anchor .own{color:var(--gold);font-size:var(--fs-sm)}
+@media (hover:hover){.pgroup .anchor:hover .nm{color:var(--accent)}}
+.pgroup .x{color:var(--muted);flex:0 0 auto}
+.pgroup .chiprow{flex:1 1 auto}
+/* the chip sits ON the card, so it is a step lighter than it */
+.pgroup .tchip{cursor:pointer;background:var(--raised)}
+@media (hover:hover){.pgroup .tchip:hover{border-color:var(--accent);color:var(--text)}}
+/* Colour is never the only signal: the triangle glyph and the visible .why text
+   both carry it. The reason is ALSO in the chip's aria-label, because an
+   .sr-only child would be pruned by that label and never announced. */
+.pgroup .tchip.warn{color:var(--danger);border-color:var(--danger-line);background:var(--danger-tint)}
+.pgroup .tchip .why{font-size:var(--fs-xs);font-weight:600;opacity:.9}
+.pgroup .tchip .why::before{content:'— ';}
+.wglyph{flex:none;width:16px;height:16px}
+/* base rule; the roster's .rosband/.rostile variants keep winning on specificity */
+.revhow{color:var(--muted);font-size:var(--fs-sm);margin:calc(var(--sp-3) * -1) 0 var(--sp-3)}
+.chiprow{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-1);min-width:0}
+/* the roster band never wrapped and must not start: wrapping cost it 28px per
+   species section at 360, on the view whose whole pass was about density */
+.rosband .chiprow{flex-wrap:nowrap}
 /* ---------- unique combos ----------
    Two tiers per card: the result is the heading (these rows sort by it), the
    recipe is a muted caption. Nothing truncates — the recipe wraps instead. */
@@ -812,6 +857,7 @@ select#genderSel{padding:10px 12px}
 .mylv input:hover{border-color:var(--border-strong)}
 .gjump{padding:3px 12px;font-size:var(--fs-sm);margin-left:4px}
 .slotlb.mt{margin-top:12px}
+@media (min-width:641px){#reverseResult .slotlb.mt{margin-top:var(--sp-5)}}
 .slot .ptag{max-width:none;min-width:0}
 .plannerhow{margin-bottom:16px}
 .plannerhow>div{padding:2px 16px 14px;color:var(--text-2);font-size:var(--fs-md)}
@@ -1308,7 +1354,19 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .child-card h3{font-size:var(--fs-h2)}
   .gtrack{width:96px}
 
-  /* --- find parents: wrap the badge instead of crushing names to "An…" --- */
+  /* --- find parents: the anchor takes its own line, the chips take the next --- */
+  .pgroup{flex-wrap:wrap;padding:var(--sp-2) var(--sp-3)}
+  /* the separator has no job once the chips are on their own line, and parked
+     in the card's top-right corner it read as a close button */
+  .pgroup .x{display:none}
+  /* two controls per row, target species full width — the §9 .dex-controls
+     pattern. Three stacked rows put the first answer at y=425 on a 360 phone. */
+  #view-reverse .controls{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2)}
+  #view-reverse .controls .ctl:first-child{grid-column:1/-1}
+  .pgroup .anchor{max-width:none;flex:1 1 auto;min-height:32px}
+  .pgroup .chiprow{flex:1 1 100%}
+  .pgroup .tchip{min-height:32px}
+  /* still used by Breedable now's .hatchpanel .pair */
   .pair{flex-wrap:wrap}
   .pair .pside{flex:1 1 128px;min-width:128px}
 
