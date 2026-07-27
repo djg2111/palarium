@@ -461,7 +461,7 @@ visual claims; contrast ratios computed, not eyeballed.
   specific to one view.
 - **Emoji migration (§7)**: replace remaining pictographic emoji with game assets or
   Lucide SVGs — 🎮 (Read my save), 🍰 (guide; `items/cake.webp` exists), 🐣, 🔍, 🗺,
-  🌙 nocturnal, 🌳 tree button, 🍖 food stat, ⚠ warnboxes, 🎲 odds, 📦, 📍, and the
+  🌙 nocturnal, 🌳 tree button, 🍖 food stat, ⚠ warnboxes, 🎲 odds, 📍, and the
   three remaining 🧬 marks (`ui/egg/mutation.webp`): the Guide "Deep dive" heading,
   the passive picker's mark (`js/passives.js`) and the Skills "Mutation only" badge.
   The Guide's `Egg mutations` summary is done — Breed's footnote links straight to
@@ -487,6 +487,8 @@ visual claims; contrast ratios computed, not eyeballed.
 - **`.hatchpanel .pair` still calls `icon(pal, 32, true)`** — the art is a second,
   mouse-only action inside a button, unreachable by keyboard and never announced.
   Find parents took the fix (a real anchor button); Breedable now still needs it.
+  The same row writes a bare `×` between the two names, which NVDA reads as
+  "times" (§4) — fix both in one pass.
 - **`class="collhead vhead"` on `#view-dex`** — `.vhead` is defined nowhere in
   `css/style.css`.
 - Toggle label grammar varies across views (§4 switch rule).
