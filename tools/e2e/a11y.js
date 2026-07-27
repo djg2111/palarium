@@ -210,7 +210,7 @@ async function focusSane(page, label) {
     await page.screenshot({path: path.join(__dirname, 'shot-roster-320.png')});
     await page.setViewportSize({width: 1280, height: 900}); await page.waitForTimeout(200);
     // The roster is always grouped; audit the three states the controls reach.
-    // #denseToggle is disabled in Tiles with nothing open (js/app.js renderRoster),
+    // #denseToggle is disabled in Tiles with nothing open (js/roster.js renderRoster),
     // and #collapseAll went away with the Tiles/Rows switch — clicking either
     // where they used to be threw and this suite never reached its last states.
     await page.click('#rosterView button[data-v="rows"]'); await page.waitForTimeout(400);

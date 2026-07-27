@@ -1,6 +1,6 @@
 ---
 name: a11y-auditor
-description: Accessibility gate for Palarium. Use PROACTIVELY before committing any change to index.html, css/style.css, or user-facing js/app.js. Runs axe-core (WCAG 2.1 A+AA) across app states plus manual WCAG 2.2 AA checks and a keyboard pass; returns PASS or FAIL with exact violations. Read-only on the repo.
+description: Accessibility gate for Palarium. Use PROACTIVELY before committing any change to index.html, css/style.css, or user-facing js/*.js. Runs axe-core (WCAG 2.1 A+AA) across app states plus manual WCAG 2.2 AA checks and a keyboard pass; returns PASS or FAIL with exact violations. Read-only on the repo.
 tools: Read, Grep, Glob, Bash, Write
 ---
 
@@ -35,7 +35,7 @@ Your verdict blocks or clears a commit — be rigorous and honest.
    focus visible (global `:focus-visible` outline not suppressed); dialogs trap Tab
    and restore focus on close; popovers close on Escape (topmost layer only);
    re-renders don't drop focus to `<body>` (known pattern: refocus the successor
-   element, deferred a tick — see makePicker.close in js/app.js).
+   element, deferred a tick — see makePicker.close in js/core.js).
 6. **Contrast**: compute (don't eyeball) ratios for any new color pairing; check
    against the approved matrix in DESIGN.md §1. Text ≥4.5:1 (3:1 large), UI component
    boundaries ≥3:1 where the boundary carries meaning. Verify information is never

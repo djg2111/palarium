@@ -61,7 +61,22 @@ css/style.css   styles
 js/data.js      generated dataset (pals, combos, passives) — window.PALDATA
 js/mapdata.js   generated map markers, regions + layer bounds — window.MAPDATA
 js/spawndata.js generated wild spawn zones (loaded on demand) — window.SPAWNDATA
-js/app.js       all app logic (vanilla JS, no dependencies)
+js/core.js      dataset lookups, icons, storage, toasts, species modal, pickers
+js/router.js    persisted state, tabs, bottom nav, deep links + hash routing
+js/breed.js     Breed view and the breeding-chain walkthrough
+js/reverse.js   Find parents view (pair search, grouping, gender warnings)
+js/passives.js  passive-skill tag picker + chips (shared by roster and planner)
+js/roster.js    My pals: entry editor, list/tiles rendering, sorting
+js/save.js      backup export/import and the Palworld save reader dialog
+js/planner.js   Planner: routes, accessibility scoring, odds, saved plans
+js/hatch.js     Breedable view
+js/combos.js    Paldex mode switch + unique-combos browser
+js/skills.js    Skills tab: partner skills, base auras, passives catalog
+js/dex.js       Paldex species gallery and table
+js/init.js      restores saved state and runs the first render of every view
+js/map.js       Map view: tiles, markers, labels, spawn zones
+js/boot.js      guide wiring, initial hash, "/" shortcut, service worker
+                (classic scripts, one global scope — load order is a contract)
 js/savparse.js  Palworld save reader — runs in a Web Worker (Oodle + GVAS)
 assets/pals/    pal icons (299, lossless WebP)
 assets/map/     map tile pyramid (170 lossless WebP tiles, z0–z3)

@@ -18,7 +18,7 @@ known-clunky flows before proposing something adjacent.
 ## Method
 
 1. Understand the current state: read the relevant markup in `index.html`, logic in
-   `js/app.js`, styles in `css/style.css`. If useful, serve the app
+   `js/*.js` (one file per view — see README), styles in `css/style.css`. If useful, serve the app
    (`python -m http.server`) and inspect the real flow before redesigning it.
 2. Identify the user's job-to-be-done and the moment of use (mid-game, hurried,
    possibly on a phone). Optimize for fewest decisions, not fewest pixels.

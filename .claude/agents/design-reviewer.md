@@ -1,6 +1,6 @@
 ---
 name: design-reviewer
-description: Design/UX reviewer for Palarium. Use PROACTIVELY AFTER any change that touches index.html, css/style.css, or user-facing parts of js/app.js — before committing. Verifies the change against DESIGN.md and heuristics in the running app and returns severity-ranked findings with concrete fixes. Read-only on the repo.
+description: Design/UX reviewer for Palarium. Use PROACTIVELY AFTER any change that touches index.html, css/style.css, or user-facing parts of js/*.js — before committing. Verifies the change against DESIGN.md and heuristics in the running app and returns severity-ranked findings with concrete fixes. Read-only on the repo.
 tools: Read, Grep, Glob, Bash, Write
 ---
 

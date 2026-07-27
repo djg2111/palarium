@@ -331,7 +331,7 @@ recoloring/filters).
   header/overlays; help affordances in consistent locations; never ask users to
   re-enter data the app already has.
 - Fully keyboard operable: pickers/popovers restore focus on close (deferred a tick —
-  see the Enter-synthesized-click bug note in `js/app.js` makePicker.close), Escape
+  see the Enter-synthesized-click bug note in `js/core.js` makePicker.close), Escape
   closes topmost layer only, tab is trapped in dialogs, roving tabindex on tablists,
   re-renders re-focus the successor of the focused element.
 - Tooltips (`title`) are enhancement only — any load-bearing information also exists
@@ -399,7 +399,7 @@ visual claims; contrast ratios computed, not eyeballed.
 
 ## 11 · Known-clunky backlog (ux-designer: start here)
 
-- **The save reader's conflict segrow** (`js/app.js`, `renderSavePreview`): Combine /
+- **The save reader's conflict segrow** (`js/save.js`, `renderSavePreview`): Combine /
   Keep mine / Use the save's explain themselves only in `title` attributes. On touch
   that is three unexplained words deciding whether a nickname survives. Wants one
   visible line under the segrow describing the selected option — the same fix the
@@ -436,7 +436,7 @@ visual claims; contrast ratios computed, not eyeballed.
   the Guide's `Egg mutations 🧬` summary — **take this one first**, because Breed's
   footnote now links straight to it, so one keypress goes tier-1 icon → emoji for
   the same concept — the Guide "Deep dive" heading, the passive picker's mark
-  (`js/app.js`) and the Skills "Mutation only" badge.
+  (`js/passives.js`) and the Skills "Mutation only" badge.
 - **`.hatchpanel .pair` still calls `icon(pal, 32, true)`** — the art is a second,
   mouse-only action inside a button, unreachable by keyboard and never announced.
   Find parents took the fix (a real anchor button); Breedable now still needs it.

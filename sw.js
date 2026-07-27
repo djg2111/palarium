@@ -24,9 +24,17 @@
 // nothing useful to say — "read my save" would be a button that breaks with the
 // tab offline, which is exactly the state someone reading a local game file is
 // likely to be in. And it is 43 KB, against the 45 KB of mapdata.js already here.
-const VERSION = 'palarium-v19';
-const SHELL = ['.', 'index.html', 'css/style.css', 'js/app.js', 'js/data.js',
-  'js/mapdata.js', 'js/savparse.js', 'assets/favicon.svg', 'assets/lockup.svg', 'manifest.webmanifest'];
+// v20: js/app.js was split into the fifteen files below. Same code, same load
+// order — but a client still holding the v19 shell would serve the old
+// index.html and 404 every one of them offline, so the version has to move
+// with the split.
+const VERSION = 'palarium-v20';
+const SHELL = ['.', 'index.html', 'css/style.css', 'js/data.js',
+  'js/mapdata.js', 'js/savparse.js',
+  'js/core.js', 'js/router.js', 'js/breed.js', 'js/reverse.js', 'js/passives.js',
+  'js/roster.js', 'js/save.js', 'js/planner.js', 'js/hatch.js', 'js/combos.js',
+  'js/skills.js', 'js/dex.js', 'js/init.js', 'js/map.js', 'js/boot.js',
+  'assets/favicon.svg', 'assets/lockup.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

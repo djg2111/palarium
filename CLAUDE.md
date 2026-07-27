@@ -1,11 +1,19 @@
 # Palarium — project instructions
 
 Static vanilla-JS Palworld breeding tool. No build step, no dependencies, dark-only,
-offline PWA. `index.html` (markup) · `js/app.js` (all logic) · `css/style.css` ·
-`js/data.js` (generated dataset — do not hand-edit) · `sw.js` · `assets/pals/`.
+offline PWA. `index.html` (markup) · `js/*.js` (logic, one file per view — see
+README) · `css/style.css` · `js/data.js` (generated dataset — do not hand-edit) ·
+`sw.js` · `assets/pals/`.
+
+The logic files are classic `<script>`s sharing one global scope, loaded in the
+order listed at the bottom of `index.html`. That order is a real contract: a file
+may call anything defined in an earlier file, but top-level code must not reach
+forward into a later one. Not ES modules — `type="module"` is CORS-blocked over
+`file://`, and the app must keep working opened straight off disk.
 
 Serve with `python -m http.server 8123` (or open `index.html` directly). Syntax check:
-`node --check js/app.js`.
+`node --check js/<file>.js`. Adding a JS file means adding it to both `index.html`
+and the `SHELL` array in `sw.js`, plus bumping `VERSION`.
 
 ## Design workflow (this is the point — follow it)
 
