@@ -515,6 +515,19 @@ visual claims; contrast ratios computed, not eyeballed.
 
 ## 11 · Known-clunky backlog (ux-designer: start here)
 
+- **Breedable now is 85 tab stops at "Any chain"** — 80 result cards plus the five
+  controls, one stop per card. §4 settles that a grid board is **one** stop with a
+  roving `tabindex`, which `.dexgrid` and `.roster.tileview` both do through
+  `gridStep`. `.hatchgrid` is the last grid in the app that doesn't, and it is the
+  hardest one: its cards are disclosures whose panel is appended **into** the grid
+  between them, so the roving model has to survive a full-width row appearing
+  mid-board — the same problem `.rospanel` solved, and the reason geometric
+  movement exists.
+- **`.hcard` renders at two heights, 62px and 94px**, because a card carrying both
+  a rarity badge and its `.ways` count wraps to a second line. At "Any chain" that
+  is most of the board, so rows come out ragged. Either let the count sit under the
+  name always, or drop the rarity badge from a card whose job is "can I breed it".
+
 - **The Planner's start slots reflow every time one is revealed.** `.slotgrid` is
   `auto-fit`, and `[hidden]` slots collapse their tracks — so slot 1 alone is a
   1076px species picker at 1366, and filling it halves the width of the control

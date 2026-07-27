@@ -172,6 +172,11 @@ function hatchChainPanel(r, kids, ownSet) {
     setPlanMode('new');
     navTab('plan');
     save(); scheduleAuto();
+    // navTab alone leaves focus on a button this navigation hides, so it fell to
+    // <body>. Land on the control this press just set — the route itself arrives
+    // 600ms later and announces itself through #planStatus (DESIGN.md §9).
+    const el = document.querySelector('#pickPT .picker-btn');
+    if (el) el.focus();
   });
   lr.appendChild(planBtn);
   panel.appendChild(lr);
