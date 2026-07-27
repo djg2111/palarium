@@ -72,6 +72,24 @@ Dark-theme rules: accents stay in this desaturated range — no saturated pure h
 (they vibrate on dark). Text is dimmed white (`--text`), never `#fff`. Large solid
 areas of accent color are avoided; accents are for interactive elements and meaning.
 
+**Contrast methodology.** The matrix is computed with WCAG 2.x ratios — the
+commitment (§8) is 2.1 AA, so 2.x math is what gates a pairing. Know its limit:
+WCAG 2 contrast is least accurate on dark backgrounds, and APCA (the candidate
+WCAG 3 model) rates dark-UI pairings more faithfully. Any future palette retune
+runs candidates through **both** models and keeps pairs that clear 2.x AA *and*
+hold up under APCA — cheap insurance against tuning to the weaker formula, not a
+new gate on day-to-day work.
+
+**The theme door stays open.** Palarium is dark-only today, and nothing here
+plans otherwise — but the no-raw-hex rule above is also what keeps a second
+theme (light, high-contrast) cheap if one is ever wanted: with every rule on
+semantic tokens, a theme is a second `:root` block plus a recomputed contrast
+matrix, not a rewrite. A stray hex in a rule is invisible today and a bug the
+day a second theme lands, which is why the rule is absolute rather than a
+preference. (Same logic covers the game-art caveat: pal tiles and extracted
+icons were composed against dark surfaces — a light theme must re-verify their
+legibility, not assume it.)
+
 ## 2 · Spacing & radius
 
 Spacing tokens: `--sp-1…7` = **4 · 8 · 12 · 16 · 20 · 24 · 32**. New rules use the
