@@ -97,6 +97,26 @@ function passiveIcon(meta, size = 15) {
   const k = passiveIconKey(meta);
   return k ? uiIcon('passive', k, size) : null;
 }
+// Vertical movement across a grid board goes by geometry, not by index. Index
+// math (i ± columns) clamps to the last item when the row below is short — so
+// ArrowUp lands in a column you were never in — and it cannot see a full-width
+// panel splitting the board into rows of unequal length. One implementation for
+// every grid board in the app (DESIGN.md §4).
+function gridStep(items, cur, dir) {
+  const rowOf = el => Math.round(el.getBoundingClientRect().top);
+  const midOf = el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; };
+  const here = rowOf(cur), x = midOf(cur);
+  const away = items.filter(t => dir > 0 ? rowOf(t) > here : rowOf(t) < here);
+  if (!away.length) return null;                    // no row that way: stay put
+  const target = dir > 0 ? Math.min(...away.map(rowOf)) : Math.max(...away.map(rowOf));
+  let best = null;
+  for (const t of away) {
+    if (rowOf(t) !== target) continue;
+    if (!best || Math.abs(midOf(t) - x) < Math.abs(midOf(best) - x)) best = t;
+  }
+  return items.indexOf(best);
+}
+
 // honor prefers-reduced-motion in JS-driven scrolls (CSS handles animations)
 const SMOOTH = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
 

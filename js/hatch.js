@@ -162,14 +162,21 @@ function hatchPanel(r) {
   for (const [aK, bK] of r.pairs) {
     const a = byKey.get(aK), b = byKey.get(bK);
     const row = document.createElement('button'); row.className = 'pair'; row.type = 'button';
+    // decorative and inert: clickable art inside a button is a second action no
+    // keyboard can reach and no screen reader announces. Find parents renders the
+    // same art the same way — the button owns the press (DESIGN.md §4).
     const side = pal => {
       const s = document.createElement('span'); s.className = 'pside';
-      s.appendChild(icon(pal, 32, true));
+      s.appendChild(icon(pal, 32, false, true));
       const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = pal.n; s.appendChild(nm);
       return s;
     };
     row.appendChild(side(a));
-    const x = document.createElement('span'); x.className = 'x'; x.textContent = '×'; row.appendChild(x);
+    // NVDA reads a bare U+00D7 as "times", turning the row into arithmetic
+    const x = document.createElement('span'); x.className = 'x';
+    x.setAttribute('aria-hidden', 'true'); x.textContent = '×'; row.appendChild(x);
+    const and = document.createElement('span'); and.className = 'sr-only'; and.textContent = 'and';
+    row.appendChild(and);
     row.appendChild(side(b));
     const issue = pairGenderIssue(aK, bK);
     if (issue) { const w = document.createElement('span'); w.className = 'warnchip'; w.append(lucide('triangleAlert', 13), genderize(issue)); row.appendChild(w); }

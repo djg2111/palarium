@@ -284,13 +284,16 @@ dexGrid.addEventListener('keydown', e => {
   let j = null;
   if (e.key === 'ArrowRight') j = Math.min(i + 1, tiles.length - 1);
   else if (e.key === 'ArrowLeft') j = Math.max(i - 1, 0);
-  else if (e.key === 'ArrowDown') j = Math.min(i + cols, tiles.length - 1);
-  else if (e.key === 'ArrowUp') j = Math.max(i - cols, 0);
+  // geometry, not i ± cols: 299 tiles rarely fill the last row, and index math
+  // clamped ArrowUp off that short row into a column you were never in
+  else if (e.key === 'ArrowDown') j = gridStep(tiles, cur, 1);
+  else if (e.key === 'ArrowUp') j = gridStep(tiles, cur, -1);
   else if (e.key === 'Home') j = 0;
   else if (e.key === 'End') j = tiles.length - 1;
   else if (e.key === 'PageDown') j = Math.min(i + cols * 4, tiles.length - 1);
   else if (e.key === 'PageUp') j = Math.max(i - cols * 4, 0);
-  if (j === null) return;
+  // an arrow with no row that way still belongs to the grid, not to the page
+  if (j === null) { if (e.key.startsWith('Arrow')) e.preventDefault(); return; }
   e.preventDefault();
   focusTile(tiles[j], true);
   tiles[j].scrollIntoView({block: 'nearest',

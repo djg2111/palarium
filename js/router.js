@@ -257,10 +257,22 @@ function applyHash(hash) {
   showTab(tab);
   return true;
 }
-window.addEventListener('hashchange', () => applyHash());
+// hashchange and popstate BOTH fire for one back/forward navigation, and each
+// ran the whole dispatch — so every view's polite live region was rebuilt with
+// identical text about 2ms apart, which is exactly the condition under which a
+// screen reader reads it twice. Collapse the pair into one dispatch.
+// A timer rather than a "same hash as last time" guard: updateHash rewrites the
+// hash between the two events, so the second one no longer looks like a repeat.
+let navQueued = false;
+function navApply() {
+  if (navQueued) return;
+  navQueued = true;
+  setTimeout(() => { navQueued = false; applyHash(); }, 0);
+}
+window.addEventListener('hashchange', navApply);
 tabsEl.addEventListener('click', e => {
   const b = e.target.closest('button');
   if (b) navTab(b.dataset.v); // back/forward navigates tabs
 });
-window.addEventListener('popstate', () => applyHash());
+window.addEventListener('popstate', navApply);
 

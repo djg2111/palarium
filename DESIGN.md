@@ -246,13 +246,13 @@ the reason in an `.sr-only` tail, while the header band and the open panel show
 the number it is warning about leaves nothing to act on.
 
 **Grid boards are one tab stop.** `.roster.tileview` and `.dexgrid` both use a
-roving `tabindex` over their items. Vertical movement should be **geometric** —
-find the adjacent row by `getBoundingClientRect().top`, then the nearest column
-by centre x — never `index ± columns`, which clamps to the last item when a row
-is short and strands you somewhere you were never focused, and cannot see a
-full-width panel splitting the board into rows of unequal length.
-`.roster.tileview` does this; **`.dexgrid` still uses index arithmetic** and is
-listed in §11.
+roving `tabindex` over their items. Vertical movement is **geometric** — find the
+adjacent row by `getBoundingClientRect().top`, then the nearest column by centre
+x — never `index ± columns`, which clamps to the first/last item when a row is
+short and strands you in a column you were never in, and cannot see a full-width
+panel splitting the board into rows of unequal length. Both boards call
+`gridStep(items, cur, dir)` in `js/core.js`; a `null` return means "no row that
+way, stay put" and must still `preventDefault`, or the page scrolls instead.
 
 **Row action toolbars** use `role="toolbar"` with roving `tabindex` (arrows/Home/End
 move within, Tab leaves), so a row costs **two** tab stops — its name and its
@@ -451,9 +451,6 @@ visual claims; contrast ratios computed, not eyeballed.
   primary button (§4). Legal — the rows are identified by their text, and hover
   (7.66:1) and focus (14.64:1) both clear 3:1 — but if any route-choice view ever
   grows past two options, the resting affordance needs revisiting first.
-- **Port the roster's geometric grid navigation to `.dexgrid`** (§4). The Paldex
-  still uses `index ± columns`, so on any width where 299 % columns ≠ 0, ArrowUp
-  off the short last row returns to a column you were never in.
 - **Bulk select & remove in the roster**: after reading a save you often want to drop
   a dozen duds; that is a dozen separate ✕ presses and a dozen toasts. Wants a
   checkbox column and one bulk action bar with a single Undo. New selection model, so
@@ -469,13 +466,6 @@ visual claims; contrast ratios computed, not eyeballed.
   where a stroke icon does not), and a **repeated** emoji is never a bar chart —
   the food stat drew up to eight 🍖 and announced "cut of meat" eight times, in
   the one stat tile out of eight that hid its own number.
-- **Every hash navigation announces its live region twice.** `hashchange` and
-  `popstate` both fire for one navigation and each runs `applyHash`, so a view's
-  `.resline` is rebuilt with identical text ~2ms apart — the exact condition under
-  which a polite region is re-read. `badLink()` already dedupes its own toast
-  against this; the route dispatch needs the same coalescing, and a plain
-  "same hash as last time" guard is not enough because `updateHash` rewrites the
-  hash between the two. App-wide, not specific to one view.
 - **A chain step announces the pair, not the step.** Pressing Next step updates
   `#breedStatus` to the new pair and silently changes the chain title to "step 2 of
   4"; focus stays on the nav button, so a screen-reader user never hears which step
@@ -484,11 +474,6 @@ visual claims; contrast ratios computed, not eyeballed.
 - **The chain card's right edge aligns with nothing** at ≥900px: `width:min(760px,100%)`
   inside `grid-column:1/-1` stops it 140px past the answer column and 116px into the
   rail. Either span the zone or clamp it to the answer column.
-- **`.hatchpanel .pair` still calls `icon(pal, 32, true)`** — the art is a second,
-  mouse-only action inside a button, unreachable by keyboard and never announced.
-  Find parents took the fix (a real anchor button); Breedable now still needs it.
-  The same row writes a bare `×` between the two names, which NVDA reads as
-  "times" (§4) — fix both in one pass.
 - The picker's `@media(max-width:640px)` block (`.pop .list` / `.pop .row`) is a
   species tile hard-coded into a popover at one breakpoint. It should be
   refactored onto `.dexgrid`/`.dextile` so there is one tile implementation.

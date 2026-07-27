@@ -340,24 +340,8 @@ rosterList.addEventListener('keydown', e => {
   const tiles = [...rosterList.querySelectorAll('.rostile')];
   const i = tiles.indexOf(cur);
   const cols = getComputedStyle(rosterList).gridTemplateColumns.split(' ').length;
-  // Vertical moves go by geometry, not by index. Index math clamps to the last
-  // tile when the row below is short — so ArrowUp came back somewhere you had
-  // never been — and it cannot see that the open panel splits the board into
-  // rows of unequal length.
-  const rowOf = el => Math.round(el.getBoundingClientRect().top);
-  const midOf = el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; };
-  const step = dir => {
-    const here = rowOf(cur), x = midOf(cur);
-    const away = tiles.filter(t => dir > 0 ? rowOf(t) > here : rowOf(t) < here);
-    if (!away.length) return null;                    // no row that way: stay put
-    const target = dir > 0 ? Math.min(...away.map(rowOf)) : Math.max(...away.map(rowOf));
-    let best = null;
-    for (const t of away) {
-      if (rowOf(t) !== target) continue;
-      if (!best || Math.abs(midOf(t) - x) < Math.abs(midOf(best) - x)) best = t;
-    }
-    return tiles.indexOf(best);
-  };
+  // geometry, not index math — gridStep in core.js, shared with the Paldex
+  const step = dir => gridStep(tiles, cur, dir);
   let j = null;
   if (e.key === 'ArrowRight') j = Math.min(i + 1, tiles.length - 1);
   else if (e.key === 'ArrowLeft') j = Math.max(i - 1, 0);
