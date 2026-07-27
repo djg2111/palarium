@@ -238,9 +238,18 @@ function applyHash(hash) {
     return true;
   }
   if (tab === 'breed') {
-    const a = resolvePal(x), b = resolvePal(y);
-    if (a) pickA.set(a, true);
-    if (b) pickB.set(b, true);
+    // A slot the link doesn't name is empty, not "leave whatever is there".
+    // updateHash writes '-' for an empty slot, so Back out of a two-parent
+    // state has to clear one; and #/breed with no keys is the empty state,
+    // which was otherwise reachable only from a cold start.
+    const pa = resolvePal(x), pb = resolvePal(y);
+    // Clearing a slot is right, but doing it silently for a key that simply
+    // didn't resolve is not — updateHash then rewrites the URL and the typo is
+    // gone. Say so, the way #/pal and #/skills do.
+    if (x && x !== '-' && !pa) badLink('Link not recognized — unknown pal “' + x + '”');
+    else if (y && y !== '-' && !pb) badLink('Link not recognized — unknown pal “' + y + '”');
+    pickA.set(pa || null, true);
+    pickB.set(pb || null, true);
     renderBreed();
   } else if (tab === 'reverse' && resolvePal(x)) {
     pickT.set(resolvePal(x), true); reverseShown = {}; renderReverse();

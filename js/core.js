@@ -29,6 +29,25 @@ function uiIcon(dir, key, size, cls) {
 }
 const workImgTag = k =>
   `<img class="uii" src="${UI}work/${k}.webp" alt="" width="15" height="15" loading="lazy" decoding="async">`;
+// Lucide (ISC) as inline SVG — DESIGN.md §7 tier 2, for generic UI concepts no
+// game asset covers. Self-hosting is by construction here: a caller passes only
+// the path data it needs, so no icon font and no full pack ever ship. Always
+// decorative — the control carries the label.
+const LU = {chevronLeft: ['m15 18-6-6 6-6'], chevronRight: ['m9 18 6-6-6-6']};
+function lucide(name, size, cls) {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 24 24');
+  s.setAttribute('width', size); s.setAttribute('height', size);
+  s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor');
+  s.setAttribute('stroke-width', '2'); s.setAttribute('stroke-linecap', 'round');
+  s.setAttribute('stroke-linejoin', 'round'); s.setAttribute('aria-hidden', 'true');
+  if (cls) s.setAttribute('class', cls);
+  for (const d of LU[name]) {
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', d); s.appendChild(p);
+  }
+  return s;
+}
 // A passive's icon is keyed by its primary effect type, which is already the
 // first token of the effect string the dataset carries — no extra data needed.
 // An effect with no number is written as the bare key ("nightowl"), so the first
@@ -79,9 +98,13 @@ function updateChecklist() {
   let all = true;
   for (const b of bar.querySelectorAll('.step')) {
     const d = !!done[b.dataset.su];
-    const base = b.dataset.base || (b.dataset.base = b.textContent);
     b.classList.toggle('done', d);
-    b.textContent = d ? '✓ ' + base : base;
+    // The mark is its own node. Rebuilding the label as textContent flattened
+    // whatever markup it carried — which silently undid the breed chip's
+    // aria-hidden × and its spoken "and", printing "×and" on screen.
+    let mk = b.querySelector('.ck');
+    if (d && !mk) { mk = document.createElement('span'); mk.className = 'ck'; mk.textContent = '✓ '; b.prepend(mk); }
+    else if (!d && mk) mk.remove();
     all = all && d;
   }
   if (all) {

@@ -139,7 +139,7 @@ Button tiers (one primary per view, never mix tiers inside one button group):
 
 Required state coverage for every interactive element: default · hover · focus-visible
 (2px `--accent` outline, offset 2 — global rule exists, don't suppress it) · active ·
-disabled (`opacity:.35`, no hover). Hover on touch devices must not gate any
+disabled (`opacity:.45`, no hover). Hover on touch devices must not gate any
 information (see §8 tooltips).
 
 Breed (one skeleton, four fillings — every result kind produces *status sentence →
@@ -153,6 +153,7 @@ never the shape):
 | `.result-zone` / `.result-zone.two` | The answer grid. `.two` is the gender kind — two equal card columns with the rail spanning `1/-1` beneath. |
 | `.cardopen` | A whole-card press target laid **over** the card (`position:absolute;inset:0`), never wrapped around it. `role="button"` on the card itself made its `aria-label` replace every heading and chip inside, and buried an `h3` in a button. Same idea as `.dextile-open`, different family. It must be `pointer-events:none` with the click handler on the **card** — as the only positioned descendant it otherwise hit-tests above every chip, silently killing their tooltips and text selection. Keyboard activation of the button bubbles a click to the card, so both routes still work. |
 | `.gtag` | The condition line on a gender-combo card ("If Katress is ♂ and Wixen is ♀"). It is the **only** thing telling the two cards apart, so it leads the body at `--fs-md`/`--text-2` — not a footnote under the chips. |
+| `.chaincard` | The Planner's route, opened one step at a time in Breed. Spans `1/-1` under the answer. A `role="group"` with `tabindex="-1"` labelled by its own title, because **every route into and out of it destroys the control that was pressed**: the Planner's `↗` is on a tab this navigation hides, and Prev/Next step rebuild the whole card. Focusing the card announces which step you landed on; the nav buttons re-focus the same direction after a step, and the opposite one at the end of the chain where their own press has just disabled them. |
 
 Write `×` between two pal names as a visible `aria-hidden` glyph plus an `.sr-only`
 "and": NVDA reads U+00D7 as "times", which turns a sentence into arithmetic.
@@ -328,6 +329,15 @@ Priority order — always exhaust a tier before falling to the next:
    development; flagged for replacement before the work is called done. Never in new
    polished UI.
 
+JS-built Lucide icons go through `lucide(name, size, cls)` in `js/core.js` — add the
+path data to the `LU` table beside it, so the repo carries only the icons it draws.
+Markup-authored ones inline the same attribute set by hand (`#swapBtn`). They are
+always `aria-hidden`: the control carries the label. A control whose visible text
+sits beside an icon must keep that text **inside** its accessible name — an
+`aria-label` that paraphrases it ("Previous chain step" over "Prev step") fails
+2.5.3 Label in Name, and axe cannot see it (`label-content-name-mismatch` is
+experimental and off by default, so a clean suite is not a clearance).
+
 Plain **text symbols** (★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×) are typography, not emoji — they
 render monochrome, inherit color, and remain allowed where established (ownership
 stars, gender marks, close/clear, step arrows). Don't add new ones when a Lucide
@@ -431,13 +441,6 @@ visual claims; contrast ratios computed, not eyeballed.
   that is three unexplained words deciding whether a nickname survives. Wants one
   visible line under the segrow describing the selected option — the same fix the
   backup flow's `#smBackupEffect` already uses.
-- **The Breed answer card has no `:active` press feedback.** The global
-  `button:not(:disabled):active` rule now matches `.cardopen`, but it translates a
-  transparent overlay — the card itself doesn't move. Wants
-  `.child-card:has(.cardopen:active){transform:translateY(1px)}` plus
-  `.cardopen:active{transform:none}`. Cosmetic; not a 2.5.x issue.
-- **`#/breed` with no keys doesn't clear the pickers**, so the empty state is only
-  reachable from a cold start or by clearing both slots by hand.
 - **`.odds.wild` ("📍 Where?") is 70.9×20.5 CSS px** at both 1366 and 360 — under the
   24px of 2.5.8, and it was not established whether the spacing exception clears it.
   Off every surface the roster/save work touched, so it was not fixed there.
@@ -459,11 +462,28 @@ visual claims; contrast ratios computed, not eyeballed.
 - **Emoji migration (§7)**: replace remaining pictographic emoji with game assets or
   Lucide SVGs — 🎮 (Read my save), 🍰 (guide; `items/cake.webp` exists), 🐣, 🔍, 🗺,
   🌙 nocturnal, 🌳 tree button, 🍖 food stat, ⚠ warnboxes, 🎲 odds, 📦, 📍, and the
-  four remaining 🧬 marks (`ui/egg/mutation.webp`, already used by Breed's footnote):
-  the Guide's `Egg mutations 🧬` summary — **take this one first**, because Breed's
-  footnote now links straight to it, so one keypress goes tier-1 icon → emoji for
-  the same concept — the Guide "Deep dive" heading, the passive picker's mark
-  (`js/passives.js`) and the Skills "Mutation only" badge.
+  three remaining 🧬 marks (`ui/egg/mutation.webp`): the Guide "Deep dive" heading,
+  the passive picker's mark (`js/passives.js`) and the Skills "Mutation only" badge.
+  The Guide's `Egg mutations` summary is done — Breed's footnote links straight to
+  it, so one keypress no longer goes tier-1 icon → emoji for the same concept.
+- **Every hash navigation announces its live region twice.** `hashchange` and
+  `popstate` both fire for one navigation and each runs `applyHash`, so a view's
+  `.resline` is rebuilt with identical text ~2ms apart — the exact condition under
+  which a polite region is re-read. `badLink()` already dedupes its own toast
+  against this; the route dispatch needs the same coalescing, and a plain
+  "same hash as last time" guard is not enough because `updateHash` rewrites the
+  hash between the two. App-wide, not specific to one view.
+- **A chain step announces the pair, not the step.** Pressing Next step updates
+  `#breedStatus` to the new pair and silently changes the chain title to "step 2 of
+  4"; focus stays on the nav button, so a screen-reader user never hears which step
+  they are on. Wants the step count in the status sentence while a chain is active —
+  which is a change to §4's one-sentence-answer contract, so it needs a spec first.
+- **The chain card's right edge aligns with nothing** at ≥900px: `width:min(760px,100%)`
+  inside `grid-column:1/-1` stops it 140px past the answer column and 116px into the
+  rail. Either span the zone or clamp it to the answer column.
+- **`.tvp-ctrl`'s `⤾` reset glyph** is a text symbol outside the established set
+  (§7) where Lucide has `rotate-ccw`. Shared by the Planner tree and Breed's chain
+  card, so it belongs to whichever pass touches the tree viewport.
 - **`.hatchpanel .pair` still calls `icon(pal, 32, true)`** — the art is a second,
   mouse-only action inside a button, unreachable by keyboard and never announced.
   Find parents took the fix (a real anchor button); Breedable now still needs it.

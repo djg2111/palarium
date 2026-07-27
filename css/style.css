@@ -217,6 +217,10 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
   .result-zone{grid-template-columns:minmax(0,1.2fr) minmax(280px,1fr)}
   /* peers, so they share a height and their portraits share a baseline */
   .result-zone.two{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
+  /* .child-card centres its body, which puts the two names ~17px apart when one
+     card wraps a fourth work chip — the pair is meant to be read side by side,
+     so the bodies start at the same edge. The ≤640 rule already does this. */
+  .result-zone.two .child-card{align-items:flex-start}
   .result-zone.two>.resrail{grid-column:1/-1}
   .result-zone:not(.two) .resrail .linkrow{flex-direction:column;align-self:stretch}
   .result-zone:not(.two) .resrail .linkrow>.alink{text-align:left}
@@ -231,7 +235,7 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
    4px indent .gjump carries for inline use in the Guide reads as misalignment
    when it is the last item in a start-aligned column. */
 .resrail .gjump{margin-top:var(--sp-4);margin-left:0}
-.child-card{position:relative;width:100%;background:linear-gradient(180deg,var(--raised),var(--surface));border:1px solid var(--border-strong);border-radius:var(--r-xl);padding:24px 28px;display:flex;gap:22px;align-items:center;animation:pop var(--t-base) var(--ease-out)}
+.child-card{position:relative;width:100%;background:linear-gradient(180deg,var(--raised),var(--surface));border:1px solid var(--border-strong);border-radius:var(--r-xl);padding:var(--sp-6) var(--sp-7);display:flex;gap:var(--sp-6);align-items:center;animation:pop var(--t-base) var(--ease-out)}
 .child-card.clickable{cursor:pointer;transition:border-color var(--t-fast),transform var(--t-fast)}
 .child-card.clickable:hover{border-color:var(--accent-line);transform:translateY(-1px)}
 /* the press target lies OVER the card instead of wrapping it, so the card's
@@ -242,6 +246,14 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .cardopen{position:absolute;inset:0;border:0;background:none;pointer-events:none;border-radius:var(--r-xl)}
 .child-card:has(.cardopen:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
 .cardopen:focus-visible{outline:none}
+/* The global button:active translate lands on a transparent overlay, so nothing
+   visible moves — the card takes the press instead (DESIGN.md §11). Both routes
+   are needed: the overlay is pointer-events:none, so a mouse press never reaches
+   it and :active lands on the card, while a keyboard press lands on the overlay.
+   Must stay after the :hover rule — same specificity, source order decides. */
+.child-card.clickable:active,
+.child-card.clickable:has(.cardopen:active){transform:translateY(1px)}
+.cardopen:active{transform:none}
 @keyframes pop{from{transform:scale(.97);opacity:0}to{transform:scale(1);opacity:1}}
 .child-card .pico{width:84px;height:84px;font-size:30px}
 .child-card h3{font-size:var(--fs-h1);line-height:1.2}
@@ -250,6 +262,8 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .badge{font-size:var(--fs-xs);font-weight:700;letter-spacing:.6px;padding:3px 10px;border-radius:var(--r-sm);text-transform:uppercase}
 .badge.unique{background:var(--gold-tint);color:var(--gold);border:1px solid var(--gold-line)}
 .badge.same{background:var(--success-tint);color:var(--success);border:1px solid var(--success-line)}
+/* Breed doesn't use this one (a badge repeated on both cards distinguishes
+   nothing), but the Planner's route steps do — js/planner.js stepEl. */
 .badge.gender{background:var(--danger-tint);color:var(--danger);border:1px solid var(--danger-line)}
 .gbar{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:var(--fs-sm);color:var(--muted)}
 .gtrack{width:130px;height:7px;border-radius:var(--r-full);background:var(--female);overflow:hidden}
@@ -882,6 +896,9 @@ select#genderSel{padding:10px 12px}
 .chainhead{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
 .chainhead .ttl{font-weight:700;font-size:var(--fs-md)}
 .chainhead .nav{margin-left:auto;display:flex;gap:6px}
+/* the chevron sits inline with the label; measured 33px tall, clear of the
+   24px floor in WCAG 2.2 2.5.8 */
+.chainhead .nav button{display:inline-flex;align-items:center;gap:var(--sp-1);padding-block:var(--sp-2)}
 .plantree{margin:6px 0 10px}
 .tn{display:flex;align-items:center;gap:0}
 .tn-parents{display:flex;flex-direction:column;gap:10px;align-items:flex-end;position:relative;padding-right:14px}

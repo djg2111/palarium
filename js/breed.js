@@ -16,6 +16,32 @@ function openChainStep(steps, idx) {
   pickB.set(byKey.get(st.bK), true);
   renderBreed();
   navTab('breed');
+  // The press happened on another tab, on a button this navigation hides, so
+  // focus would fall to <body>. Land the reader on what the press revealed —
+  // the card is labelled by its own title, so focusing it says which step it is.
+  // preventScroll, then scroll the view instead: letting the browser reveal a
+  // 442px card pushed the heading, the answer sentence and the result card off
+  // the top of a phone screen, so you arrived at a bare tree diagram.
+  const cc = document.querySelector('.chaincard');
+  if (cc) {
+    cc.focus({preventScroll: true});
+    document.getElementById('view-breed').scrollIntoView({block: 'start', behavior: SMOOTH});
+  }
+}
+// The chain nav rebuilds itself on every step, so the button that was just
+// pressed is gone by the time it takes effect. Re-focus the same direction, or
+// the other one where this end of the chain has just disabled it (DESIGN.md §9).
+function focusChainNav(dir) {
+  const btns = [...document.querySelectorAll('.chaincard .nav button')];
+  const b = btns.find(x => +x.dataset.d === dir && !x.disabled) || btns.find(x => !x.disabled);
+  if (b) b.focus();
+}
+// After a press that re-renders the zone and destroys its own button, hand focus
+// to the answer the press produced rather than letting it fall to <body>.
+function focusResult() {
+  const el = document.querySelector('#breedResult .cardopen') ||
+             document.querySelector('#breedResult .linkrow button');
+  if (el) el.focus(); else focusPicker(pickA);
 }
 function appendChainCard(zone, a, b) {
   if (!breedChain) return;
@@ -24,8 +50,10 @@ function appendChainCard(zone, a, b) {
   const n = breedChain.steps.length;
   const target = byKey.get(breedChain.steps[n - 1].cK);
   const card = document.createElement('div'); card.className = 'chaincard';
+  // focusable and named, so arriving from the Planner announces where you landed
+  card.tabIndex = -1; card.setAttribute('role', 'group'); card.setAttribute('aria-labelledby', 'chainTtl');
   const head = document.createElement('div'); head.className = 'chainhead';
-  const ttl = document.createElement('span'); ttl.className = 'ttl';
+  const ttl = document.createElement('span'); ttl.className = 'ttl'; ttl.id = 'chainTtl';
   ttl.textContent = `Breeding chain — step ${breedChain.idx + 1} of ${n} toward ${target.n}`;
   head.appendChild(ttl);
   const nav = document.createElement('div'); nav.className = 'nav';
@@ -37,20 +65,29 @@ function appendChainCard(zone, a, b) {
     pickA.set(byKey.get(s2.aK), true);
     pickB.set(byKey.get(s2.bK), true);
     renderBreed();
+    focusChainNav(d);
   };
-  const mk = (txt, label, d, disabled) => {
-    const bt = document.createElement('button'); bt.type = 'button'; bt.textContent = txt;
-    bt.setAttribute('aria-label', label); bt.disabled = disabled;
+  // Lucide chevrons, not ◀ ▶: those two aren't in the established text-symbol
+  // set, they carry an emoji presentation on some platforms, and §7 names
+  // chevrons as a tier-2 icon outright.
+  // No aria-label: one that didn't contain the visible words ("Previous chain
+  // step" over "Prev step") fails 2.5.3 Label in Name, so speech input couldn't
+  // say what it could see. The group's own name already supplies the context.
+  const mk = (txt, d, disabled) => {
+    const bt = document.createElement('button'); bt.type = 'button';
+    bt.disabled = disabled; bt.dataset.d = d;
+    if (d < 0) bt.append(lucide('chevronLeft', 16), txt);
+    else bt.append(txt, lucide('chevronRight', 16));
     bt.addEventListener('click', () => go(d));
     return bt;
   };
-  nav.append(mk('◀ Prev step', 'Previous chain step', -1, breedChain.idx === 0),
-             mk('Next step ▶', 'Next chain step', 1, breedChain.idx === n - 1));
+  nav.append(mk('Previous step', -1, breedChain.idx === 0),
+             mk('Next step', 1, breedChain.idx === n - 1));
   head.appendChild(nav);
   card.appendChild(head);
   card.appendChild(treeViewport(routeTree(breedChain.steps, breedChain.idx)));
   const exit = document.createElement('button'); exit.className = 'alink'; exit.textContent = '✕ Leave chain view';
-  exit.addEventListener('click', () => { breedChain = null; renderBreed(); });
+  exit.addEventListener('click', () => { breedChain = null; renderBreed(); focusResult(); });
   card.appendChild(exit);
   zone.appendChild(card);
 }
@@ -140,7 +177,8 @@ function renderBreed() {
       if (exA && exB) {
         const ex = document.createElement('button'); ex.type = 'button'; ex.className = 'alink';
         ex.append('Try an example: ', pairPhrase(exA, exB));
-        ex.addEventListener('click', () => { pickA.set(exA, true); pickB.set(exB, true); renderBreed(); });
+        // the button destroys itself in the re-render, so hand focus to the answer
+        ex.addEventListener('click', () => { pickA.set(exA, true); pickB.set(exB, true); renderBreed(); focusResult(); });
         lr.appendChild(ex);
       }
       const rev = document.createElement('button'); rev.type = 'button'; rev.className = 'alink';
@@ -173,11 +211,15 @@ function renderBreed() {
   if (res.kind === 'gender') {
     zone.classList.add('two');
     for (const ch of kids) {
-      const pa = byKey.get(ch.pa), pb = byKey.get(ch.pb);
       const gs = g => g === 'Male' ? '♂' : '♀';
+      // Orient onto the picked slots, the way planner.js stepEl does. ch.pa/pb
+      // come from the dataset combo, whose own order is arbitrary — so the one
+      // line that tells the two cards apart could name the parents backwards
+      // from the status sentence and the pickers directly above it.
+      const ga = ch.pa === a.k ? ch.ga : ch.gb, gb = ch.pb === b.k ? ch.gb : ch.ga;
       // No .badge.gender: it repeats on both cards so it distinguishes nothing,
       // and it is --danger pink for a fact that is not a warning.
-      zone.appendChild(childCard(ch.pal, {gtag: `If ${pa.n} is ${gs(ch.ga)} and ${pb.n} is ${gs(ch.gb)}`}));
+      zone.appendChild(childCard(ch.pal, {gtag: `If ${a.n} is ${gs(ga)} and ${b.n} is ${gs(gb)}`}));
     }
   } else {
     const badge = res.kind === 'unique' ? ['unique', 'Unique combo'] : res.kind === 'same' ? ['same', 'Same species'] : null;
@@ -191,7 +233,9 @@ function renderBreed() {
   rail.appendChild(lb);
   const sub = html => { const s = document.createElement('p'); s.className = 'sub'; s.innerHTML = html; rail.appendChild(s); return s; };
   if (res.kind === 'gender') {
-    sub('Which pal you get depends on each parent’s gender.');
+    // species, not pal — the two cards are two species (§6 lexicon), and the
+    // status sentence this explains already says "one of two species"
+    sub('Which species you get depends on each parent’s gender.');
   } else if (res.kind === 'unique') {
     sub('This is a unique combo. It ignores the breeding-power math.');
   } else if (res.kind === 'same') {

@@ -40,7 +40,9 @@
   <div class="setup" id="setupbar" hidden>
     <span class="lb">Get set up:</span>
     <button type="button" class="step" data-su="star" title="Opens the Paldex — tap ☆ on species you own">★ Star pals you own</button>
-    <button type="button" class="step" data-su="breed" title="Loads an example pair in the Breed tab">Try a breed: Relaxaurus × Sparkit</button>
+    <!-- × as a hidden glyph + a spoken "and" (DESIGN.md §4) — bare, NVDA reads
+         "Relaxaurus times Sparkit" -->
+    <button type="button" class="step" data-su="breed" title="Loads an example pair in the Breed tab">Try a breed: Relaxaurus <span aria-hidden="true">×</span><span class="sr-only">and</span> Sparkit</button>
     <button type="button" class="step" data-su="plan" title="Opens the Planner — pick a start pal and a target species">Plan a route</button>
     <button class="dismiss" id="tipDismiss" aria-label="Dismiss setup checklist">✕</button>
   </div>
@@ -439,7 +441,9 @@
           </ul>
         </div></details>
 
-        <details id="g-mutations"><summary>Egg mutations 🧬</summary><div>
+        <!-- the same tier-1 icon Breed's footnote carries: that footnote links
+             straight here, so one keypress must not swap the art for an emoji -->
+        <details id="g-mutations"><summary>Egg mutations <img class="uii" src="assets/ui/egg/mutation.webp" alt="" width="18" height="18" loading="lazy" decoding="async"></summary><div>
           <ul>
             <li>Every bred egg has a <b>~1% chance to mutate</b> — <b>~3%</b> if you use an <b>Extravagant Vegetable Cake</b> instead of a regular Cake. A <b>Vegetable Cake</b>'s two eggs each roll separately, so it's ≈2% per breeding cycle at the base rate.</li>
             <li>Mutated eggs are <b>visibly different</b> — purple with a distinct pattern — so you'll know before it hatches.</li>
