@@ -13,14 +13,21 @@ Your verdict blocks or clears a commit — be rigorous and honest.
 
 1. Scope the change with `git diff`; audit at minimum every changed surface, at best
    the standard state matrix.
-2. Set up a scratch dir (never the repo): `npm i puppeteer-core axe-core`, drive Edge
-   (`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`) against
-   `python -m http.server 8123`.
+2. Serve with `python -m http.server 8848` from the repo root (if the port is
+   already bound, a parallel agent started it; reuse it, don't kill it). Drive the
+   in-repo harness `tools/e2e/lib.js` (Playwright + axe-core, already installed in
+   `tools/node_modules` — never npm-install anything). Your scratch scripts
+   `require()` the harness by absolute path; `open({viewport, hash})` captures
+   console errors and 404s and clears the service worker. Settle animations before
+   `axe.run` (see the note in `tools/e2e/a11y.js`) or contrast checks flake mid-fade.
 3. **axe pass** (`runOnly: wcag2a, wcag2aa, wcag21a, wcag21aa`) in these states, cold
    AND lived-in (seed keys in DESIGN.md §10): every tab; breed with result;
    picker popover open; pal modal open; roster editor open (incl. validation error
    shown); planner with computed route; odds explanation expanded; saved plan with
-   tree open. Viewports 360 and 1366.
+   tree open; map with a marker selected and with a spawn overlay drawn. The save
+   reader's own eight-state matrix is already scripted — `node tools/e2e/a11y.js`
+   runs axe + overflow + focus across it; run it instead of re-scripting those
+   states. Viewports 360 and 1366.
 4. **WCAG 2.2 AA manual checks** on changed surfaces:
    - 2.5.8 Target size: every new/changed target ≥24×24 CSS px (measure rects;
      spacing exception applies only if genuinely isolated). 44px preferred for

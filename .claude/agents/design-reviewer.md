@@ -17,13 +17,16 @@ defect — cite which.
 ## Method (verify, never speculate)
 
 1. `git diff` / `git log` to scope what changed; read the touched code.
-2. Serve the app (`python -m http.server 8123`) and exercise the changed surface in
-   headless Edge (puppeteer-core + Edge at
-   `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`; `npm i
-   puppeteer-core` in a scratch dir — never in the repo). Recipes in DESIGN.md §10.
+2. Serve the app (`python -m http.server 8848` from the repo root — if the port is
+   already bound, a parallel agent started it; reuse it, don't kill it) and exercise
+   the changed surface with the in-repo harness `tools/e2e/lib.js` (Playwright +
+   axe-core, already installed in `tools/node_modules` — never npm-install anything).
+   Your scratch scripts `require()` the harness by absolute path; `open({viewport,
+   hash})` captures console errors and 404s and clears the service worker. Recipes
+   in DESIGN.md §10.
 3. Test BOTH cold start (`localStorage.clear()`) and a lived-in state (seed
    `palbreed_owned`/`palbreed_roster`/`palbreed_plans` — see DESIGN.md §10), at 360
-   and 1366px minimum; 390/768 when layout is affected.
+   and 1366px minimum; 320/390/768 when layout is affected (canonical list: §10).
 4. Measure, don't eyeball: `getBoundingClientRect` for sizes/overflow (no horizontal
    page scroll ≤640px; targets ≥24px, 44px for primary mobile actions),
    `getComputedStyle` for token compliance, computed ratios for any new color pairing.
@@ -34,7 +37,8 @@ defect — cite which.
 ## Review lenses
 
 - **Token discipline**: raw hex/px values that should be tokens; off-scale spacing or
-  font sizes in new rules; new grays outside the bg→bg2→bg3 ladder.
+  font sizes in new rules; new grays outside the bg→surface→raised→overlay ladder
+  (§1); new `rgba()` outside the two-alpha tint recipe.
 - **Component reuse**: new one-off button/input/chip styles when a canon class exists
   (DESIGN.md §4); multiple or zero primaries in a view; missing hover/focus/active/
   disabled states; state styling inconsistent with siblings.

@@ -2,8 +2,8 @@
 
 Static vanilla-JS Palworld breeding tool. No build step, no dependencies, dark-only,
 offline PWA. `index.html` (markup) · `js/*.js` (logic, one file per view — see
-README) · `css/style.css` · `js/data.js` (generated dataset — do not hand-edit) ·
-`sw.js` · `assets/pals/`.
+README) · `css/style.css` · `js/data.js`, `js/mapdata.js`, `js/spawndata.js`
+(generated — regenerate via `tools/`, never hand-edit) · `sw.js` · `assets/pals/`.
 
 The logic files are classic `<script>`s sharing one global scope, loaded in the
 order listed at the bottom of `index.html`. That order is a real contract: a file
@@ -11,9 +11,13 @@ may call anything defined in an earlier file, but top-level code must not reach
 forward into a later one. Not ES modules — `type="module"` is CORS-blocked over
 `file://`, and the app must keep working opened straight off disk.
 
-Serve with `python -m http.server 8123` (or open `index.html` directly). Syntax check:
-`node --check js/<file>.js`. Adding a JS file means adding it to both `index.html`
-and the `SHELL` array in `sw.js`, plus bumping `VERSION`.
+Serve with `python -m http.server 8848` — the port `tools/e2e` expects — or open
+`index.html` directly. Syntax check: `node --check js/<file>.js`. Browser regression
+suite: `tools/e2e/` (Playwright + axe-core, already installed in `tools/node_modules`
+— never npm-install a browser harness elsewhere); `tools/e2e/lib.js` is the shared
+harness, `node tools/e2e/a11y.js` runs the save-reader a11y matrix. Synthetic save
+fixtures live in `tests/` (`tools/make-fixture.js`). Adding a JS file means adding it
+to both `index.html` and the `SHELL` array in `sw.js`, plus bumping `VERSION`.
 
 ## Design workflow (this is the point — follow it)
 

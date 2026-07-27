@@ -384,12 +384,19 @@ recoloring/filters).
 ## 10 · Verification recipes
 
 ```sh
-# serve
-python -m http.server 8123
+# serve — 8848 is the port tools/e2e/lib.js expects; reuse the server if already bound
+python -m http.server 8848
 # console-error smoke test
-msedge --headless=new --disable-gpu --enable-logging=stderr --virtual-time-budget=5000 --dump-dom http://localhost:8123/index.html
-# axe + interaction harness (scratch dir): npm i puppeteer-core axe-core
-# then drive Edge at 360/390/768/1366px; seed lived-in state via localStorage keys:
+msedge --headless=new --disable-gpu --enable-logging=stderr --virtual-time-budget=5000 --dump-dom http://localhost:8848/index.html
+# axe + interaction harness: tools/e2e/lib.js (Playwright + axe-core, installed in
+# tools/node_modules — no scratch npm install). require() it by absolute path from a
+# scratch script; open({viewport, hash}) returns a page with console errors, pageerrors
+# and 404s captured and the service worker cleared. axe loads from
+# tools/node_modules/axe-core/axe.min.js; settle animations before axe.run (see
+# tools/e2e/a11y.js — mid-fade sampling flakes contrast checks).
+# The save reader's own state matrix is already scripted: node tools/e2e/a11y.js
+# Canonical viewports: 320 · 360 · 390 · 768 · 1366 (320 is the 1.4.10 reflow floor).
+# Seed lived-in state via localStorage keys:
 #   palbreed_owned (array of species keys), palbreed_roster, palbreed_plans, palbreed_tipseen='1'
 # deep links to exercise: #/breed/SheepBall/ElecCat  #/pal/Anubis  #/plan/SheepBall+ElecCat/Anubis
 ```

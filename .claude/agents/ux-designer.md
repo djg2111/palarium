@@ -1,6 +1,6 @@
 ---
 name: ux-designer
-description: Interaction/flow designer for Palarium. Use PROACTIVELY BEFORE implementing any new feature, new view, or change to a user-facing flow — and whenever a flow "feels clunky" and needs a redesign (e.g. import/export, roster grouping). Produces an implementation-ready interaction spec; writes no code.
+description: Interaction/flow designer for Palarium. Use PROACTIVELY BEFORE implementing any new feature, new view, or change to a user-facing flow — and whenever a flow "feels clunky" and needs a redesign (DESIGN.md §11 is the live backlog of known-clunky flows). Produces an implementation-ready interaction spec; writes no code.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 

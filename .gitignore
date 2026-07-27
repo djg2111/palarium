@@ -12,3 +12,8 @@ obj/
 *.sav
 tools/saves/
 !tests/*.sav
+
+node_modules/
+
+# e2e test output — regenerated every run
+tools/e2e/shot-*.png
