@@ -64,6 +64,7 @@ not in this table needs a computed ratio before merge:
 | `--text` on `--accent-tint` over `--raised` | — | — | 12.80 | — | AA/AAA — the open roster tile |
 | `--muted` on `--accent-tint` over `--raised` | — | — | 5.16 | — | AA |
 | `--female` on `--accent-tint` over `--raised` | — | — | 4.96 | — | AA — the tightest pairing in the app |
+| `--danger` on `--danger-tint` over `--surface` | — | 6.72 | — | — | AA — the blocked partner chip. At `opacity:.9` (its `.why` reason line) 5.72, still AA |
 | `--text` on `--accent-tint` over `--bg` | 14.29 | — | — | — | AA — the selected roster row. `--male` 6.81, `--muted` 5.76, `--success` chip 8.04. The tint itself is 1.12:1 against a plain row, so it is atmosphere; the checkbox carries the state |
 | `--text` on `--gold-tint` over `--surface` | — | 14.15 | — | — | AA — the owned Paldex tile |
 | `--muted` on `--gold-tint` over `--surface` | — | 5.70 | — | — | AA — a tinted fill costs ~0.2 against the plain surface |
@@ -139,7 +140,7 @@ Button tiers (one primary per view, never mix tiers inside one button group):
 | Destructive | `.alink.danger` | `--danger` text and `--danger-line` border; hover fills `--danger-tint` | The one destructive action of a view or bar. **Never `.alink.primary`** — a solid accent fill on a destructive default invites the mis-press the control exists to make safe |
 | Quiet/tertiary | `.tx`, `.thbtn`, text-styled buttons | no border until hover | Dismiss, inline meta actions |
 | Icon | `.star`, `.tvp-ctrl button`, `.mnav`, `.close` | square/round, ≥24px hit area | Single-glyph actions, always `aria-label` |
-| Switch | `.toggle` (+ `.kn`) | pill + knob, `role="switch"` | Boolean filters/options; label states the *outcome* ("Pairs I can make") |
+| Switch | `.toggle` (+ `.kn`) | pill + knob, `role="switch"` | Boolean filters/options; label states the *outcome*, and the outcome it names must be the one it delivers — "Pairs I can make" became **"Pairs from pals I own"** because it kept gender-blocked pairs, which §4's own band rule says are not pairs you can make |
 | Segmented | `.segrow`, `.srcrow` | joined buttons, one `.on` | Mutually exclusive small sets |
 
 Required state coverage for every interactive element: default · hover · focus-visible

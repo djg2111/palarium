@@ -1,6 +1,8 @@
 // ---------- reverse view ----------
 const pickT = makePicker(document.getElementById('pickT'), {placeholder:'Pick a species…', ariaLabel:'Target species', allowClear:true, ownedToggle:true, onChange:() => { reverseShown = {}; renderReverse(); }});
-const pickL = makePicker(document.getElementById('pickL'), {placeholder:'Any species', allowClear:true, ownedToggle:true, onChange:() => { reverseShown = {}; renderReverse(); }});
+// ariaLabel, or makePicker falls back to the placeholder and the control
+// announces "Any species" - its visible label reaches no accessible name (2.5.3)
+const pickL = makePicker(document.getElementById('pickL'), {placeholder:'Any species', ariaLabel:'Only pairs with', allowClear:true, ownedToggle:true, onChange:() => { reverseShown = {}; renderReverse(); }});
 // #pairFilter is gone: it substring-matched either parent name, which is what
 // pickL already does exactly — and pickL's own popover has a search box.
 const GROUP_PAGE = 20, GROUP_MORE = 40;
@@ -31,7 +33,13 @@ function reversePairs(target) {
   return out;
 }
 function setReverseStatus(...parts) {
-  document.getElementById('reverseStatus').replaceChildren(...parts);
+  const el = document.getElementById('reverseStatus');
+  // replaceChildren always mutates, and an aria-atomic region re-speaks the whole
+  // sentence on any mutation — so pressing Show more re-read a sentence that had
+  // not changed instead of leaving the new rows to speak for themselves.
+  const next = parts.map(x => typeof x === 'string' ? x : x.textContent).join('');
+  if (el.textContent === next) return;
+  el.replaceChildren(...parts);
 }
 // Greedy set cover: repeatedly take the species that covers the most remaining
 // pairs and emit it as one group. Anchoring on, say, the lower Paldex number
@@ -104,24 +112,33 @@ function renderReverse() {
   if (ownedOnly) pairs = pairs.filter(p => score(p) === 2);
 
   if (!pairs.length) {
-    if (lock) {
+    // Which filter actually emptied it? Blaming the lock when the switch did the
+    // work printed "No Lamball pair includes Mau" over a dataset holding two of
+    // them. The recovery button also named a total it did not deliver, because
+    // it cleared one of the two filters and left the other on.
+    const byLock = lock ? all.filter(p => p.a.k === lock.k || p.b.k === lock.k) : all;
+    const clearAll = () => {
+      pickL.set(null, true); ownedOnly = false; setSwitch(ownedToggle, false);
+      reverseShown = {}; renderReverse();
+      const a = zone.querySelector('.pgroup .anchor'); if (a) a.focus();
+    };
+    if (lock && !byLock.length) {
       setReverseStatus('No ', strongName(t.n), ' pair includes ' + lock.n + '.');
-      linkrow(act(`Show all ${total.toLocaleString()} pairs`, false, () => {
-        pickL.set(null, true); renderReverse();
-        const a = zone.querySelector('.pgroup .anchor'); if (a) a.focus();
-      }));
+      linkrow(act('Show every pair', false, clearAll));
+    } else if (ownedOnly) {
+      const c2 = byLock.length;
+      setReverseStatus('You own both halves of none of the ',
+        strongName(c2.toLocaleString() + ' pair' + (c2 === 1 ? '' : 's')),
+        lock ? ' that make ' + t.n + ' with ' + lock.n + '.' : ' that make ' + t.n + '.');
+      linkrow(act('Show every pair', false, clearAll));
     } else if (!lock && !ownedOnly) {
       // unreachable today (measured: every one of the 299 species has at least
       // one pair) — but leaving the previous target's sentence in the live
       // region would be a stale answer, not an empty one
       setReverseStatus('No pair makes ' + t.n + '.');
-    } else if (ownedOnly) {
-      setReverseStatus('None of the ', strongName(total.toLocaleString() + ' pairs'), ' that make ' + t.n + ' use only pals you own.');
-      linkrow(act('Show every pair', false, () => {
-        ownedOnly = false; setSwitch(ownedToggle, false); renderReverse();
-        const a = zone.querySelector('.pgroup .anchor'); if (a) a.focus();
-      }));
     }
+    // an instruction for controls that are not on screen
+    document.getElementById('reverseHow').hidden = true;
     restoreReverseFocus(hadFocus, zone);
     return;
   }
@@ -149,6 +166,11 @@ function renderReverse() {
   const of = n === total ? '' : ' of the ' + shown + ' shown';
   const plural = k => k === 1 ? '' : 's';
   const makes = k => k === 1 ? ' makes ' : ' make ';
+  // A filter narrows what is listed, not what is true. These three branches lead
+  // with the whole set's count and say separately how much of it survived the
+  // filter. Printing only the filtered number asserted it as the dataset's own
+  // answer; printing it as a fraction of itself read "2 of the 2 shown pairs".
+  const filtered = n === total ? '' : ` ${shown} match${n === 1 ? 'es' : ''} your filter.`;
   if (selfOnly) {
     setReverseStatus(t.n + ' can’t be bred from other species — only from two ' + t.n + '.');
   } else if (tiers[0] && tiers[0].key === 'now') {
@@ -171,25 +193,34 @@ function renderReverse() {
     setReverseStatus('You own both halves of ', strongName(String(c)), ' pair' + plural(c) + ', but the genders don’t work yet.');
   } else if (tiers[0] && tiers[0].key === 'one') {
     const g1 = groupPairs(tiers[0].list, tiers[0].pin).length;
-    setReverseStatus('No pair is ready yet. ', strongName(String(g1)), ' of your pals need' + (g1 === 1 ? 's' : '') + ' one more partner.');
+    // groupPairs counts anchor species, and section 6 keeps species and pals apart
+    setReverseStatus('No pair is ready yet. ', strongName(String(g1)), ' species you own need' + (g1 === 1 ? 's' : '') + ' one more partner.');
   } else if (!os.size) {
-    setReverseStatus(strongName(shown), ' pair' + plural(n) + makes(n) + t.n + '. Star pals you own to see which you can breed.');
+    // the button below already says to star pals, so the sentence doesn't
+    setReverseStatus(strongName(tot), ' pair' + plural(total) + makes(total) + t.n + '.' + filtered);
   } else if (uniqueOnly) {
-    setReverseStatus('Only ', strongName(shown), ' pair' + plural(n) + makes(n) + t.n + ' — all fixed unique combos.');
+    setReverseStatus('Only ', strongName(tot), ' pair' + plural(total) + makes(total) + t.n + ' — all fixed unique combos.' + filtered);
   } else {
-    setReverseStatus('None of your pals make ' + t.n + '. ', strongName(shown), ' pair' + plural(n) + (n === 1 ? ' does.' : ' do.'));
+    setReverseStatus('None of your pals make ' + t.n + '. ', strongName(tot), ' pair' + plural(total) + (total === 1 ? ' does.' : ' do.') + filtered);
   }
   if (!os.size && !selfOnly) linkrow(act('Star pals you own in the Paldex', false, () => navTab('dex')));
 
   // ---- the groups ----
-  const band = txt => { const h = document.createElement('h3'); h.className = 'slotlb mt'; h.textContent = txt; zone.appendChild(h); };
+  // the lead band carries the tier a player acts on first, so it is not
+  // typographically identical to "Both parents missing" (section 3)
+  const band = (txt, lead) => { const h = document.createElement('h3');
+    h.className = 'slotlb mt' + (lead ? ' lead' : ''); h.textContent = txt; zone.appendChild(h); };
   for (const tier of tiers) {
     const groups = groupPairs(tier.list, tier.pin);
     const cap = reverseShown[tier.key] || GROUP_PAGE;
     const c = tier.list.length;
     if (tiers.length > 1) {
-      const cut = groups.length > cap ? ` · showing ${cap} of ${groups.length.toLocaleString()} parents` : '';
-      band(`${tier.label} · ${c.toLocaleString()} pair${c === 1 ? '' : 's'}${cut}`);
+      // the truncation qualified the parent count but left the pair count
+      // asserting a total the list below does not hold
+      const shownPairs = groups.slice(0, cap).reduce((sum, g) => sum + g.items.length, 0);
+      const cut = groups.length > cap
+        ? ` · showing ${shownPairs.toLocaleString()} from ${cap} of ${groups.length.toLocaleString()} parents` : '';
+      band(`${tier.label} · ${c.toLocaleString()} pair${c === 1 ? '' : 's'}${cut}`, tier === tiers[0]);
     }
     const ul = document.createElement('ul'); ul.className = 'pairs';
     for (const g of groups.slice(0, cap)) ul.appendChild(pairGroup(g, os, t));
@@ -202,7 +233,7 @@ function renderReverse() {
     const m = document.createElement('button'); m.type = 'button'; m.className = 'more';
     const step = Math.min(GROUP_MORE, left);
     m.textContent = `Show ${step} more · ${left.toLocaleString()} hidden`;
-    m.setAttribute('aria-label', `Show ${step} more parents under ${tier.label} · ${left.toLocaleString()} hidden`);
+    m.setAttribute('aria-label', m.textContent + (tiers.length > 1 ? ' — ' + tier.label : ''));
     m.addEventListener('click', () => {
       reverseShown = {...reverseShown, [tier.key]: cap + GROUP_MORE};
       renderReverse();
@@ -231,7 +262,11 @@ function pairGroup(g, os) {
 
   const anchor = document.createElement('button');
   anchor.type = 'button'; anchor.className = 'anchor';
-  anchor.setAttribute('aria-label', g.pal.n + ', open species card');
+  // Under "One parent missing" the star is the only thing saying which half you
+  // have, and it is aria-hidden - so the row's actionable content reached no
+  // accessible name at all (1.3.1).
+  const ownSay = k => os.has(k) ? ', owned' : '';
+  anchor.setAttribute('aria-label', g.pal.n + ownSay(g.pal.k) + ', open species card');
   anchor.title = 'Open ' + g.pal.n + '’s card';
   // so closing a modal opened from here can find this same row again after the
   // re-render, instead of dropping you back at the top of a 40-row list
@@ -295,8 +330,8 @@ function pairGroup(g, os) {
     // "and", never the × glyph — NVDA reads U+00D7 as "times".
     const why = issue ? ' — ' + issue.replace(/♂/g, 'male').replace(/♀/g, 'female') : '';
     chip.setAttribute('aria-label', (it.self
-      ? `${g.pal.n}${say(ga)} and another ${g.pal.n}${say(gb)}`
-      : `${g.pal.n}${say(ga)} and ${partnerName}${say(gb)}`) + why + ' — open in Breed');
+      ? `${g.pal.n}${say(ga)}${ownSay(g.pal.k)} and another ${g.pal.n}${say(gb)}`
+      : `${g.pal.n}${say(ga)}${ownSay(g.pal.k)} and ${partnerName}${say(gb)}${ownSay(it.other.k)}`) + why + ' — open in Breed');
     // the reason has to be on screen too: in the aria-label alone, sighted and
     // touch users saw a pink chip under "Breed now" and no words at all
     if (issue) { const w = document.createElement('span'); w.className = 'why';
@@ -315,7 +350,7 @@ function pairGroup(g, os) {
   if (anchorNeeds.size === 1) {
     const sym = [...anchorNeeds][0];
     anchor.insertBefore(gEl(sym), nm.nextSibling);
-    anchor.setAttribute('aria-label', `${g.pal.n} (${sym === '♂' ? 'male' : 'female'}), open species card`);
+    anchor.setAttribute('aria-label', `${g.pal.n} (${sym === '♂' ? 'male' : 'female'})${ownSay(g.pal.k)}, open species card`);
   }
   li.appendChild(strip);
   return li;

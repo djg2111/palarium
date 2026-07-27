@@ -286,7 +286,10 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .alink.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover);color:var(--ink)}
 
 /* ---------- reverse view ---------- */
-.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:22px}
+/* one row class for filter/order/present controls (DESIGN.md section 9).
+   .controls was a second copy used exactly once; only the label-bottom
+   alignment was a real difference, so that is all that survives. */
+.revcontrols{align-items:flex-end;margin-bottom:22px}
 .ctl label{display:block;font-size:var(--fs-sm);font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .search-inp{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 14px;outline:none;width:210px}
 .search-inp:focus{border-color:var(--accent)}
@@ -323,6 +326,11 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 /* flex-basis, not min-width: `1 1 auto` sizes each item to its content and THEN
    shares the free space, so the content difference survives into the rendered
    width and the interior seam wandered ~96px down the page. */
+/* flex-grow makes the last group on a line absorb the row, so the tiers a
+   player acts on - almost always 1-2 groups - drew as near-empty full-width
+   bars while "Both parents missing" rendered tidy columns. Density was inverted
+   against actionability. */
+@media (min-width:908px){#reverseResult .pgroup{max-width:calc((100% - var(--sp-2)) / 2)}}
 .pgroup{display:flex;align-items:center;gap:var(--sp-2);flex:1 1 min(430px,100%);
   max-width:100%;background:var(--surface);
   border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--sp-2) var(--sp-4)}
@@ -348,6 +356,12 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 /* a warn chip carries a sentence, not a name — like .needrow's catch chips it
    wraps inside its own border instead of pushing the row past the viewport
    (385px of nowrap chip was the page's width at 320) */
+/* the .warn rule below wins on source order, so the plain :hover never applied:
+   on the one tier where a chip most needs to look pressable it read as inert */
+@media (hover:hover){.pgroup .tchip.warn:hover{border-color:var(--danger)}}
+/* section 4 rules this for .mchip.warn already: a --male blue glyph on a pink
+   chip stops reading as a gender colour */
+.pgroup .tchip.warn .g{color:inherit}
 .pgroup .tchip.warn{color:var(--danger);border-color:var(--danger-line);background:var(--danger-tint);
   white-space:normal;text-align:left}
 .pgroup .tchip .why{font-size:var(--fs-xs);font-weight:600;opacity:.9}
@@ -376,7 +390,7 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .combo .cx{color:var(--faint)}
 .combo .cself{font-style:italic;color:var(--muted)}
 .more{margin:22px auto 0;display:block;background:var(--surface);border:1px solid var(--border-strong);padding:10px 26px;border-radius:var(--r-md);font-weight:600}
-.more:hover{border-color:var(--border-strong);color:var(--text)}
+.more:hover{border-color:var(--accent);color:var(--text)}
 
 /* ---------- dex view ---------- */
 .dex-controls{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center}
@@ -899,6 +913,7 @@ select#genderSel{padding:10px 12px}
 .mylv input:hover{border-color:var(--border-strong)}
 .gjump{padding:3px 12px;font-size:var(--fs-sm);margin-left:4px}
 .slotlb.mt{margin-top:12px}
+#reverseResult .slotlb.lead{font-size:var(--fs-sm);color:var(--text-2)}
 @media (min-width:641px){#reverseResult .slotlb.mt{margin-top:var(--sp-5)}}
 .slot .ptag{max-width:none;min-width:0}
 .plannerhow{margin-bottom:16px}
@@ -1405,8 +1420,8 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .setup .dismiss{position:absolute;top:5px;right:4px;margin:0}
 
   /* --- filter/search rows: one full-width control per line --- */
-  .controls,.dex-controls{gap:10px}
-  .controls>.ctl,.dex-controls>.ctl,
+  .dex-controls{gap:10px}
+  .dex-controls>.ctl,
   .dex-controls>.search-inp,.dex-controls>select,.dex-controls>.isel,
   .dex-controls>.toggle,.dex-controls>.segrow{flex:1 1 100%;width:100%;min-width:0;max-width:none}
   /* Five stacked full-width controls put the first tile 514px down a 740px
@@ -1428,7 +1443,7 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .ctl .picker,.ctl select,.ctl .search-inp,.ctl .toggle{width:100%;max-width:none;min-width:0}
   /* an &nbsp; label exists only to bottom-align the desktop row — on a stack
      it renders as a phantom gap above the toggle */
-  .controls .ctl label[aria-hidden="true"],
+
   .dex-controls .ctl label[aria-hidden="true"]{display:none}
   #hatchDepth button,#comboKind button{flex:1 1 0;padding:9px 6px}
 
@@ -1454,8 +1469,9 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .pgroup .x{display:none}
   /* two controls per row, target species full width — the §9 .dex-controls
      pattern. Three stacked rows put the first answer at y=425 on a 360 phone. */
-  #view-reverse .controls{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2)}
-  #view-reverse .controls .ctl:first-child{grid-column:1/-1}
+  /* same two-column shape .dexcontrols uses; the target picker spans both */
+  .revcontrols{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2)}
+  .revcontrols .ctl:first-child{grid-column:1/-1}
   .pgroup .anchor{max-width:none;flex:1 1 auto;min-height:32px}
   .pgroup .chiprow{flex:1 1 100%}
   .pgroup .tchip{min-height:32px}
