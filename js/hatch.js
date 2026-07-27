@@ -71,7 +71,10 @@ function renderHatch() {
   rows.sort((a, b) => (b.isNew - a.isNew) || (a.gen - b.gen) || a.p.z - b.p.z);
   const newCount = rows.filter(r => r.isNew).length;
   const depthLbl = hatchDepth === 1 ? 'one step' : hatchDepth === 2 ? '≤2 steps' : 'any chain';
-  stats.textContent = `${rows.length} species from ${own.length} owned · ${depthLbl} · ${newCount} new`;
+  // with the filter on every shown species is new by definition, so the tail
+  // counted the same set twice
+  stats.textContent = `${rows.length} species from ${own.length} owned · ${depthLbl}`
+    + (hatchNewOnly ? ' · new only' : ` · ${newCount} new`);
   if (!rows.length) {
     const h = document.createElement('div'); h.className = 'hint'; h.style.gridColumn = '1/-1';
     h.append('Nothing matches these filters. ');
@@ -88,7 +91,16 @@ function renderHatch() {
     const expanded = hatchOpen === r.p.k;
     const card = document.createElement('button'); card.className = 'hcard' + (expanded ? ' expanded' : ''); card.type = 'button';
     card.setAttribute('aria-expanded', String(expanded));
-    card.appendChild(icon(r.p, 40, true));
+    // aria-controls, so the card says WHAT it expands — the panel is a sibling
+    // appended after it, a relationship nothing else made programmatic
+    const panelId = 'hpanel-' + r.p.k;
+    card.setAttribute('aria-controls', panelId);
+    // so the re-render this press triggers can find the same card again
+    card.dataset.k = r.p.k;
+    // decorative and inert: clickable art inside a button is a second action no
+    // keyboard can reach and none announces, and a non-decorative alt made every
+    // card announce its species twice (DESIGN.md §4)
+    card.appendChild(icon(r.p, 40, false, true));
     const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.p.n; card.appendChild(nm);
     if (r.p.rar >= 5) card.appendChild(tierBadge(r.p));
     if (r.isNew) { const nb = document.createElement('span'); nb.className = 'newb'; nb.textContent = 'NEW'; card.appendChild(nb); }
@@ -96,9 +108,21 @@ function renderHatch() {
     ways.textContent = r.gen === 1 ? r.ways + (r.ways === 1 ? ' pair' : ' pairs') : r.gen + ' steps';
     card.appendChild(ways);
     card.title = (expanded ? 'Hide' : 'Show') + (r.gen === 1 ? ` the pairs that produce ${r.p.n}` : ` a breeding chain to ${r.p.n}`);
-    card.addEventListener('click', () => { hatchOpen = expanded ? null : r.p.k; renderHatch(); });
+    card.addEventListener('click', () => {
+      hatchOpen = expanded ? null : r.p.k;
+      renderHatch();
+      // renderHatch wipes the whole list, so the card just pressed is gone and
+      // focus fell to <body> on every open AND every close — on the view's one
+      // interaction (DESIGN.md §9)
+      const again = list.querySelector(`.hcard[data-k="${CSS.escape(r.p.k)}"]`);
+      if (again) again.focus();
+    });
     list.appendChild(card);
-    if (expanded) list.appendChild(r.gen === 1 ? hatchPanel(r) : hatchChainPanel(r, kids, ownSet));
+    if (expanded) {
+      const panel = r.gen === 1 ? hatchPanel(r) : hatchChainPanel(r, kids, ownSet);
+      panel.id = panelId;
+      list.appendChild(panel);
+    }
   }
 }
 // rebuild one concrete chain to a multi-step species from its witness pairs;
