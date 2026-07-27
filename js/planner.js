@@ -22,6 +22,9 @@ function scheduleAuto() {
 for (const n of SLOTS) {
   pickS[n] = makePicker(document.getElementById('pickS' + n), {
     placeholder: n === 1 ? 'Pick a species…' : 'Add another starter…',
+    // ariaLabel, or makePicker names the control after its placeholder and the
+    // visible "Start pal 2" label reaches no accessible name (2.5.3)
+    ariaLabel: 'Start pal ' + n,
     allowClear: true, ownedToggle: true,
     onChange: () => { slotPassives[n] = []; slotGenders[n] = null; slotPass[n].set([]); updateSlotUI(); save(); scheduleAuto(); }});
   slotPass[n] = makePassivePicker(document.getElementById('passS' + n), 4,
@@ -106,6 +109,11 @@ tablistKeys(planModeEl);
 // already uses for a small exclusive choice (#hatchDepth, #comboKind).
 let partnerMode = 'any';
 const partnerModeEl = document.getElementById('partnerMode');
+const PARTNER_WHY = {
+  any: 'Routes through any species, whether or not you can get one.',
+  wild: 'Routes only through species you own or could go and catch.',
+  mine: 'Routes only through pals you already own.',
+};
 function setPartnerMode(m, silent) {
   partnerMode = m;
   partnerModeEl.querySelectorAll('button').forEach(b => {
@@ -113,6 +121,10 @@ function setPartnerMode(m, silent) {
     b.classList.toggle('on', on);
     b.setAttribute('aria-pressed', String(on));
   });
+  // The line named all three options in every state, so it described the
+  // control rather than the choice — the same defect the save reader's conflict
+  // segrow had, and DESIGN.md 4 settles it the same way.
+  document.getElementById('partnerHint').textContent = PARTNER_WHY[m] || PARTNER_WHY.any;
   if (!silent) { save(); scheduleAuto(); }
 }
 partnerModeEl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setPartnerMode(b.dataset.m); });
@@ -488,7 +500,12 @@ function computeRoute() {
   // warn when desired passives are covered by neither a starter nor a roster partner on the route
   const uncovered = best && best.length && wo ? desired.filter(x => !wo.carry.includes(x)) : missing;
   if (uncovered.length) {
-    out.prepend(warnBox(`Nothing on this route carries ${uncovered.join(', ')}. Add a starter or roster pal that has ${uncovered.length === 1 ? 'it' : 'them'}, or catch a carrier mid-chain. Odds below track only what the route carries.`));
+    // With no route there is no "this route" and no "odds below" — the same
+    // sentence pointed at content that isn't on the page.
+    const them = uncovered.length === 1 ? 'it' : 'them';
+    out.prepend(warnBox(best && best.length
+      ? `Nothing on this route carries ${uncovered.join(', ')}. Add a starter or roster pal that has ${them}, or catch a carrier mid-chain. Odds below track only what the route carries.`
+      : `Nothing you own carries ${uncovered.join(', ')}. Add a starter or roster pal that has ${them}, or catch a carrier mid-chain.`));
   }
   // warn when a merge step pairs two recorded same-gender starters
   if (best && starters.length > 1) {
@@ -560,9 +577,15 @@ function stepEl(s, opts = {}) {
   let ga = null, gb = null;
   if (s.kind === 'gender' && s.pa) { ga = s.pa === s.aK ? s.ga : s.gb; gb = s.pb === s.bK ? s.gb : s.ga; }
   row.appendChild(unit(s.aK, ga, false));
-  const x = document.createElement('span'); x.className = 'sym'; x.textContent = '×'; row.appendChild(x);
+  // NVDA reads a bare U+00D7 as "times" and U+2192 as "right arrow", which turns
+  // a breeding step into arithmetic (DESIGN.md §4)
+  const x = document.createElement('span'); x.className = 'sym';
+  x.setAttribute('aria-hidden', 'true'); x.textContent = '×'; row.appendChild(x);
+  const and = document.createElement('span'); and.className = 'sr-only'; and.textContent = 'and'; row.appendChild(and);
   row.appendChild(unit(s.bK, gb, true));
-  const arr = document.createElement('span'); arr.className = 'arr2'; arr.textContent = '→'; row.appendChild(arr);
+  const arr = document.createElement('span'); arr.className = 'arr2';
+  arr.setAttribute('aria-hidden', 'true'); arr.textContent = '→'; row.appendChild(arr);
+  const makes = document.createElement('span'); makes.className = 'sr-only'; makes.textContent = 'make'; row.appendChild(makes);
   row.appendChild(unit(s.cK, null, false));
   if (s.kind && s.kind !== 'avg') {
     const bd = document.createElement('span');
@@ -1011,16 +1034,36 @@ let plans = normPlans(readStore('palbreed_plans', []));
 function savePlans() { localStorage.setItem('palbreed_plans', JSON.stringify(plans)); updateChecklist(); }
 function renderPlans() {
   const list = document.getElementById('plansList');
+  // Every re-render throws the whole list away, so remember what had focus and
+  // hand it back: ticking a step or deleting a plan otherwise dropped you on
+  // <body>, with the entire page between you and where you were (DESIGN.md 9).
+  const ae = document.activeElement;
+  let restore = null;
+  if (ae && list.contains(ae)) {
+    const card = ae.closest('.plan');
+    restore = {
+      id: card ? card.dataset.id : null,
+      chk: ae.classList.contains('chk') ? ae.dataset.i : null,
+      cls: ae.classList.contains('del') ? '.del' : ae.classList.contains('treebtn') ? '.treebtn' : ae.classList.contains('stepopen') ? '.stepopen' : null,
+      idx: [...list.querySelectorAll('.plan')].findIndex(c => c === card),
+    };
+  }
   planModeEl.hidden = !plans.length;
   planModeEl.querySelector('[data-m="saved"]').textContent = `Saved plans (${plans.length})`;
   list.innerHTML = '';
   if (!plans.length) {
     if (planMode === 'saved') setPlanMode('new');
+    // deleting the last plan empties the list and bounces to the route form,
+    // so the restore below never runs — hand focus to where the new form starts
+    if (restore) {
+      const el = document.querySelector('#pickS1 .picker-btn') || document.getElementById('clearSlots');
+      if (el) el.focus();
+    }
     list.innerHTML = '<div class="hint">No saved plans yet — compute a route and save it.</div>';
     return;
   }
   for (const plan of plans) {
-    const card = document.createElement('div'); card.className = 'plan';
+    const card = document.createElement('div'); card.className = 'plan'; card.dataset.id = plan.id;
     const head = document.createElement('div'); head.className = 'planhead';
     head.appendChild(icon(byKey.get(plan.tK), 38, true));
     const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = plan.name; head.appendChild(nm);
@@ -1029,14 +1072,21 @@ function renderPlans() {
     prog.textContent = doneCnt === plan.steps.length ? '✓ complete' : `${doneCnt}/${plan.steps.length} steps`;
     head.appendChild(prog);
     if (plan.passives.length) head.appendChild(passiveChips(plan.passives));
-    const treeBtn = document.createElement('button'); treeBtn.className = 'stepopen pushr'; treeBtn.textContent = 'Tree ⌄';
+    const treeBtn = document.createElement('button'); treeBtn.className = 'stepopen pushr treebtn';
     treeBtn.title = 'Show this plan as an interactive tree';
     treeBtn.setAttribute('aria-expanded', 'false');
+    // a Lucide chevron, not the two arrowhead glyphs this used: neither is in
+    // section 7's established text-symbol set, and aria-expanded already carries
+    // the state so the mark only has to point
+    const setTreeLabel = open => {
+      treeBtn.replaceChildren('Tree', lucide(open ? 'chevronUp' : 'chevronDown', 14));
+    };
+    setTreeLabel(false);
     const treeBox = document.createElement('div'); treeBox.className = 'plantree'; treeBox.hidden = true;
     treeBtn.addEventListener('click', () => {
       treeBox.hidden = !treeBox.hidden;
       treeBtn.setAttribute('aria-expanded', String(!treeBox.hidden));
-      treeBtn.textContent = treeBox.hidden ? 'Tree ⌄' : 'Tree ⌃';
+      setTreeLabel(!treeBox.hidden);
       if (!treeBox.hidden && !treeBox.childElementCount) treeBox.appendChild(treeViewport(routeTree(plan.steps)));
     });
     head.appendChild(treeBtn);
@@ -1065,12 +1115,32 @@ function renderPlans() {
       const row = stepEl(s, {stepNo: i + 1, chain: plan.steps, onOpen: () => openChainStep(plan.steps, i)});
       if (plan.done[i]) row.classList.add('done');
       const chk = document.createElement('input'); chk.type = 'checkbox'; chk.className = 'chk'; chk.checked = !!plan.done[i];
+      // four boxes called "Mark step done" name nothing — say which step
       chk.title = 'Mark step done';
+      chk.setAttribute('aria-label', `Step ${i + 1} done — ${byKey.get(s.aK).n} and ${byKey.get(s.bK).n} to ${byKey.get(s.cK).n}`);
+      chk.dataset.i = i;
       chk.addEventListener('change', () => { plan.done[i] = chk.checked; savePlans(); renderPlans(); });
       row.insertBefore(chk, row.firstChild);
       card.appendChild(row);
     });
     list.appendChild(card);
   }
+  if (restore) restorePlanFocus(restore, list);
+}
+// The successor of whatever the press destroyed: the same control on the same
+// plan, then the same control on the plan that took its place, then the list's
+// first control — never <body>.
+function restorePlanFocus(r, list) {
+  const cards = [...list.querySelectorAll('.plan')];
+  const card = (r.id && list.querySelector(`.plan[data-id="${CSS.escape(r.id)}"]`))
+    || cards[Math.min(r.idx < 0 ? 0 : r.idx, cards.length - 1)];
+  let el = null;
+  if (card) {
+    if (r.chk != null) el = card.querySelector(`.chk[data-i="${r.chk}"]`) || card.querySelector('.chk');
+    else if (r.cls) el = card.querySelector(r.cls);
+    el = el || card.querySelector('button, input');
+  }
+  el = el || list.querySelector('button, input') || document.querySelector('#planMode button.active');
+  if (el) el.focus();
 }
 

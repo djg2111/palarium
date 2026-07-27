@@ -57,6 +57,8 @@ function itemIcon(key, size, cls) {
 const LU = {
   chevronLeft: ['m15 18-6-6 6-6'],
   chevronRight: ['m9 18 6-6-6-6'],
+  chevronDown: ['m6 9 6 6 6-6'],
+  chevronUp: ['m18 15-6-6-6 6'],
   triangleAlert: ['m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3', 'M12 9v4', 'M12 17h.01'],
   search: [['circle', {cx: 11, cy: 11, r: 8}], 'm21 21-4.3-4.3'],
   moon: ['M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z'],

@@ -1153,13 +1153,33 @@ function renderRosterStrip() {
   for (const r of [...roster].sort((a, b) => byKey.get(a.k).z - byKey.get(b.k).z)) {
     const p = byKey.get(r.k);
     const chip = document.createElement('button'); chip.className = 'spal'; chip.type = 'button';
-    chip.appendChild(icon(p, 30));
+    // decorative: the name sits right beside it, and a non-decorative alt made a
+    // pal with no nickname announce its species twice (DESIGN.md §4)
+    chip.appendChild(icon(p, 30, false, true));
     const nm = document.createElement('span'); nm.textContent = r.nick || p.n; chip.appendChild(nm);
     if (r.g) chip.appendChild(gEl(gsymR(r.g)));
-    if (r.ps.length) { const c = document.createElement('span'); c.className = 'zk'; c.textContent = r.ps.length + '◆'; c.title = r.ps.join(', '); chip.appendChild(c); }
+    // the count's meaning lived only in a title, which touch never shows. The
+    // glyph stays — it is compact typography, not an emoji — but it is
+    // decorative now and the count is spelled out in the chip's own name below.
+    if (r.ps.length) {
+      const c = document.createElement('span'); c.className = 'zk';
+      c.textContent = r.ps.length + '◆';
+      c.title = r.ps.join(', ');
+      c.setAttribute('aria-hidden', 'true');
+      chip.appendChild(c);
+    }
     chip.title = p.n + (r.ps.length ? ' — ' + r.ps.join(', ') : '');
+    // the whole strip is one tab stop, like every other chip row in the app
+    // (§4) — it was one stop per roster pal, 12 of the form's 22
+    chip.setAttribute('aria-label', (r.nick ? r.nick + ', ' + p.n : p.n)
+      + (r.g ? ', ' + (r.g === 'M' ? 'male' : 'female') : '')
+      + (r.ps.length ? ' — ' + r.ps.join(', ') : ' — no passives'));
     chip.addEventListener('click', () => setSlotAuto(r));
     strip.appendChild(chip);
   }
+  strip.setAttribute('role', 'toolbar');
+  strip.setAttribute('aria-orientation', 'horizontal');
+  strip.setAttribute('aria-label', 'Quick add from your roster');
+  rovingRow(strip);
 }
 
