@@ -168,6 +168,7 @@ Find parents:
 | Class | Role |
 |---|---|
 | `.pgroup` | One parent and every partner that pairs with it. A `<li>` holding an `.anchor` button (opens that species' card) and a `role="toolbar"` `.chiprow` of `.tchip` partner buttons (each opens that pair in Breed). **Two tab stops per row**, as a roster row. Replaces one `.pair` per combination, which repeated the same left parent up to 21 rows running and carried a badge that stole width from both names. Groups are cut by greedy set cover — take the species covering the most remaining pairs — with ties broken on Paldex order so the same roster always renders the same. |
+| `.resline` (Find parents) | The status sentence, same contract as Breed's. Its **"of the N shown" clause only ever qualifies a tier count** — a branch whose numerator is already the shown count has nothing to compare itself to, and printing both read "2 of the 2 shown pairs make Lamball". Under the owned filter the clause is dropped entirely: every shown pair uses pals you own by definition, so the old predicate measured the set against itself. Where a fraction is printed, the **noun follows the denominator and the verb follows the numerator** — "1 of the 2 shown pairs uses pals you own". |
 | `<h3 class="slotlb">` band | The ownership tier: `Breed now` · `Blocked by gender` · `One parent missing` · `Both parents missing`, each carrying its pair count and, when truncated, `showing N of M parents`. Bands render only when two or more tiers are non-empty. This replaces a sort that was real but invisible, and announced only in prose. **A pair whose genders can't work is not in `Breed now`** — owning both species isn't the same as being able to breed them, and counting them together made the headline sentence false. |
 | `.tchip.warn` | A partner chip whose pair is blocked — `--danger` text, tint fill, `--danger-line` border, a `.wglyph` triangle, and the reason in **visible** `.why` text. The reason also goes in the chip's `aria-label`, and must **not** be an `.sr-only` child: `aria-label` prunes the subtree, so a hidden span in there is never announced. The pal art stays (§7 tier 1) — swapping it for the triangle cost the recognition the row is scanned by, and made warn chips 3px shorter than their siblings. |
 | `.pgroup .x` | The `×` between anchor and chips, `aria-hidden`. **Hidden at ≤640**, where the chips wrap to their own line and it parks in the card's top-right corner reading as a close button. |
@@ -495,6 +496,17 @@ Measure claims (getBoundingClientRect / getComputedStyle); screenshot evidence f
 visual claims; contrast ratios computed, not eyeballed.
 
 ## 11 · Known-clunky backlog (ux-designer: start here)
+
+- **Find parents is dominated by Terraria collab species, with no way to filter
+  them.** Measured over the full pair lists: **22 of Lamball's 30 pairs (73%)**
+  and **44 of Chikipi's 46 (96%)** need a collab pal, and they crowd the tiers a
+  player is most likely to read — one group under *Both parents missing* was
+  eleven collab partners in a row. The Planner already owns this problem and
+  solves it with the `No Terraria collab partners` switch (`avoidCollab`), because
+  those species can't be caught in every game version. Find parents needs the
+  same escape, and the design questions are real: filter or de-prioritise, share
+  `avoidCollab` with the Planner or keep a separate control, and what the status
+  sentence says once a filter can empty a tier. Needs a spec before code.
 
 - **`#smPick`'s two choice rows are the quietest "forward" on any view**: fill 1.10:1
   and border 1.36:1 against the dialog surface, since a route-choice view carries no

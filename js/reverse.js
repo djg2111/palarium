@@ -141,26 +141,43 @@ function renderReverse() {
   const selfOnly = total === 1 && all[0].a.k === all[0].b.k;
   const uniqueOnly = all.every(p => p.kind === 'unique' || p.kind === 'gender');
   const n = pairs.length, shown = n.toLocaleString(), tot = total.toLocaleString();
-  // the denominator has to describe the same population as the numerator: with
-  // a species filter on, "1 of 58" compared a filtered count to an unfiltered one
+  // The denominator has to describe the same population as the numerator: with
+  // a species filter on, "1 of 58" compared a filtered count to an unfiltered
+  // one. So it can only ever qualify a TIER count — a branch whose numerator is
+  // already the shown count has nothing to compare itself to, and printing both
+  // read "2 of the 2 shown pairs make Lamball".
   const of = n === total ? '' : ' of the ' + shown + ' shown';
   const plural = k => k === 1 ? '' : 's';
+  const makes = k => k === 1 ? ' makes ' : ' make ';
   if (selfOnly) {
     setReverseStatus(t.n + ' can’t be bred from other species — only from two ' + t.n + '.');
   } else if (tiers[0] && tiers[0].key === 'now') {
     const c = tiers[0].list.length;
-    setReverseStatus('You can breed ' + t.n + ' now — ', strongName(String(c)), of + ' pair' + plural(c) + ' use' + (c === 1 ? 's' : '') + ' pals you own.');
+    if (ownedOnly) {
+      // every shown pair uses pals you own by definition here, so the old
+      // predicate measured the set against itself. Ready vs blocked is the
+      // number that still means something.
+      const rest = n - c;
+      setReverseStatus('You can breed ' + t.n + ' now — ', strongName(String(c)),
+        ' pair' + plural(c) + ' ready' + (rest ? ', ' + rest + ' blocked by gender.' : '.'));
+    } else {
+      // the noun follows the denominator when there is one: keyed to c it wrote
+      // "1 of the 2 shown pair"
+      setReverseStatus('You can breed ' + t.n + ' now — ', strongName(String(c)),
+        of + ' pair' + plural(of ? n : c) + ' use' + (c === 1 ? 's' : '') + ' pals you own.');
+    }
   } else if (tiers[0] && tiers[0].key === 'blocked') {
     const c = tiers[0].list.length;
     setReverseStatus('You own both halves of ', strongName(String(c)), ' pair' + plural(c) + ', but the genders don’t work yet.');
   } else if (tiers[0] && tiers[0].key === 'one') {
-    setReverseStatus('No pair is ready yet. ', strongName(String(groupPairs(tiers[0].list, tiers[0].pin).length)), ' of your pals need one more partner.');
+    const g1 = groupPairs(tiers[0].list, tiers[0].pin).length;
+    setReverseStatus('No pair is ready yet. ', strongName(String(g1)), ' of your pals need' + (g1 === 1 ? 's' : '') + ' one more partner.');
   } else if (!os.size) {
-    setReverseStatus(strongName(shown), of + ' pairs make ' + t.n + '. Star pals you own to see which you can breed.');
+    setReverseStatus(strongName(shown), ' pair' + plural(n) + makes(n) + t.n + '. Star pals you own to see which you can breed.');
   } else if (uniqueOnly) {
-    setReverseStatus('Only ', strongName(shown), of + ' pairs make ' + t.n + ' — all fixed unique combos.');
+    setReverseStatus('Only ', strongName(shown), ' pair' + plural(n) + makes(n) + t.n + ' — all fixed unique combos.');
   } else {
-    setReverseStatus('None of your pals make ' + t.n + '. ', strongName(shown), of + ' pairs do.');
+    setReverseStatus('None of your pals make ' + t.n + '. ', strongName(shown), ' pair' + plural(n) + (n === 1 ? ' does.' : ' do.'));
   }
   if (!os.size && !selfOnly) linkrow(act('Star pals you own in the Paldex', false, () => navTab('dex')));
 
