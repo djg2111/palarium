@@ -64,6 +64,7 @@ not in this table needs a computed ratio before merge:
 | `--text` on `--accent-tint` over `--raised` | — | — | 12.80 | — | AA/AAA — the open roster tile |
 | `--muted` on `--accent-tint` over `--raised` | — | — | 5.16 | — | AA |
 | `--female` on `--accent-tint` over `--raised` | — | — | 4.96 | — | AA — the tightest pairing in the app |
+| `--text` on `--accent-tint` over `--bg` | 14.29 | — | — | — | AA — the selected roster row. `--male` 6.81, `--muted` 5.76, `--success` chip 8.04. The tint itself is 1.12:1 against a plain row, so it is atmosphere; the checkbox carries the state |
 | `--text` on `--gold-tint` over `--surface` | — | 14.15 | — | — | AA — the owned Paldex tile |
 | `--muted` on `--gold-tint` over `--surface` | — | 5.70 | — | — | AA — a tinted fill costs ~0.2 against the plain surface |
 | `--border-strong` | 1.99 | 1.82 | 1.66 | 1.50 | **Decorative only** — a border below 3:1 must never be the sole indicator of a control's boundary or state; pair with a fill, icon, or text change |
@@ -94,7 +95,10 @@ legibility, not assume it.)
 
 Spacing tokens: `--sp-1…7` = **4 · 8 · 12 · 16 · 20 · 24 · 32**. New rules use the
 scale; existing off-scale values (7, 9, 11, 13, 14, 18, 22, 26…) migrate
-opportunistically when a rule is already being touched — no mass rewrites.
+opportunistically when a rule is already being touched — no mass rewrites. One
+deliberate exception: the roster's `.rosband` / `.rosselall` / `.rosrow.selectable`
+share `padding-left:15px` so all three checkbox levels sit on one vertical rule.
+Alignment across components outranks the scale; don't "fix" one of the three.
 
 Radius tokens — reuse the nearest, don't add new ones:
 
@@ -132,6 +136,7 @@ Button tiers (one primary per view, never mix tiers inside one button group):
 |---|---|---|---|
 | Primary | `.alink.primary` | solid `--accent` fill, `--ink` text, 700; hover `--accent-hover` | The one main action of a view/dialog |
 | Secondary | `.alink` | `--surface` + `--border`, `--muted` text; hover accent border | Everything actionable but not primary |
+| Destructive | `.alink.danger` | `--danger` text and `--danger-line` border; hover fills `--danger-tint` | The one destructive action of a view or bar. **Never `.alink.primary`** — a solid accent fill on a destructive default invites the mis-press the control exists to make safe |
 | Quiet/tertiary | `.tx`, `.thbtn`, text-styled buttons | no border until hover | Dismiss, inline meta actions |
 | Icon | `.star`, `.tvp-ctrl button`, `.mnav`, `.close` | square/round, ≥24px hit area | Single-glyph actions, always `aria-label` |
 | Switch | `.toggle` (+ `.kn`) | pill + knob, `role="switch"` | Boolean filters/options; label states the *outcome* ("Pairs I can make") |
@@ -186,7 +191,9 @@ cannot expire under your hands), `.pchip` (passive), `.tchip` (pal chip), `.badg
 `.mchip` (meta), `.picker` (pal select), `.ptag` (tag input), `.needrow`, `.rsummary`.
 
 **A segmented choice whose options differ in consequence carries one visible line
-under it, naming the consequence of the selection** — `#smBackupEffect` for restore
+under it, naming the consequence of the selection** — sized to the block it
+explains (`--fs-md` under a dialog section, `--fs-sm` inside a conflict row where
+its siblings are `--fs-sm`), not to a single global value — `#smBackupEffect` for restore
 mode, `.confeff` for a save-reader conflict. A `title` per option is not enough:
 touch has no hover, and these are the controls deciding whether a nickname
 survives. The line is **not** a live region where its own renderer rebuilds it —

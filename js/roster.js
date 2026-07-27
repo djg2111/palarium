@@ -330,13 +330,33 @@ function exitSelect(refocus = true) {
   renderRoster();
   // §9: the button hides itself on entry, so it has to be back on screen
   // before it can be the thing focus returns to. renderRoster just did that.
-  if (refocus && !rosterSelectBtn.hidden) rosterSelectBtn.focus();
+  // §9 again, from the other side: the button is hidden exactly when the roster
+  // just emptied, so "don't focus a hidden control" has to name a successor
+  // rather than silently do nothing.
+  if (refocus) (rosterSelectBtn.hidden
+    ? (rosterList.querySelector('.hint button') || document.getElementById('rosterOpenAdd'))
+    : rosterSelectBtn).focus();
 }
 // the bar's height feeds the list's bottom padding and the toast offset, so a
 // wrapped count line can never hide the last row or the Undo
 new ResizeObserver(() => {
   document.documentElement.style.setProperty('--bulkbar-h', Math.round(bulkBar.getBoundingClientRect().height) + 'px');
 }).observe(bulkBar);
+// the tab bar carries env(safe-area-inset-bottom) itself, so its measured height
+// is the exact offset the bulk bar needs to sit flush on it
+new ResizeObserver(() => {
+  const n = document.getElementById('bottomnav');
+  const h = Math.round(n.getBoundingClientRect().height);
+  if (h) document.documentElement.style.setProperty('--nav-h', h + 'px');
+}).observe(document.getElementById('bottomnav'));
+// Escape exits the mode from anywhere in the view, not only from the list:
+// the bar is one Shift+Tab from any row, so it is exactly where a keyboard user
+// stands when they reach for it.
+document.getElementById('view-roster').addEventListener('keydown', e => {
+  if (selecting && e.key === 'Escape' && !rosterList.contains(e.target)) {
+    e.stopPropagation(); exitSelect();
+  }
+});
 rosterSelectBtn.addEventListener('click', enterSelect);
 bulkDone.addEventListener('click', () => exitSelect());
 bulkRemove.addEventListener('click', () => removeEntries([...selected]));
@@ -412,6 +432,14 @@ rosterList.addEventListener('keydown', e => {
 function shownRows() {
   return [...rosterList.querySelectorAll('.rosrow')].map(li => li.dataset.id);
 }
+// A mouse click moves focus but not the roving tab stop, so Shift+Tab from a
+// clicked row went to the check-all instead of the bar. Keep them together.
+rosterList.addEventListener('focusin', e => {
+  if (!selecting) return;
+  const cb = e.target.closest && e.target.closest('.rchk');
+  if (!cb) return;
+  for (const b2 of rosterList.querySelectorAll('.rchk')) b2.tabIndex = b2 === cb ? 0 : -1;
+});
 function toggleRow(id, on, range) {
   const ids = shownRows();
   // Shift extends from the last toggled row to this one, setting all to the new
@@ -457,11 +485,14 @@ function syncSelectUI() {
   const hidden = [...selected].filter(id => !shown.includes(id)).length;
   // hidden-ness outranks "all of them": a selection you cannot see is the fact
   // that changes what Remove will do
-  bulkCount.textContent = !n ? 'Pick the pals you want to remove.'
+  const next = !n ? 'Select the pals you want to remove.'
     : hidden === n ? `${n} selected — none shown`
     : hidden ? `${n} selected — ${hidden} not shown`
     : n === roster.length ? `${n} selected — all of them`
     : `${n} selected`;
+  // aria-atomic re-speaks the whole sentence on any change, and renderRoster runs
+  // per keystroke while filtering — only write when it actually differs
+  if (bulkCount.textContent !== next) bulkCount.textContent = next;
   bulkRemove.textContent = n ? 'Remove ' + n : 'Remove';
   bulkRemove.disabled = !n;
 }
@@ -528,7 +559,16 @@ function removeEntries(ids) {
   if (!taken.length) return;
   // exactly one falls through to the single-entry path, so the two can never
   // disagree about wording or about the still-starred follow-up
-  if (taken.length === 1) { selected.delete(taken[0].entry.id); removeEntry(taken[0].entry); renderRoster(); return; }
+  if (taken.length === 1) {
+    selected.delete(taken[0].entry.id); removeEntry(taken[0].entry); renderRoster();
+    // the same two handoffs the batch path does below: syncSelectUI disables the
+    // button under the user's focus, so without this it falls to <body> — and a
+    // remove that empties the roster must not leave the mode running over the
+    // empty state, announcing "Pick the pals you want to remove"
+    if (!roster.length) exitSelect();
+    else { const chk = rosterList.querySelector('.rchk'); if (chk) chk.focus(); }
+    return;
+  }
   const speciesGone = [...new Set(taken.map(t => t.entry.k))]
     .filter(k => !roster.some(r => r.k === k && !set.has(r.id)) && owned.has(k));
   for (let i = taken.length - 1; i >= 0; i--) roster.splice(taken[i].i, 1);
@@ -777,6 +817,9 @@ function renderRoster() {
       li.addEventListener('click', e => {
         if (e.target.closest('.rchk')) return;
         toggleRow(r.id, !selected.has(r.id), e.shiftKey);
+        // the <li> isn't focusable, so a pointer user who then reached for Space
+        // or an arrow key was scrolling the page instead of driving the list
+        cb.focus();
       });
     }
 
@@ -931,12 +974,23 @@ function renderRoster() {
   const band = (p, entries, total) => {
     const h = document.createElement('h3');
     h.className = 'rosband';
+    // In selection mode the band is a checkbox BESIDE a heading, never one
+    // inside it: prepending the control made the computed heading name read
+    // "Select all 6 Lamball Lamball 6 pals …" to heading navigation. Same
+    // ruling as .rosselall — a control is not a heading.
+    let bandWrap = null, bandCb = null;
     if (selecting) {
-      const cb = mkChk('band', p.k);
-      // no visible text of its own, so it has to say what it selects
-      cb.setAttribute('aria-label', entries.length === 1
+      bandCb = mkChk('band', p.k);
+      bandCb.setAttribute('aria-label', entries.length === 1
         ? 'Select ' + p.n : `Select all ${entries.length} ${p.n}`);
-      h.prepend(cb);
+      bandWrap = document.createElement('div');
+      bandWrap.className = 'rosbandsel';
+      bandWrap.append(bandCb, h);
+      // the whole band selects its species, the way a row and the check-all do
+      bandWrap.addEventListener('click', e => {
+        if (e.target.closest('.rchk')) return;
+        bandCb.checked = !bandCb.checked; toggleGroup(p.k, bandCb.checked); bandCb.focus();
+      });
     }
     const ic = icon(p, 28, false, true);
     ic.style.removeProperty('--ico');
@@ -944,7 +998,7 @@ function renderRoster() {
     const nm = document.createElement('span'); nm.className = 'gname2'; nm.textContent = p.n;
     h.appendChild(nm);
     h.appendChild(chipsFor(p.k, entries, total));
-    return {h, nm};
+    return {h: bandWrap || h, nm};
   };
 
   if (selecting) {

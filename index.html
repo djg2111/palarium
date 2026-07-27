@@ -139,9 +139,11 @@
             <!-- DOM-placed before the list it summarises so one Shift+Tab reaches it
            from any row; rendered fixed at the bottom of the viewport. -->
       <div class="bulkbar" id="bulkbar" hidden>
-        <span class="cnt" id="bulkCount" aria-live="polite" aria-atomic="true"></span>
-        <button type="button" class="alink danger" id="bulkRemove" disabled>Remove</button>
-        <button type="button" class="tx" id="bulkDone">Done</button>
+        <div class="barin">
+          <span class="cnt" id="bulkCount" aria-live="polite" aria-atomic="true"></span>
+          <button type="button" class="alink danger" id="bulkRemove" disabled>Remove</button>
+          <button type="button" class="tx" id="bulkDone">Done</button>
+        </div>
       </div>
 <div class="roster" id="rosterList"></div>
     </div>
@@ -366,9 +368,9 @@
         <div class="mapmarks" id="mapMarks"></div>
       </div>
       <div class="mapzoom">
-        <button type="button" id="mapIn" aria-label="Zoom in" title="Zoom in">+</button>
-        <button type="button" id="mapOut" aria-label="Zoom out" title="Zoom out">−</button>
-        <button type="button" id="mapReset" aria-label="Fit the whole map" title="Fit the whole map">⤢</button>
+        <button type="button" id="mapIn" aria-label="Zoom in" title="Zoom in"><svg class="lui" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+        <button type="button" id="mapOut" aria-label="Zoom out" title="Zoom out"><svg class="lui" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+        <button type="button" id="mapReset" aria-label="Fit the whole map" title="Fit the whole map"><svg class="lui" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
       </div>
       <div class="maphelp" id="mapHelp">Drag to pan · scroll to zoom · tap a marker</div>
       <aside class="mapinfo" id="mapInfo" hidden aria-live="polite"></aside>
@@ -403,7 +405,7 @@
       </div>
 
       <div class="gcard">
-        <h2><img class="uii" src="assets/ui/egg/mutation.webp" alt="" width="22" height="22" loading="lazy" decoding="async">Deep dive</h2>
+        <h2><svg class="lui" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>Deep dive</h2>
         <div class="sub">How the game actually decides what hatches — the same rules this calculator runs.</div>
 
         <details open id="g-formula"><summary>The species formula (breeding power)</summary><div>
@@ -653,7 +655,7 @@
       </div>
     </details>
   </div>
-  <div class="warnbox" id="rosterErr" aria-live="polite" hidden>Pick a species first — the roster needs to know which pal this is.</div>
+  <div class="warnbox" id="rosterErr" aria-live="polite" hidden><svg class="lui" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Pick a species first — the roster needs to know which pal this is.</div>
   <div class="formacts">
     <button class="alink primary" id="rosterAdd">+ Add to roster</button>
     <button class="alink" id="rosterAddAnother">+ Save &amp; add another</button>

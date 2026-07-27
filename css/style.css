@@ -759,6 +759,15 @@ select#genderSel{padding:10px 12px}
    chips, so it drops to its own line and keeps the row on two tracks */
 @media (max-width:1000px){
   .rosrow{grid-template-columns:minmax(0,1fr) minmax(0,2fr) 116px}
+  /* selection mode renders no actions track but does add a 28px checkbox lead.
+     Without these the .who below lands in the checkbox column and every name in
+     the list clips to 28px — silently, because it ellipsises rather than
+     overflowing. The =<640 block already had them; this range did not. */
+  .rosrow.selectable{grid-template-columns:28px minmax(0,1fr) minmax(0,2fr)}
+  .rosrow.selectable .rchk{grid-area:1/1}
+  .rosrow.selectable .who{grid-area:1/2}
+  .rosrow.selectable .pscol{grid-area:1/3}
+  .rosrow.selectable .note{grid-area:2/2/3/-1}
   /* the toolbar has to be pinned to row 1 explicitly: the note spans the full
      width before it in DOM order, which would otherwise push it to a third row
      and leave an empty band under every row that has a note */
@@ -812,8 +821,9 @@ select#genderSel{padding:10px 12px}
 .toast .undo,.toast .tx{min-width:24px;min-height:24px;display:inline-flex;align-items:center;justify-content:center}
 .toast .undo{color:var(--accent);font-weight:700}
 .toast .undo:hover{text-decoration:underline}
-.toast .tx{color:var(--muted);padding:2px 6px;border-radius:var(--r-sm)}
-.toast .tx:hover{color:var(--text);background:var(--raised)}
+/* the quiet tier, one rule for both its homes (DESIGN.md §4) */
+.toast .tx,.bulkbar .tx{color:var(--muted);padding:4px 10px;border-radius:var(--r-md);min-height:24px}
+.toast .tx:hover,.bulkbar .tx:hover{color:var(--text);background:var(--raised)}
 .subtabs{margin-bottom:18px;width:fit-content}
 .subtabs button{padding:6px 15px;font-size:var(--fs-md)}
 @media(max-width:640px){.subtabs{display:flex}}
@@ -999,23 +1009,29 @@ select#genderSel{padding:10px 12px}
 
 /* ---------- roster: bulk selection ---------- */
 .rosselall{display:flex;align-items:center;gap:12px;padding:9px 15px;background:var(--surface);
-  border-bottom:1px solid var(--border);font-size:var(--fs-sm);font-weight:700;color:var(--muted);cursor:pointer}
-.rosselall .salb{letter-spacing:.4px;text-transform:uppercase}
+  border-bottom:1px solid var(--border);font-size:var(--fs-md);font-weight:700;color:var(--text);cursor:pointer}
 .rosrow.selectable{cursor:pointer;grid-template-columns:28px minmax(140px,240px) minmax(200px,1fr) minmax(0,220px)}
 .rosrow.selectable:hover{background:var(--raised)}
 .rosrow.selectable.on{background:var(--accent-tint)}
-.rosband .rchk{margin-right:2px}
+.rosbandsel{display:flex;align-items:center;gap:10px;cursor:pointer;
+  background:var(--surface);border-bottom:1px solid var(--border);padding-left:15px}
+.rosbandsel:hover{background:var(--raised)}
+.rosbandsel .rosband{flex:1;min-width:0;background:none;border-bottom:0;padding-left:0}
 /* Same surface recipe as a toast — --overlay, a hairline, the same shadow — so
    the bottom of the viewport reads as one family. z-index under .toasts (300)
    and over the mobile tab bar (90). */
-.bulkbar{position:fixed;left:0;right:0;bottom:0;z-index:250;min-height:56px;
-  display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;
+/* z-index BELOW .overlay (100), not above: at 250 the bar rendered on top of a
+   modal's scrim and Remove fired through it, emptying the roster in one press
+   that looked inert. Above the mobile tab bar (90) is all it needs. */
+.bulkbar{position:fixed;left:0;right:0;bottom:0;z-index:95;min-height:56px;
   padding:var(--sp-2) var(--sp-4);background:var(--overlay);border-top:1px solid var(--border-strong);
   box-shadow:0 -10px 34px rgba(0,0,0,.45)}
+/* full-bleed surface, contents on the app's own column — nothing else in the
+   app is full-bleed, and a count 115px left of every other word read as chrome */
+.bulkbar .barin{max-width:1200px;margin:0 auto;padding:0 20px;
+  display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap}
 .bulkbar .cnt{font-size:var(--fs-md);color:var(--text-2);font-weight:600;min-width:0;flex:1}
-/* .tx is a text button and measured 36x23 here — under the 2.5.8 floor */
-.bulkbar .tx{min-height:24px;padding:4px 10px;border-radius:var(--r-md);color:var(--muted)}
-.bulkbar .tx:hover{color:var(--text);background:var(--raised)}
+
 /* not .alink.primary: a solid --accent fill on a destructive default invites the
    mis-press this whole mode exists to make safe. The view's primary stays +Add. */
 .bulkbar .alink.danger{color:var(--danger);border-color:var(--danger-line)}
@@ -1451,9 +1467,12 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
          margin-left:auto, and a row stacks into three lines --- */
   .collhead .collacts{margin-left:0;width:100%}
   /* identity + toolbar on line 1, passives on line 2, note on line 3 */
-  .bulkbar{bottom:calc(76px + env(safe-area-inset-bottom))}
-  body.selecting .toasts{bottom:calc(76px + env(safe-area-inset-bottom) + var(--bulkbar-h,64px) + 12px)}
-  .rosrow.selectable{grid-template-columns:28px minmax(0,1fr)}
+  /* flush on the tab bar. 76px is the .toasts offset, where a floating pill
+     wants air; an opaque full-bleed bar with a border-top showed 19px of
+     scrolling list between two fixed surfaces and read as a paint bug. */
+  .bulkbar{bottom:var(--nav-h,58px)}
+  body.selecting .toasts{bottom:calc(var(--nav-h,58px) + var(--bulkbar-h,64px) + 12px)}
+  .rosrow.selectable{grid-template-columns:28px minmax(0,1fr);padding-left:15px}
   .rosrow.selectable .who{grid-area:1/2}
   .rosrow.selectable .pscol{grid-area:2/2/3/-1}
   .rosrow.selectable .note{grid-area:3/2/4/-1}

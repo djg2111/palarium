@@ -176,9 +176,12 @@ function renderBackupPreview() {
     // the warnbox is not live, so switching mode would announce nothing
     eff.textContent = `Replaces everything here with the ${countsPhrase(P.inRoster.length, P.inPlans.length, P.inOwned.length)} in this backup.`;
     warn.hidden = false;
-    warn.textContent = `Removes your ${countsPhrase(roster.length, plans.length, owned.size)}. ` +
+    // replaceChildren, not textContent: every other .warnbox in the app leads
+    // with the triangle, and a textContent write would drop it
+    warn.replaceChildren(lucide('triangleAlert', 16),
+      `Removes your ${countsPhrase(roster.length, plans.length, owned.size)}. ` +
       `Then restores the ${countsPhrase(P.inRoster.length, P.inPlans.length, P.inOwned.length)} above. ` +
-      'You can undo this straight after.';
+      'You can undo this straight after.');
   }
 
   const h3 = t => { const h = document.createElement('h3'); h.className = 'smh3'; h.textContent = t; prev.appendChild(h); };

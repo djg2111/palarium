@@ -937,7 +937,7 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
       ? `${target.n} can only come from its unique combo — no averaging chain reaches it${narrowed}. Check its pairs in Find Parents.`
       : `No route found${partnerMode === 'mine' ? ' using only your pals — try switching chain partners to “In the wild” or “Any species”'
         : partnerMode === 'wild' ? ' using only catchable partners — try switching chain partners to “Any species”'
-        : avoidCollab ? ' without collab partners — try turning off "Avoid Terraria collab partners"' : ' within 8 steps'}.`;
+        : avoidCollab ? ' without collab partners — try turning off “No Terraria collab partners”' : ' within 8 steps'}.`;
     out.appendChild(h); return;
   }
   if (!steps.length) {

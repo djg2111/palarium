@@ -141,7 +141,7 @@ function restoreFromToast() {
   const next = toastsEl.lastElementChild;
   const btn = next && next.querySelector('.undo, .tx');
   if (btn) { btn.focus(); return; }
-  if (toastReturn && document.contains(toastReturn)) { toastReturn.focus(); return; }
+  if (toastReturn && toastReturn !== document.body && document.contains(toastReturn)) { toastReturn.focus(); return; }
   // last resort: the current tab button, which always exists
   document.querySelector('#tabs button.active')?.focus();
 }
