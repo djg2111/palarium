@@ -45,13 +45,18 @@
     <button class="dismiss" id="tipDismiss" aria-label="Dismiss setup checklist">✕</button>
   </div>
   <section class="view active" id="view-breed">
+    <div class="collhead">
+      <h2>Breed</h2>
+      <!-- Persistent, never rebuilt: renderBreed's zone.innerHTML='' would destroy
+           the live region, and a re-inserted one announces unreliably. -->
+      <span class="resline" id="breedStatus" aria-live="polite" aria-atomic="true">Pick two parents to see what their egg hatches.</span>
+    </div>
     <div class="parents">
       <div class="pwrap"><div class="slotlb">Parent 1</div><div id="pickA"></div></div>
-      <span class="op">×</span>
+      <button class="swap" id="swapBtn" type="button" aria-label="Swap parents" title="Swap parents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg></button>
       <div class="pwrap"><div class="slotlb">Parent 2</div><div id="pickB"></div></div>
-      <button class="swap" id="swapBtn" title="Swap parents">⇄</button>
     </div>
-    <div class="result-zone" id="breedResult"><div class="hint">Pick two parents to see their child.</div></div>
+    <div class="result-zone" id="breedResult"></div>
   </section>
 
   <section class="view" id="view-reverse">

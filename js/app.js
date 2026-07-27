@@ -283,11 +283,34 @@ function closeModal(keepHistory) {
   if (!overlay.classList.contains('open')) { modalPushed = false; return; }
   overlay.classList.remove('open'); document.body.style.overflow = '';
   currentModalPal = null;
-  if (lastFocusModal && document.contains(lastFocusModal)) lastFocusModal.focus();
+  const restore = lastFocusModal;
   lastFocusModal = null;
-  if (keepHistory) { modalPushed = false; return; }
+  if (keepHistory) { modalPushed = false; refocusAfterModal(restore, false); return; }
+  const popping = modalPushed;
   if (modalPushed) { modalPushed = false; history.back(); }
   else if (location.hash.startsWith('#/pal/')) history.replaceState(null, '', '#/' + currentTab);
+  refocusAfterModal(restore, popping);
+}
+// history.back() re-renders the view through applyHash, and a re-render destroys
+// the node we came from — so restoring focus synchronously (as this used to)
+// left Escape and Back dropping focus onto <body>. A plain setTimeout is not
+// enough either: back() is asynchronous, so the timeout lands BEFORE the
+// popstate. Wait for the popstate, with a fallback so nothing is stranded.
+function refocusAfterModal(el, popping) {
+  let done = false;
+  const land = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener('popstate', onPop);
+    if (el && document.contains(el)) { el.focus(); return; }
+    const view = document.querySelector('.view.active');
+    const alt = view && view.querySelector('.cardopen');
+    if (alt) alt.focus();
+  };
+  const onPop = () => setTimeout(land, 0);
+  if (popping) window.addEventListener('popstate', onPop);
+  // also covers the case where no popstate ever arrives
+  setTimeout(land, popping ? 200 : 0);
 }
 // close without touching history, then point the hash back at the current tab
 // (used when another overlay opens on top, e.g. the roster editor)
@@ -1110,114 +1133,201 @@ function appendChainCard(zone, a, b) {
   zone.appendChild(card);
 }
 
+let cardSeq = 0;
 function childCard(p, opts = {}) {
   const card = document.createElement('div'); card.className = 'child-card clickable';
-  card.tabIndex = 0;
-  card.setAttribute('role', 'button');
-  card.setAttribute('aria-label', 'View ' + p.n + ' details');
-  card.title = 'View ' + p.n + '’s full card';
+  // A real <button> laid over the card, not role="button" wrapped around it.
+  // Wrapping made the card's own name ("View X details") replace everything
+  // inside it, buried a heading in a button, and left no room for the card to
+  // ever hold an interactive chip. Same pattern as .dextile-open (DESIGN.md §4).
+  const hid = 'ccn' + (++cardSeq);
+  const open = document.createElement('button');
+  open.type = 'button'; open.className = 'cardopen';
+  open.setAttribute('aria-labelledby', hid);
+  const sr = document.createElement('span'); sr.className = 'sr-only';
+  sr.id = hid + 'd'; sr.textContent = 'Opens the full card';
+  open.setAttribute('aria-describedby', sr.id);
+  // inside the button, not beside it — as a sibling, browse mode read the
+  // description once for the button and again as loose text before the heading
+  open.appendChild(sr);
+  card.appendChild(open);
+  // on the card, not the button: the button is pointer-events:none so chips
+  // keep their tooltips, and Enter/Space on it bubbles a click up to here
   card.addEventListener('click', () => openModal(p));
-  card.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === card) { e.preventDefault(); openModal(p); } });
-  card.appendChild(icon(p, 84));
+  // decorative: the heading beside it already says the name
+  card.appendChild(icon(p, 84, false, true));
   const body = document.createElement('div');
-  const h = document.createElement('h2'); h.textContent = p.n;
-  const z = document.createElement('span'); z.className = 'zk'; z.textContent = zk(p); h.appendChild(z);
+  const h = document.createElement('h3'); h.id = hid; h.textContent = p.n;
+  // the space matters — without it the accessible name reads "Daedream#22"
+  const z = document.createElement('span'); z.className = 'zk'; z.textContent = ' ' + zk(p); h.appendChild(z);
   body.appendChild(h);
+  // The condition is the only thing telling two gender-combo cards apart, so it
+  // leads the body instead of sitting under the chips styled as a footnote.
+  if (opts.gtag) { const t = document.createElement('div'); t.className = 'gtag'; t.appendChild(genderize(opts.gtag)); body.appendChild(t); }
   const crow = document.createElement('div'); crow.className = 'crow';
   crow.appendChild(typeChips(p));
   if (opts.badge) { const bd = document.createElement('span'); bd.className = 'badge ' + opts.badge[0]; bd.textContent = opts.badge[1]; crow.appendChild(bd); }
   crow.appendChild(eggChip(p));
   body.appendChild(crow);
-  if (opts.gtag) { const t = document.createElement('div'); t.className = 'gtag'; t.appendChild(genderize(opts.gtag)); body.appendChild(t); }
   body.appendChild(genderBar(p));
   body.appendChild(worksEl(p));
   card.appendChild(body);
   return card;
 }
+// "A × B" for the status sentence. NVDA reads U+00D7 as "times", which turns
+// the sentence into arithmetic — so the glyph is shown and "and" is announced.
+function pairPhrase(a, b) {
+  const f = document.createDocumentFragment();
+  f.append(a.n + ' ');
+  const x = document.createElement('span'); x.setAttribute('aria-hidden', 'true'); x.textContent = '×';
+  const s = document.createElement('span'); s.className = 'sr-only'; s.textContent = 'and';
+  f.append(x, s, ' ' + b.n);
+  return f;
+}
+const strongName = n => { const e = document.createElement('b'); e.textContent = n; return e; };
+// a button that navigates away is destroyed by the re-render, so focus has to
+// be placed deliberately or it falls to <body> (DESIGN.md §9)
+const focusPicker = pk => { const el = pk.root.querySelector('.picker-btn'); if (el) el.focus(); };
+function setBreedStatus(...parts) {
+  const el = document.getElementById('breedStatus');
+  el.replaceChildren(...parts);
+}
+
 function renderBreed() {
   save();
   const zone = document.getElementById('breedResult');
   zone.innerHTML = '';
+  zone.classList.remove('two');
   const a = pickA.get(), b = pickB.get();
+
   if (!a || !b) {
-    const h = document.createElement('div'); h.className = 'hint';
-    h.textContent = 'Pick two parents to see their child. Click the result card for full details.';
-    zone.appendChild(h);
+    // The sentence lives in the persistent status line, so .hint — which is a
+    // sentence plus an action — would say it twice (DESIGN.md §4).
     const lr = document.createElement('div'); lr.className = 'linkrow';
-    const exA = PALS.find(p => p.n === 'Relaxaurus'), exB = PALS.find(p => p.n === 'Sparkit');
-    if (exA && exB) {
-      const ex = document.createElement('button'); ex.className = 'alink';
-      ex.textContent = 'Try an example: Relaxaurus × Sparkit';
-      ex.title = 'A unique combo — the gold UNIQUE badge means the pair ignores the breeding math';
-      ex.addEventListener('click', () => { pickA.set(exA, true); pickB.set(exB, true); renderBreed(); });
-      lr.appendChild(ex);
+    if (a || b) {
+      const n = a ? '2' : '1', pk = a ? pickB : pickA;
+      setBreedStatus('Now pick parent ' + n + '.');
+      const go = document.createElement('button'); go.type = 'button'; go.className = 'alink';
+      go.textContent = 'Pick parent ' + n;
+      // a thumb-reachable target, so the phone user doesn't scroll back up
+      go.addEventListener('click', () => pk.openPop());
+      lr.appendChild(go);
+    } else {
+      setBreedStatus('Pick two parents to see what their egg hatches.');
+      const exA = PALS.find(p => p.n === 'Relaxaurus'), exB = PALS.find(p => p.n === 'Sparkit');
+      if (exA && exB) {
+        const ex = document.createElement('button'); ex.type = 'button'; ex.className = 'alink';
+        ex.append('Try an example: ', pairPhrase(exA, exB));
+        ex.addEventListener('click', () => { pickA.set(exA, true); pickB.set(exB, true); renderBreed(); });
+        lr.appendChild(ex);
+      }
+      const rev = document.createElement('button'); rev.type = 'button'; rev.className = 'alink';
+      rev.textContent = 'Work backwards from a target species';
+      rev.addEventListener('click', () => { navTab('reverse'); focusPicker(pickT); });
+      lr.appendChild(rev);
     }
-    const rev = document.createElement('button'); rev.className = 'alink';
-    rev.textContent = '…or work backwards from a target pal';
-    rev.addEventListener('click', () => navTab('reverse'));
-    lr.appendChild(rev);
     zone.appendChild(lr);
     return;
   }
+
   localStorage.setItem('palbreed_bred', '1'); updateChecklist();
   const res = breed(a, b);
-  const mutNote = () => {
-    const m = document.createElement('div'); m.className = 'mathline';
-    m.append('🧬 ~1% of bred eggs mutate (3% with an Extravagant Vegetable Cake) — ');
-    const g = document.createElement('button'); g.type = 'button'; g.className = 'alink gjump';
-    g.textContent = 'Egg mutations ↗'; g.title = 'Open the Guide section on egg mutations';
-    g.addEventListener('click', () => {
-      navTab('guide');
-      const d = document.getElementById('g-mutations');
-      if (d) { d.open = true; d.scrollIntoView({block: 'start', behavior: SMOOTH}); }
-    });
-    m.appendChild(g);
-    zone.appendChild(m);
-  };
+  const kids = res.children;
+  const one = kids.length === 1 ? kids[0].pal : null;
+
+  // ---- the answer, in one sentence ----
   if (res.kind === 'gender') {
-    const note = document.createElement('div'); note.className = 'gender-note';
-    note.textContent = 'This pair breeds differently depending on parent genders:';
-    zone.appendChild(note);
-    const wrap = document.createElement('div'); wrap.className = 'multi';
-    for (const ch of res.children) {
-      const pa = byKey.get(ch.pa), pb = byKey.get(ch.pb);
-      const gsym = g => g === 'Male' ? '♂' : '♀';
-      wrap.appendChild(childCard(ch.pal, {badge:['gender','Gender combo'], gtag:`${pa.n} ${gsym(ch.ga)} × ${pb.n} ${gsym(ch.gb)}`}));
-    }
-    zone.appendChild(wrap);
-    mutNote();
-    appendChainCard(zone, a, b);
-    return;
+    // species, not pals — one egg hatches one pal; what varies is which species
+    setBreedStatus(pairPhrase(a, b), ' hatches one of two species.');
+  } else if (res.kind === 'same') {
+    setBreedStatus('Two ' + a.n + ' hatch ', strongName(one.n), '.');
+  } else if (res.kind === 'unique') {
+    setBreedStatus(pairPhrase(a, b), ' hatches ', strongName(one.n), ' — a unique combo.');
+  } else {
+    setBreedStatus(pairPhrase(a, b), ' hatches ', strongName(one.n), '.');
   }
-  const ch = res.children[0].pal;
-  const badge = res.kind === 'unique' ? ['unique','Unique combo'] : res.kind === 'same' ? ['same','Same species'] : null;
-  zone.appendChild(childCard(ch, {badge}));
-  if (res.kind === 'avg') {
-    const m = document.createElement('div'); m.className = 'mathline';
-    m.innerHTML = `breeding power: <b>${a.r}</b> + <b>${b.r}</b> → target <b>${res.target}</b> → closest pal <b>${ch.n}</b> (${ch.r})`;
-    zone.appendChild(m);
-    const alts = CANDS.filter(c => c.k !== ch.k)
+
+  // ---- the card, or two of them ----
+  if (res.kind === 'gender') {
+    zone.classList.add('two');
+    for (const ch of kids) {
+      const pa = byKey.get(ch.pa), pb = byKey.get(ch.pb);
+      const gs = g => g === 'Male' ? '♂' : '♀';
+      // No .badge.gender: it repeats on both cards so it distinguishes nothing,
+      // and it is --danger pink for a fact that is not a warning.
+      zone.appendChild(childCard(ch.pal, {gtag: `If ${pa.n} is ${gs(ch.ga)} and ${pb.n} is ${gs(ch.gb)}`}));
+    }
+  } else {
+    const badge = res.kind === 'unique' ? ['unique', 'Unique combo'] : res.kind === 'same' ? ['same', 'Same species'] : null;
+    zone.appendChild(childCard(one, {badge}));
+  }
+
+  // ---- why, then what next, then the footnote ----
+  const rail = document.createElement('div'); rail.className = 'resrail';
+  const lb = document.createElement('div'); lb.className = 'slotlb';
+  lb.textContent = res.kind === 'gender' ? 'Why two results' : 'Why ' + one.n;
+  rail.appendChild(lb);
+  const sub = html => { const s = document.createElement('p'); s.className = 'sub'; s.innerHTML = html; rail.appendChild(s); return s; };
+  if (res.kind === 'gender') {
+    sub('Which pal you get depends on each parent’s gender.');
+  } else if (res.kind === 'unique') {
+    sub('This is a unique combo. It ignores the breeding-power math.');
+  } else if (res.kind === 'same') {
+    sub('Two of the same species always hatch that species.');
+    // Say it is universal. Stated bare here and nowhere else, it reads as an
+    // extra rule that same-species pairs carry and mixed pairs don't.
+    const s = document.createElement('p'); s.className = 'sub';
+    s.appendChild(genderize('Every pair needs one ♂ and one ♀ — this one included.'));
+    rail.appendChild(s);
+  } else {
+    sub(`Breeding power <b>${a.r}</b> + <b>${b.r}</b> averages to <b>${res.target}</b> — closest is <b>${one.n}</b> (${one.r}).`);
+    const alts = CANDS.filter(c => c.k !== one.k)
       .map(c => ({c, d: Math.abs(c.r - res.target)}))
       .sort((x, y) => x.d - y.d || y.c.pr - x.c.pr).slice(0, 2);
-    if (alts.length) {
-      const m2 = document.createElement('div'); m2.className = 'mathline';
-      m2.textContent = 'next closest — they lose the tie to ' + ch.n + ': ' + alts.map(al => `${al.c.n} (${al.c.r})`).join(' · ');
-      zone.appendChild(m2);
-    }
+    if (alts.length) sub('Next closest: ' + alts.map(al => `${al.c.n} (${al.c.r})`).join(' · ') + ' — they lose the tie.');
   }
-  mutNote();
+
   const lr = document.createElement('div'); lr.className = 'linkrow';
-  const b2 = document.createElement('button'); b2.className = 'alink'; b2.textContent = `Find all parents of ${ch.n}`;
-  b2.addEventListener('click', () => { pickT.set(ch, true); reverseShown = 120; renderReverse(); navTab('reverse'); });
-  const b3 = document.createElement('button'); b3.className = 'alink'; b3.textContent = `Continue: breed ${ch.n} with…`;
-  b3.title = 'Use this child as Parent 1 and pick its partner';
-  b3.addEventListener('click', () => {
-    breedChain = null;
-    pickA.set(ch, true); pickB.set(null, true); renderBreed();
-    setTimeout(() => pickB.openPop(), 0);
+  // With two children the pair is already on screen, so "find all parents"
+  // answers a question nobody asked; every child gets a way to continue.
+  if (one) {
+    const b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'alink';
+    b2.textContent = `Find all parents of ${one.n}`;
+    b2.addEventListener('click', () => {
+      pickT.set(one, true); reverseShown = 120; renderReverse(); navTab('reverse'); focusPicker(pickT);
+    });
+    lr.appendChild(b2);
+  }
+  for (const ch of kids) {
+    const p = ch.pal;
+    const bt = document.createElement('button'); bt.type = 'button'; bt.className = 'alink';
+    bt.textContent = `Breed ${p.n} with…`;
+    bt.title = 'Use this pal as Parent 1 and pick its partner';
+    bt.addEventListener('click', () => {
+      breedChain = null;
+      pickA.set(p, true); pickB.set(null, true); renderBreed();
+      setTimeout(() => pickB.openPop(), 0);
+    });
+    lr.appendChild(bt);
+  }
+  rail.appendChild(lr);
+
+  // True of every pair in the game, so it is a footnote, not a finding.
+  const g = document.createElement('button'); g.type = 'button'; g.className = 'alink gjump';
+  g.appendChild(uiIcon('egg', 'mutation', 18));
+  g.append('About 1% of eggs mutate ↗');
+  g.setAttribute('aria-label', 'About 1% of eggs mutate — open the Guide');
+  g.title = '3% with an Extravagant Vegetable Cake';
+  g.addEventListener('click', () => {
+    navTab('guide');
+    const d = document.getElementById('g-mutations');
+    if (d) {
+      d.open = true; d.scrollIntoView({block: 'start', behavior: SMOOTH});
+      const s = d.querySelector('summary'); if (s) s.focus();
+    }
   });
-  lr.append(b2, b3);
-  zone.appendChild(lr);
+  rail.appendChild(g);
+  zone.appendChild(rail);
   appendChainCard(zone, a, b);
 }
 

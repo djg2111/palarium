@@ -124,8 +124,24 @@ Required state coverage for every interactive element: default · hover · focus
 disabled (`opacity:.35`, no hover). Hover on touch devices must not gate any
 information (see §8 tooltips).
 
+Breed (one skeleton, four fillings — every result kind produces *status sentence →
+card(s) → why → next → footnote*; the kind changes the copy and the card count,
+never the shape):
+
+| Class | Role |
+|---|---|
+| `.resline` | The one-sentence answer, in the heading block beside the `h2`, and the view's `aria-live="polite"` region. **Lives in `index.html` and is never rebuilt** — `renderBreed`'s `zone.innerHTML=''` would destroy the live region, and a re-inserted one announces unreliably. Update it with `replaceChildren`. |
+| `.resrail` | The secondary column beside the answer: `.slotlb` "why" label, `.sub` reasoning, `.linkrow` next steps, then the footnote. Two columns above 900px, stacked below. |
+| `.result-zone` / `.result-zone.two` | The answer grid. `.two` is the gender kind — two equal card columns with the rail spanning `1/-1` beneath. |
+| `.cardopen` | A whole-card press target laid **over** the card (`position:absolute;inset:0`), never wrapped around it. `role="button"` on the card itself made its `aria-label` replace every heading and chip inside, and buried an `h3` in a button. Same idea as `.dextile-open`, different family. It must be `pointer-events:none` with the click handler on the **card** — as the only positioned descendant it otherwise hit-tests above every chip, silently killing their tooltips and text selection. Keyboard activation of the button bubbles a click to the card, so both routes still work. |
+| `.gtag` | The condition line on a gender-combo card ("If Katress is ♂ and Wixen is ♀"). It is the **only** thing telling the two cards apart, so it leads the body at `--fs-md`/`--text-2` — not a footnote under the chips. |
+
+Write `×` between two pal names as a visible `aria-hidden` glyph plus an `.sr-only`
+"and": NVDA reads U+00D7 as "times", which turns a sentence into arithmetic.
+
 Other canon components: `.pcard` (view card), `.hint` (empty state — must include a
-next action), `.warnbox` (inline warning), `.toast` (feedback ≤8s, with Undo for
+next action; **a view with a persistent status line puts its empty-state sentence
+there instead**, or the sentence is announced twice — Breed does this), `.warnbox` (inline warning), `.toast` (feedback ≤8s, with Undo for
 destructive), `.pchip` (passive), `.tchip` (pal chip), `.badge` (outcome kinds),
 `.mchip` (meta), `.picker` (pal select), `.ptag` (tag input), `.needrow`, `.rsummary`.
 
@@ -367,6 +383,13 @@ visual claims; contrast ratios computed, not eyeballed.
   that is three unexplained words deciding whether a nickname survives. Wants one
   visible line under the segrow describing the selected option — the same fix the
   backup flow's `#smBackupEffect` already uses.
+- **The Breed answer card has no `:active` press feedback.** The global
+  `button:not(:disabled):active` rule now matches `.cardopen`, but it translates a
+  transparent overlay — the card itself doesn't move. Wants
+  `.child-card:has(.cardopen:active){transform:translateY(1px)}` plus
+  `.cardopen:active{transform:none}`. Cosmetic; not a 2.5.x issue.
+- **`#/breed` with no keys doesn't clear the pickers**, so the empty state is only
+  reachable from a cold start or by clearing both slots by hand.
 - **`.odds.wild` ("📍 Where?") is 70.9×20.5 CSS px** at both 1366 and 360 — under the
   24px of 2.5.8, and it was not established whether the spacing exception clears it.
   Off every surface the roster/save work touched, so it was not fixed there.
@@ -386,11 +409,15 @@ visual claims; contrast ratios computed, not eyeballed.
   is never focused, so reaching Undo means tabbing past the whole page. App-wide, not
   specific to one view.
 - **Emoji migration (§7)**: replace remaining pictographic emoji with game assets or
-  Lucide SVGs — 🎮 (Read my save), 🍰 (guide; `items/cake.webp` exists), 🧬 mutation
-  marks (`ui/egg/mutation.webp`), 🐣, 🔍, 🗺, 🌙 nocturnal, 🌳 tree button,
-  🍖 food stat, ⚠ warnboxes, 🎲 odds, 📦, 📍.
-- View heading inconsistency — Breed and Find parents still have no heading block
-  (Paldex now has one).
+  Lucide SVGs — 🎮 (Read my save), 🍰 (guide; `items/cake.webp` exists), 🐣, 🔍, 🗺,
+  🌙 nocturnal, 🌳 tree button, 🍖 food stat, ⚠ warnboxes, 🎲 odds, 📦, 📍, and the
+  four remaining 🧬 marks (`ui/egg/mutation.webp`, already used by Breed's footnote):
+  the Guide's `Egg mutations 🧬` summary — **take this one first**, because Breed's
+  footnote now links straight to it, so one keypress goes tier-1 icon → emoji for
+  the same concept — the Guide "Deep dive" heading, the passive picker's mark
+  (`js/app.js`) and the Skills "Mutation only" badge.
+- View heading inconsistency — Find parents still has no heading block (Breed and
+  Paldex now have one).
 - Toggle label grammar varies across views (§4 switch rule).
 - Select conventions: the Roster's and Paldex's selects now carry visible `.ctl`
   labels (§9); **Skills** still uses bare, unlabelled selects and should follow.

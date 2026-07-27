@@ -196,22 +196,56 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .tier.legendary{background:var(--gold-tint);color:var(--gold)}
 
 /* ---------- breed view ---------- */
-.parents{display:flex;align-items:flex-end;justify-content:center;gap:14px;flex-wrap:wrap;margin-bottom:8px}
-.pwrap{flex:1;min-width:230px;max-width:340px}
+/* the status sentence — also the view's polite live region */
+.resline{color:var(--muted);font-size:var(--fs-md);line-height:1.4;min-height:1.4em}
+.resline b{color:var(--text);font-weight:600}
+/* swap sits in the divider between the two pickers, the flight-search convention */
+.parents{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:end;gap:var(--sp-3);max-width:820px;margin-bottom:var(--sp-4)}
+.pwrap{min-width:0;max-width:none}
 .pwrap .picker{max-width:none;min-width:0}
-.op{font-size:22px;color:var(--muted);font-weight:400;padding-bottom:9px}
-/* stacked layout: the decorative × wraps to the row edge and reads as a close button */
-@media(max-width:640px){.op{display:none}}
-.swap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:8px 12px;color:var(--muted);font-size:var(--fs-base);margin-bottom:3px}
-.swap:hover{color:var(--text);border-color:var(--border-strong)}
-.result-zone{margin-top:26px;display:flex;flex-direction:column;align-items:center;gap:16px}
-.child-card{width:min(560px,100%);background:linear-gradient(180deg,var(--raised),var(--surface));border:1px solid var(--border-strong);border-radius:var(--r-xl);padding:24px 28px;display:flex;gap:22px;align-items:center;animation:pop var(--t-base) var(--ease-out)}
+.swap{width:40px;height:40px;padding:0;display:grid;place-items:center;margin-bottom:var(--sp-1);
+  border-radius:var(--r-full);background:var(--raised);border:1px solid var(--border-strong);color:var(--muted)}
+.swap:hover{color:var(--text);border-color:var(--accent);background:var(--accent-tint)}
+.swap svg{width:18px;height:18px}
+/* answer left, reasoning right — the column was 48% used with everything centred */
+/* minmax(0,1fr) on the base track, not an implicit auto: the chain card's
+   min-content is 734px, which floored the single column and ran the whole
+   view off a 360px phone. Same trap as .roster.rowview — see DESIGN.md §4. */
+.result-zone{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-5) var(--sp-6);align-items:start;margin-top:var(--sp-5)}
+@media(min-width:900px){
+  .result-zone{grid-template-columns:minmax(0,1.2fr) minmax(280px,1fr)}
+  /* peers, so they share a height and their portraits share a baseline */
+  .result-zone.two{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
+  .result-zone.two>.resrail{grid-column:1/-1}
+  .result-zone:not(.two) .resrail .linkrow{flex-direction:column;align-self:stretch}
+  .result-zone:not(.two) .resrail .linkrow>.alink{text-align:left}
+}
+.result-zone>.chaincard{grid-column:1/-1}
+.resrail{display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-2)}
+.resrail .sub b{color:var(--text);font-weight:600}
+/* every state starts at the same edge — the empty and one-parent link rows are
+   direct children of the zone, so scoping this to .resrail left them centred */
+.result-zone .linkrow{margin-top:var(--sp-2);justify-content:flex-start}
+/* spacing is the tier break — a rule would read as a section boundary. The
+   4px indent .gjump carries for inline use in the Guide reads as misalignment
+   when it is the last item in a start-aligned column. */
+.resrail .gjump{margin-top:var(--sp-4);margin-left:0}
+.child-card{position:relative;width:100%;background:linear-gradient(180deg,var(--raised),var(--surface));border:1px solid var(--border-strong);border-radius:var(--r-xl);padding:24px 28px;display:flex;gap:22px;align-items:center;animation:pop var(--t-base) var(--ease-out)}
 .child-card.clickable{cursor:pointer;transition:border-color var(--t-fast),transform var(--t-fast)}
-.child-card.clickable:hover{border-color:var(--border-strong);transform:translateY(-1px)}
+.child-card.clickable:hover{border-color:var(--accent-line);transform:translateY(-1px)}
+/* the press target lies OVER the card instead of wrapping it, so the card's
+   heading and chips stay in the AT tree (same idea as .dextile-open) */
+/* pointer-events:none or the overlay hit-tests above every chip in the card,
+   killing their tooltips and text selection. The click handler lives on the
+   card; keyboard activation of this button bubbles to it. */
+.cardopen{position:absolute;inset:0;border:0;background:none;pointer-events:none;border-radius:var(--r-xl)}
+.child-card:has(.cardopen:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.cardopen:focus-visible{outline:none}
 @keyframes pop{from{transform:scale(.97);opacity:0}to{transform:scale(1);opacity:1}}
 .child-card .pico{width:84px;height:84px;font-size:30px}
-.child-card h2{font-size:var(--fs-h1);line-height:1.2}
-.child-card .zk{color:var(--muted);font-weight:400;font-size:var(--fs-base);margin-left:6px}
+.child-card h3{font-size:var(--fs-h1);line-height:1.2}
+.child-card .zk{color:var(--muted);font-weight:400;font-size:var(--fs-base)}
 .crow{display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap}
 .badge{font-size:var(--fs-xs);font-weight:700;letter-spacing:.6px;padding:3px 10px;border-radius:var(--r-sm);text-transform:uppercase}
 .badge.unique{background:var(--gold-tint);color:var(--gold);border:1px solid var(--gold-line)}
@@ -225,10 +259,8 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .works span.hot{border-color:var(--accent);color:var(--text)}
 .mathline{color:var(--muted);font-size:var(--fs-sm);text-align:center}
 .mathline b{color:var(--text);font-weight:600}
-.gender-note{width:min(560px,100%);color:var(--muted);font-size:var(--fs-md);text-align:center}
-.multi{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;width:100%}
-.multi .child-card{width:min(440px,100%)}
-.gtag{font-size:var(--fs-sm);color:var(--muted);font-weight:600;margin-top:4px}
+/* the only thing telling two gender-combo cards apart, so it is not a footnote */
+.gtag{font-size:var(--fs-md);color:var(--text-2);font-weight:600;margin-top:var(--sp-1)}
 .linkrow{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .alink{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:7px 16px;font-size:var(--fs-md);font-weight:600;color:var(--muted)}
 .alink:hover{color:var(--text);border-color:var(--border-strong)}
@@ -356,8 +388,9 @@ tbody tr:hover{background:var(--surface)}
 @media(max-width:840px){
   th.hn,td.hn{display:none}
   td{padding:6px 8px}th{padding:7px 8px}
-  .child-card{flex-direction:column;text-align:center;padding:20px}
-  .child-card .crow,.child-card .gbar,.child-card .works{justify-content:center}
+  /* .child-card used to stack and centre here; it stays a row at every width
+     now and only the art shrinks at <=640 — stacking cost ~100px of height and
+     centred the running text the redesign moved to the start edge. */
   .modal{padding:18px 16px 22px}
   .mhead{flex-direction:column;text-align:center}
   .mhead h2{justify-content:center}
@@ -1260,13 +1293,20 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .dex-controls .ctl label[aria-hidden="true"]{display:none}
   #hatchDepth button,#comboKind button{flex:1 1 0;padding:9px 6px}
 
-  /* --- breed: equal full-width parent slots, swap between them --- */
-  .parents{flex-direction:column;align-items:stretch;gap:10px;margin-bottom:4px}
-  .parents>.pwrap{max-width:none;width:100%}
-  .parents>.pwrap:nth-child(1){order:1}
-  .parents>.swap{order:2;align-self:center;margin:0;padding:7px 24px}
-  .parents>.pwrap:nth-child(3){order:3}
-  .result-zone{margin-top:20px}
+  /* --- breed: equal full-width parent slots, swap between them.
+         No order: overrides any more — the swap is between the pickers in the
+         DOM now, so visual order and focus order agree for free. --- */
+  .parents{grid-template-columns:minmax(0,1fr);gap:var(--sp-1);margin-bottom:var(--sp-3)}
+  .swap{justify-self:center;margin:calc(var(--sp-1) * -1) 0}
+  .collhead .resline{flex:1 0 100%}
+  .result-zone{margin-top:var(--sp-4);gap:var(--sp-4)}
+  /* stay a row and shrink the art: stacking it centred cost ~100px per card,
+     which pushed the answer below the fold on a 640-tall phone */
+  .child-card{flex-direction:row;text-align:left;padding:var(--sp-4);gap:var(--sp-3);align-items:flex-start}
+  .child-card .crow,.child-card .gbar,.child-card .works{justify-content:flex-start}
+  .child-card .pico{width:64px;height:64px;font-size:24px}
+  .child-card h3{font-size:var(--fs-h2)}
+  .gtrack{width:96px}
 
   /* --- find parents: wrap the badge instead of crushing names to "An…" --- */
   .pair{flex-wrap:wrap}
