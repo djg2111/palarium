@@ -898,7 +898,8 @@ select#genderSel{padding:10px 12px}
 .tvp.grabbing{cursor:grabbing}
 .tvp-inner{transform-origin:0 0;width:max-content;padding:16px}
 .tvp-ctrl{position:absolute;right:10px;bottom:10px;display:flex;gap:6px;z-index:5}
-.tvp-ctrl button{width:32px;height:32px;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--border-strong);color:var(--muted);font-size:var(--fs-base);line-height:1}
+.tvp-ctrl button{width:32px;height:32px;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--border-strong);color:var(--muted);
+  display:grid;place-items:center}
 .tvp-ctrl button:hover{color:var(--text);border-color:var(--border-strong)}
 .tvp-hint{position:absolute;left:12px;bottom:12px;font-size:var(--fs-xs);color:var(--muted);pointer-events:none}
 .tchip.cur{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}

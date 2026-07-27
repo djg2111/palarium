@@ -66,6 +66,8 @@ const LU = {
   mapPin: ['M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0Z', ['circle', {cx: 12, cy: 10, r: 3}]],
   percent: ['M19 5 5 19', ['circle', {cx: 6.5, cy: 6.5, r: 2.5}], ['circle', {cx: 17.5, cy: 17.5, r: 2.5}]],
   rotateCcw: ['M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8', 'M3 3v5h5'],
+  plus: ['M5 12h14', 'M12 5v14'],
+  minus: ['M5 12h14'],
 };
 const SVGNS = 'http://www.w3.org/2000/svg';
 function lucide(name, size, cls) {

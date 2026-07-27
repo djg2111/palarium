@@ -484,19 +484,11 @@ visual claims; contrast ratios computed, not eyeballed.
 - **The chain card's right edge aligns with nothing** at ≥900px: `width:min(760px,100%)`
   inside `grid-column:1/-1` stops it 140px past the answer column and 116px into the
   rail. Either span the zone or clamp it to the answer column.
-- **`.tvp-ctrl`'s `⤾` reset glyph** is a text symbol outside the established set
-  (§7) where Lucide has `rotate-ccw`. Shared by the Planner tree and Breed's chain
-  card, so it belongs to whichever pass touches the tree viewport.
 - **`.hatchpanel .pair` still calls `icon(pal, 32, true)`** — the art is a second,
   mouse-only action inside a button, unreachable by keyboard and never announced.
   Find parents took the fix (a real anchor button); Breedable now still needs it.
   The same row writes a bare `×` between the two names, which NVDA reads as
   "times" (§4) — fix both in one pass.
-- **`class="collhead vhead"` on `#view-dex`** — `.vhead` is defined nowhere in
-  `css/style.css`.
-- Toggle label grammar varies across views (§4 switch rule).
-- Select conventions: the Roster's and Paldex's selects now carry visible `.ctl`
-  labels (§9); **Skills** still uses bare, unlabelled selects and should follow.
 - The picker's `@media(max-width:640px)` block (`.pop .list` / `.pop .row`) is a
   species tile hard-coded into a popover at one breakpoint. It should be
   refactored onto `.dexgrid`/`.dextile` so there is one tile implementation.

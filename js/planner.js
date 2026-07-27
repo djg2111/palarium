@@ -842,12 +842,15 @@ function treeViewport(treeEl) {
   vp.addEventListener('pointercancel', endDrag);
   const ctrl = document.createElement('div'); ctrl.className = 'tvp-ctrl';
   const mid = () => { const r = vp.getBoundingClientRect(); return [r.width / 2, r.height / 2]; };
-  for (const [txt, label, fn] of [
-    ['+', 'Zoom in', () => zoomAt(...mid(), 1.25)],
-    ['−', 'Zoom out', () => zoomAt(...mid(), 1 / 1.25)],
-    ['⤾', 'Reset view', () => { scale = fitScale; tx = fitX(); ty = 0; apply(); }],
+  // Lucide, not the three text glyphs this used: the reset arrow was outside the
+  // established symbol set (DESIGN.md §7) and left one stroke weight beside two
+  // font glyphs in a three-button group.
+  for (const [ic, label, fn] of [
+    ['plus', 'Zoom in', () => zoomAt(...mid(), 1.25)],
+    ['minus', 'Zoom out', () => zoomAt(...mid(), 1 / 1.25)],
+    ['rotateCcw', 'Reset view', () => { scale = fitScale; tx = fitX(); ty = 0; apply(); }],
   ]) {
-    const b = document.createElement('button'); b.type = 'button'; b.textContent = txt;
+    const b = document.createElement('button'); b.type = 'button'; b.appendChild(lucide(ic, 16));
     b.title = label; b.setAttribute('aria-label', label);
     b.addEventListener('click', fn);
     ctrl.appendChild(b);
