@@ -111,7 +111,7 @@
         </div>
         <div class="collacts">
           <button class="alink primary" id="rosterOpenAdd">+ Add pal</button>
-          <button class="alink savebtn" id="importBtn" title="Fill your roster from your Palworld save file. Your save is never changed."><span class="sicon" aria-hidden="true">🎮</span>Read my save</button>
+          <button class="alink savebtn" id="importBtn" title="Fill your roster from your Palworld save file. Your save is never changed."><svg class="sicon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>Read my save</button>
           <button class="alink" id="exportBtn">Backup &amp; restore</button>
           <input type="file" id="importFile" accept="application/json,.json" style="display:none">
           <input type="file" id="saveFile" accept=".sav" style="display:none">
@@ -366,7 +366,7 @@
     <div class="guide">
 
       <div class="gcard">
-        <h2><span>🍰</span>Breeding, explained like you're 5</h2>
+        <h2><img class="uii" src="assets/items/cake.webp" alt="" width="22" height="22" loading="lazy" decoding="async">Breeding, explained like you're 5</h2>
         <div class="sub">The short version — everything you need to hatch your first eggs.</div>
         <ol>
           <li><b>Build a Breeding Farm</b> (Technology level 19). Also build an <b>Egg Incubator</b> (level 7, needs Paldium).</li>
@@ -389,7 +389,7 @@
       </div>
 
       <div class="gcard">
-        <h2><span>🧬</span>Deep dive</h2>
+        <h2><img class="uii" src="assets/ui/egg/mutation.webp" alt="" width="22" height="22" loading="lazy" decoding="async">Deep dive</h2>
         <div class="sub">How the game actually decides what hatches — the same rules this calculator runs.</div>
 
         <details open id="g-formula"><summary>The species formula (breeding power)</summary><div>
@@ -448,7 +448,7 @@
             <li>Every bred egg has a <b>~1% chance to mutate</b> — <b>~3%</b> if you use an <b>Extravagant Vegetable Cake</b> instead of a regular Cake. A <b>Vegetable Cake</b>'s two eggs each roll separately, so it's ≈2% per breeding cycle at the base rate.</li>
             <li>Mutated eggs are <b>visibly different</b> — purple with a distinct pattern — so you'll know before it hatches.</li>
             <li>A mutated pal can come with any of: up to <b>2 free condensation levels</b>, <b>Alpha</b> (oversized) status, one or more <b>mutation-exclusive passives</b>, or even hatch as a <b>different species</b> than the normal child.</li>
-            <li>The exclusive passives (marked 🧬 in this app's passive picker) can't be rolled any other way: <b>Babysitter</b> (+30% egg production &amp; incubation speed at base — the breeding meta pick), <b>Idiosyncratic</b>, <b>Immortality</b>, <b>Heavily Armored</b>, <b>Skymarcher</b>. Once obtained they inherit like normal passives.</li>
+            <li>The exclusive passives (marked <img class="uii" src="assets/ui/egg/mutation.webp" alt="" width="16" height="16" loading="lazy" decoding="async"> in this app's passive picker) can't be rolled any other way: <b>Babysitter</b> (+30% egg production &amp; incubation speed at base — the breeding meta pick), <b>Idiosyncratic</b>, <b>Immortality</b>, <b>Heavily Armored</b>, <b>Skymarcher</b>. Once obtained they inherit like normal passives.</li>
             <li>Which species a mutated egg can turn into is <i>not fully understood yet</i> — community data collection is ongoing, so this app doesn't pretend to predict it. Treat species mutations as a lottery bonus.</li>
           </ul>
         </div></details>
@@ -470,10 +470,10 @@
 <footer>Palarium · a personal fan project — pal data, icons &amp; map extracted from the game files (v1.0.1) · Palworld © Pocketpair · works offline · star pals in the Paldex to build your owned list<span class="kbdonly"> · press <code>/</code> to search</span></footer>
 
 <nav class="bottomnav" id="bottomnav" aria-label="Quick navigation">
-  <button data-v="breed" type="button"><span class="bi" aria-hidden="true">🐣</span>Breed</button>
-  <button data-v="reverse" type="button"><span class="bi" aria-hidden="true">🔍</span>Find</button>
-  <button data-v="plan" type="button"><span class="bi" aria-hidden="true">🗺️</span>Plan</button>
-  <button id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false"><span class="bi" aria-hidden="true">⋯</span>More</button>
+  <button data-v="breed" type="button"><svg class="bi" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c6.23-.05 7.87-5.57 7.5-10-.36-4.34-3.95-9.96-7.5-10-3.55.04-7.14 5.66-7.5 10-.37 4.43 1.27 9.95 7.5 10z"/></svg>Breed</button>
+  <button data-v="reverse" type="button"><svg class="bi" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>Find</button>
+  <button data-v="plan" type="button"><svg class="bi" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>Plan</button>
+  <button id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false"><svg class="bi" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</button>
 </nav>
 <div class="moresheet" id="moresheet">
   <button data-v="hatch" type="button">Breedable now</button>

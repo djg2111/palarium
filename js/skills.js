@@ -637,7 +637,7 @@ function pvCard(e, mine) {
   card.appendChild(ul);
   const foot = document.createElement('div'); foot.className = 'pvfoot';
   if (e.m.mt) {
-    const b = document.createElement('span'); b.className = 'badge mut'; b.textContent = '🧬 Mutation only';
+    const b = document.createElement('span'); b.className = 'badge mut'; b.append(uiIcon('egg', 'mutation', 14), 'Mutation only');
     b.title = 'Only rolls onto mutation pals — you can’t catch it on an ordinary wild pal, so it has to be bred in from one';
     foot.appendChild(b);
   }

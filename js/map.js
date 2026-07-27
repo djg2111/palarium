@@ -926,7 +926,7 @@ function mapRenderSpawnBar(p) {
   txt.append(b, sub);
   spawnBarEl.appendChild(txt);
   if (sum && sum.night) {
-    const n = document.createElement('span'); n.className = 'sbadge'; n.textContent = '🌙 Night only';
+    const n = document.createElement('span'); n.className = 'sbadge'; n.append(lucide('moon', 13), 'Night only');
     spawnBarEl.appendChild(n);
   }
   if (sum && sum.dungeonOnly) {

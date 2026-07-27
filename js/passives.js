@@ -52,7 +52,8 @@ function makePassivePicker(mount, max = 4, onChange) {
       const nm = document.createElement('span'); nm.className = 'trow-n';
       const ic = passiveIcon(p, 15);
       if (ic) nm.appendChild(ic);
-      nm.append((p.mt ? '🧬 ' : '') + p.n);
+      if (p.mt) nm.append(uiIcon('egg', 'mutation', 14));
+      nm.append(p.n);
       const tier = document.createElement('span'); tier.className = 'tr-r';
       tier.textContent = (p.r > 0 ? '+'.repeat(Math.min(p.r, 4)) : p.r < 0 ? '−'.repeat(Math.min(-p.r, 4)) : '·') + (p.e ? '  ' + p.e : '') + (p.mt ? '  (mutation-only)' : '');
       r.append(nm, tier);

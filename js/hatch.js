@@ -172,7 +172,7 @@ function hatchPanel(r) {
     const x = document.createElement('span'); x.className = 'x'; x.textContent = '×'; row.appendChild(x);
     row.appendChild(side(b));
     const issue = pairGenderIssue(aK, bK);
-    if (issue) { const w = document.createElement('span'); w.className = 'warnchip'; w.append('⚠ ', genderize(issue)); row.appendChild(w); }
+    if (issue) { const w = document.createElement('span'); w.className = 'warnchip'; w.append(lucide('triangleAlert', 13), genderize(issue)); row.appendChild(w); }
     row.addEventListener('click', () => { pickA.set(a, true); pickB.set(b, true); renderBreed(); navTab('breed'); });
     wrap.appendChild(row);
   }

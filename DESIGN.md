@@ -330,8 +330,13 @@ Priority order — always exhaust a tier before falling to the next:
    polished UI.
 
 JS-built Lucide icons go through `lucide(name, size, cls)` in `js/core.js` — add the
-path data to the `LU` table beside it, so the repo carries only the icons it draws.
-Markup-authored ones inline the same attribute set by hand (`#swapBtn`). They are
+shapes to the `LU` table beside it, so the repo carries only the icons it draws (an
+entry is a list of shapes: a bare string is a `<path d>`, `[tag, attrs]` gets you a
+circle or a rect). Every one carries `.lui`, the stroke-icon twin of `.uii` — one
+alignment rule for the whole app instead of a per-component patch. Markup-authored
+ones inline the same attribute set by hand (`#swapBtn`). Game art goes through
+`uiIcon(dir, key, size)` for `assets/ui/` and `itemIcon(key, size)` for
+`assets/items/`; both drop themselves rather than render a broken image. Icons are
 always `aria-hidden`: the control carries the label. A control whose visible text
 sits beside an icon must keep that text **inside** its accessible name — an
 `aria-label` that paraphrases it ("Previous chain step" over "Prev step") fails
@@ -441,9 +446,6 @@ visual claims; contrast ratios computed, not eyeballed.
   that is three unexplained words deciding whether a nickname survives. Wants one
   visible line under the segrow describing the selected option — the same fix the
   backup flow's `#smBackupEffect` already uses.
-- **`.odds.wild` ("📍 Where?") is 70.9×20.5 CSS px** at both 1366 and 360 — under the
-  24px of 2.5.8, and it was not established whether the spacing exception clears it.
-  Off every surface the roster/save work touched, so it was not fixed there.
 - **`#smPick`'s two choice rows are the quietest "forward" on any view**: fill 1.10:1
   and border 1.36:1 against the dialog surface, since a route-choice view carries no
   primary button (§4). Legal — the rows are identified by their text, and hover
@@ -459,13 +461,14 @@ visual claims; contrast ratios computed, not eyeballed.
 - **Toast Undo is far from the keyboard**: `.toasts` sits at the end of `<body>` and
   is never focused, so reaching Undo means tabbing past the whole page. App-wide, not
   specific to one view.
-- **Emoji migration (§7)**: replace remaining pictographic emoji with game assets or
-  Lucide SVGs — 🎮 (Read my save), 🍰 (guide; `items/cake.webp` exists), 🐣, 🔍, 🗺,
-  🌙 nocturnal, 🌳 tree button, 🍖 food stat, ⚠ warnboxes, 🎲 odds, 📍, and the
-  three remaining 🧬 marks (`ui/egg/mutation.webp`): the Guide "Deep dive" heading,
-  the passive picker's mark (`js/passives.js`) and the Skills "Mutation only" badge.
-  The Guide's `Egg mutations` summary is done — Breed's footnote links straight to
-  it, so one keypress no longer goes tier-1 icon → emoji for the same concept.
+- **Emoji migration (§7) — done.** Every pictographic emoji in the UI is now a game
+  asset or a Lucide SVG. The only survivors are in `WORKS` (a `<select>` option
+  can't hold an image) and in code comments describing the change. Two mechanical
+  rules came out of it and hold for new work: an emoji swapped into a chip or box
+  needs that container to become `inline-flex` (a glyph sits on the text baseline
+  where a stroke icon does not), and a **repeated** emoji is never a bar chart —
+  the food stat drew up to eight 🍖 and announced "cut of meat" eight times, in
+  the one stat tile out of eight that hid its own number.
 - **Every hash navigation announces its live region twice.** `hashchange` and
   `popstate` both fire for one navigation and each runs `applyHash`, so a view's
   `.resline` is rebuilt with identical text ~2ms apart — the exact condition under

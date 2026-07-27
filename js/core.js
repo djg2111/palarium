@@ -29,22 +29,60 @@ function uiIcon(dir, key, size, cls) {
 }
 const workImgTag = k =>
   `<img class="uii" src="${UI}work/${k}.webp" alt="" width="15" height="15" loading="lazy" decoding="async">`;
+// One warning box, one glyph. Each caller used to write its own '⚠ ' + string,
+// so the mark was an emoji in some views and a Lucide triangle in others.
+// The glyph is decorative — .warnbox is already coloured and worded as a
+// warning, and DESIGN.md §6 forbids carrying that in colour or icon alone.
+function warnBox(...parts) {
+  const w = document.createElement('div'); w.className = 'warnbox';
+  w.append(lucide('triangleAlert', 16), ...parts);
+  return w;
+}
+// Inventory art (assets/items/), the other half of §7 tier 1. Same contract as
+// uiIcon: decorative, disappears rather than showing a broken image.
+function itemIcon(key, size, cls) {
+  const i = new Image(size, size);
+  i.className = 'uii' + (cls ? ' ' + cls : '');
+  i.src = 'assets/items/' + key + '.webp';
+  i.alt = ''; i.loading = 'lazy'; i.decoding = 'async'; i.draggable = false;
+  i.onerror = () => i.remove();
+  return i;
+}
 // Lucide (ISC) as inline SVG — DESIGN.md §7 tier 2, for generic UI concepts no
-// game asset covers. Self-hosting is by construction here: a caller passes only
-// the path data it needs, so no icon font and no full pack ever ship. Always
-// decorative — the control carries the label.
-const LU = {chevronLeft: ['m15 18-6-6 6-6'], chevronRight: ['m9 18 6-6-6-6']};
+// game asset covers. Self-hosting is by construction here: the table below holds
+// only the icons this app draws, so no icon font and no full pack ever ships.
+// Always decorative — the control carries the label.
+// An entry is a list of shapes: a bare string is a <path d>, anything else is
+// [tag, attrs] so an icon can use circles and rects too.
+const LU = {
+  chevronLeft: ['m15 18-6-6 6-6'],
+  chevronRight: ['m9 18 6-6-6-6'],
+  triangleAlert: ['m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3', 'M12 9v4', 'M12 17h.01'],
+  search: [['circle', {cx: 11, cy: 11, r: 8}], 'm21 21-4.3-4.3'],
+  moon: ['M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z'],
+  egg: ['M12 22c6.23-.05 7.87-5.57 7.5-10-.36-4.34-3.95-9.96-7.5-10-3.55.04-7.14 5.66-7.5 10-.37 4.43 1.27 9.95 7.5 10z'],
+  route: [['circle', {cx: 6, cy: 19, r: 3}], 'M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15', ['circle', {cx: 18, cy: 5, r: 3}]],
+  upload: ['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M17 8l-5-5-5 5', 'M12 3v12'],
+  mapPin: ['M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0Z', ['circle', {cx: 12, cy: 10, r: 3}]],
+  percent: ['M19 5 5 19', ['circle', {cx: 6.5, cy: 6.5, r: 2.5}], ['circle', {cx: 17.5, cy: 17.5, r: 2.5}]],
+  rotateCcw: ['M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8', 'M3 3v5h5'],
+};
+const SVGNS = 'http://www.w3.org/2000/svg';
 function lucide(name, size, cls) {
-  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const s = document.createElementNS(SVGNS, 'svg');
   s.setAttribute('viewBox', '0 0 24 24');
   s.setAttribute('width', size); s.setAttribute('height', size);
   s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor');
   s.setAttribute('stroke-width', '2'); s.setAttribute('stroke-linecap', 'round');
   s.setAttribute('stroke-linejoin', 'round'); s.setAttribute('aria-hidden', 'true');
-  if (cls) s.setAttribute('class', cls);
-  for (const d of LU[name]) {
-    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    p.setAttribute('d', d); s.appendChild(p);
+  // .lui is the alignment base, the stroke-icon twin of .uii — one rule keeps
+  // every inline icon off the text baseline instead of per-component patches
+  s.setAttribute('class', 'lui' + (cls ? ' ' + cls : ''));
+  for (const shape of LU[name]) {
+    const [tag, attrs] = typeof shape === 'string' ? ['path', {d: shape}] : shape;
+    const el = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    s.appendChild(el);
   }
   return s;
 }
@@ -399,8 +437,14 @@ function openModal(p, rentry) {
   const crow = document.createElement('div'); crow.className = 'crow';
   crow.appendChild(typeChips(p));
   crow.appendChild(tierBadge(p));
-  const meta = [`Size ${p.sz}`]; if (p.noct) meta.push('🌙 Nocturnal'); if (p.cb) meta.push('🌳 Terraria collab');
-  for (const m of meta) { const c = document.createElement('span'); c.className = 'mchip'; c.textContent = m; crow.appendChild(c); }
+  // Terraria collab keeps no glyph: the tree emoji it carried read as a grass
+  // element beside the type chips, and the words say it on their own (§7).
+  const meta = [[`Size ${p.sz}`, null], ...(p.noct ? [['Nocturnal', 'moon']] : []), ...(p.cb ? [['Terraria collab', null]] : [])];
+  for (const [m, ic] of meta) {
+    const c = document.createElement('span'); c.className = 'mchip';
+    if (ic) c.appendChild(lucide(ic, 14));
+    c.append(m); crow.appendChild(c);
+  }
   hb.appendChild(crow);
   hb.appendChild(genderBar(p));
   head.appendChild(hb);
@@ -492,7 +536,9 @@ function openModal(p, rentry) {
   (p.st || []).forEach((v, i) => {
     const d = document.createElement('div'); d.className = 'stat';
     const l = document.createElement('div'); l.className = 'lb'; l.textContent = labels[i];
-    const val = document.createElement('div'); val.className = 'vl'; val.textContent = i === 6 ? '🍖'.repeat(Math.min(v, 8)) || v : v;
+    // Food amount was drawn as up to eight 🍖, which announced as "cut of meat"
+    // eight times and was the only stat in the grid not showing its number.
+    const val = document.createElement('div'); val.className = 'vl'; val.textContent = v;
     d.append(l, val); grid.appendChild(d);
   });
   ss.appendChild(grid);

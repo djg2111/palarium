@@ -5,21 +5,10 @@ const pickL = makePicker(document.getElementById('pickL'), {placeholder:'Any spe
 // pickL already does exactly — and pickL's own popover has a search box.
 const GROUP_PAGE = 20, GROUP_MORE = 40;
 let reverseShown = {};           // groups shown per tier key, not pairs
-// Lucide triangle-alert, replacing the ⚠ this view used (DESIGN.md §7 tier 2)
-function warnGlyph() {
-  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  s.setAttribute('class', 'wglyph'); s.setAttribute('viewBox', '0 0 24 24');
-  s.setAttribute('width', '16'); s.setAttribute('height', '16');
-  s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor');
-  s.setAttribute('stroke-width', '2'); s.setAttribute('stroke-linecap', 'round');
-  s.setAttribute('stroke-linejoin', 'round'); s.setAttribute('aria-hidden', 'true');
-  for (const d of ['m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3',
-                   'M12 9v4', 'M12 17h.01']) {
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', d); s.appendChild(path);
-  }
-  return s;
-}
+// Lucide triangle-alert, replacing the ⚠ this view used (DESIGN.md §7 tier 2).
+// One implementation, in core's LU table — every other ⚠ in the app now draws
+// the same shape through it.
+const warnGlyph = () => lucide('triangleAlert', 16, 'wglyph');
 let ownedOnly = false;
 const ownedToggle = document.getElementById('ownedToggle');
 ownedToggle.addEventListener('click', () => { ownedOnly = !ownedOnly; setSwitch(ownedToggle, ownedOnly); reverseShown = {}; renderReverse(); });

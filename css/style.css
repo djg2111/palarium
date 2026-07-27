@@ -118,7 +118,7 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
   .tabs{display:none}
   .bottomnav{position:fixed;left:0;right:0;bottom:0;z-index:90;display:flex;background:rgba(13,17,23,.94);backdrop-filter:blur(8px);border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom)}
   .bottomnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px 10px;font-size:var(--fs-xs);font-weight:600;color:var(--muted);border-radius:0}
-  .bottomnav button .bi{font-size:18px;line-height:1}
+  .bottomnav button .bi{display:block}
   .bottomnav button.active{color:var(--accent)}
   .moresheet.open{display:flex}
   .moresheet{position:fixed;right:8px;bottom:calc(64px + env(safe-area-inset-bottom));z-index:95;flex-direction:column;min-width:190px;background:var(--overlay);border:1px solid var(--border-strong);border-radius:var(--r-lg);box-shadow:0 12px 40px rgba(0,0,0,.5);overflow:hidden}
@@ -180,6 +180,9 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 /* Game UI icons, extracted from the paks. .uii is the shared base: never let
    one stretch a flex row, and never let a missing file reserve empty space. */
 .uii{display:inline-block;flex-shrink:0;vertical-align:-2px}
+/* the stroke-icon twin of .uii: inline Lucide art, aligned once for the whole
+   app rather than patched per component (DESIGN.md §7) */
+.lui{display:inline-block;flex-shrink:0;vertical-align:-2px}
 /* The element icon is element-coloured and so is its chip, so it's knocked
    down to the chip's ink colour instead of vanishing into the background. */
 .chip .uii{filter:brightness(0);opacity:.82;vertical-align:0}
@@ -588,6 +591,9 @@ select#genderSel{padding:10px 12px}
   color:var(--muted);font-size:var(--fs-sm);font-style:italic;margin:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .warnbox{border-left:3px solid var(--danger);background:var(--danger-tint);padding:10px 14px;border-radius:0 10px 10px 0;font-size:var(--fs-md);margin-bottom:12px;color:var(--text-2)}
+/* inline, not a flex item: the message can be a fragment of text nodes and
+   gender spans, and a flex .warnbox would gap every one of them apart */
+.warnbox .lui{color:var(--danger);margin-right:6px;vertical-align:-3px}
 .rmodal{width:min(480px,100%)}
 .rmtitle{font-size:var(--fs-h2);margin-bottom:16px}
 /* said once to a new roster, then gone — see openRosterEditor */
@@ -824,8 +830,12 @@ select#genderSel{padding:10px 12px}
 .hatchpanel{grid-column:1/-1;background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--r-lg);padding:13px 15px;display:flex;flex-direction:column;gap:10px}
 .hatchpanel .hpttl{font-size:var(--fs-sm);font-weight:700;color:var(--muted)}
 .hatchpanel .pair{background:var(--surface)}
-.warnchip{font-size:var(--fs-xs);color:var(--danger);border:1px solid var(--danger-line);border-radius:var(--r-sm);padding:1px 7px;flex-shrink:0}
-.odds{font-size:var(--fs-xs);color:var(--muted);border:1px solid var(--border);border-radius:var(--r-sm);padding:1px 7px;flex-shrink:0;cursor:pointer}
+.warnchip{font-size:var(--fs-xs);color:var(--danger);border:1px solid var(--danger-line);border-radius:var(--r-sm);padding:1px 7px;flex-shrink:0;
+  display:inline-flex;align-items:center;gap:4px}
+/* min-height, not padding alone: at 1px 7px this measured 70.9×20.5 and missed
+   the 24px floor of WCAG 2.2 2.5.8 (DESIGN.md §11) */
+.odds{font-size:var(--fs-xs);color:var(--muted);border:1px solid var(--border);border-radius:var(--r-sm);padding:1px 8px;flex-shrink:0;cursor:pointer;
+  display:inline-flex;align-items:center;gap:4px;min-height:24px}
 .odds:hover{color:var(--text);border-color:var(--border-strong)}
 .odds[aria-expanded="true"]{color:var(--text);border-color:var(--accent)}
 .oddsinfo{flex-basis:100%;font-size:var(--fs-sm);color:var(--muted);line-height:1.45}
@@ -840,7 +850,8 @@ select#genderSel{padding:10px 12px}
 .wildinfo b{color:var(--text);font-weight:700}
 .wildinfo .wnote{color:var(--text-2)}
 .wildinfo .wtag{font-size:var(--fs-xs);font-weight:700;color:var(--accent);background:var(--accent-tint);
-  border:1px solid var(--accent-line);border-radius:var(--r-full);padding:1px 8px}
+  border:1px solid var(--accent-line);border-radius:var(--r-full);padding:1px 8px;
+  display:inline-flex;align-items:center;gap:4px}
 .wildinfo .wlb{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--muted)}
 .wildinfo .whub{display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;color:var(--text-2);
   background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:2px 9px}
@@ -1021,7 +1032,8 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
 .spawnbar .sb-txt b{font-size:var(--fs-md)}
 .spawnbar .sb-txt span{color:var(--muted);font-size:var(--fs-sm)}
 .spawnbar .sbadge{font-size:var(--fs-xs);font-weight:700;padding:3px 9px;border-radius:var(--r-full);
-  background:var(--raised);border:1px solid var(--border-strong);color:var(--text-2);white-space:nowrap}
+  background:var(--raised);border:1px solid var(--border-strong);color:var(--text-2);white-space:nowrap;
+  display:inline-flex;align-items:center;gap:4px}
 .spawnbar .sb-legend{margin-left:auto;display:flex;align-items:center;gap:8px;
   font-size:var(--fs-xs);color:var(--muted);white-space:nowrap}
 /* the swatches carry the same alpha the map does, so the key matches the
@@ -1204,7 +1216,8 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
 .palref:hover{border-color:var(--border-strong);background:var(--raised)}
 .badge.nostack{background:var(--raised);color:var(--muted);border:1px solid var(--border);text-transform:none;letter-spacing:0}
 .badge.aura{background:var(--success-tint);color:var(--success);border:1px solid var(--success-line)}
-.badge.mut{background:var(--accent-tint);color:var(--accent);border:1px solid var(--accent-line);text-transform:none;letter-spacing:0}
+.badge.mut{background:var(--accent-tint);color:var(--accent);border:1px solid var(--accent-line);text-transform:none;letter-spacing:0;
+  display:inline-flex;align-items:center;gap:4px}
 .badge.have{background:var(--gold-tint);color:var(--gold);border:1px solid var(--gold-line);text-transform:none;letter-spacing:0}
 button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 /* an effect tag is a filter you can click from any pal card */
@@ -1242,8 +1255,7 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
    Sits beside Export/Import data but must not read as the same thing: one
    restores a Palarium backup, this one reads a game file. Hence its own icon
    and wording, and a preview before anything is written. */
-.savebtn{gap:6px}
-.savebtn .sicon{font-size:var(--fs-md);line-height:1}
+.savebtn{display:inline-flex;align-items:center;gap:6px}
 .smodal{width:min(680px,100%)}
 /* the promise the whole feature rests on, said where the file is picked */
 .privacy{background:var(--raised);border:1px solid var(--border);border-left:3px solid var(--accent);

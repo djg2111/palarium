@@ -483,16 +483,12 @@ function computeRoute() {
   // say it plainly when the wild filter couldn't be applied — the toggle still
   // reads "In the wild", and a route that quietly ignored it would be a lie
   if (partnerMode === 'wild' && accFailed) {
-    const w = document.createElement('div'); w.className = 'warnbox';
-    w.textContent = '⚠ The spawn data didn’t load, so this route used every species as a partner — it may route through pals you can’t catch anywhere. Reload the page to try again.';
-    out.prepend(w);
+    out.prepend(warnBox('The spawn data didn’t load, so this route used every species as a partner — it may route through pals you can’t catch anywhere. Reload the page to try again.'));
   }
   // warn when desired passives are covered by neither a starter nor a roster partner on the route
   const uncovered = best && best.length && wo ? desired.filter(x => !wo.carry.includes(x)) : missing;
   if (uncovered.length) {
-    const w = document.createElement('div'); w.className = 'warnbox';
-    w.textContent = `⚠ Nothing on this route carries ${uncovered.join(', ')}. Add a starter or roster pal that has ${uncovered.length === 1 ? 'it' : 'them'}, or catch a carrier mid-chain. Odds below track only what the route carries.`;
-    out.prepend(w);
+    out.prepend(warnBox(`Nothing on this route carries ${uncovered.join(', ')}. Add a starter or roster pal that has ${uncovered.length === 1 ? 'it' : 'them'}, or catch a carrier mid-chain. Odds below track only what the route carries.`));
   }
   // warn when a merge step pairs two recorded same-gender starters
   if (best && starters.length > 1) {
@@ -507,9 +503,7 @@ function computeRoute() {
       if (ga && gb && ga.length === 1 && gb.length === 1 && ga[0] === gb[0] && !warned.has(key)) {
         warned.add(key);
         const sym = ga[0] === 'M' ? '♂' : '♀';
-        const w = document.createElement('div'); w.className = 'warnbox';
-        w.appendChild(genderize(`⚠ Your ${byKey.get(st.aK).n} and ${byKey.get(st.bK).n} are both recorded as ${sym} — a breeding pair needs one ♂ and one ♀. You'll need an opposite-gender ${byKey.get(st.aK).n} or ${byKey.get(st.bK).n} (catch or hatch one) before this merge step.`));
-        out.prepend(w);
+        out.prepend(warnBox(genderize(`Your ${byKey.get(st.aK).n} and ${byKey.get(st.bK).n} are both recorded as ${sym} — a breeding pair needs one ♂ and one ♀. You'll need an opposite-gender ${byKey.get(st.aK).n} or ${byKey.get(st.bK).n} (catch or hatch one) before this merge step.`)));
       }
     }
   }
@@ -580,7 +574,7 @@ function stepEl(s, opts = {}) {
   if (opts.odds) {
     // a button, not a tooltip-only span: touch users have no hover
     const o = document.createElement('button'); o.type = 'button'; o.className = 'odds';
-    o.textContent = `🎲 ≈${Math.max(1, Math.round(opts.odds.p * 100))}%/egg`;
+    o.append(lucide('percent', 13), `≈${Math.max(1, Math.round(opts.odds.p * 100))}%/egg`);
     const expl = `≈${Math.round(opts.odds.p * 100)}% per egg to inherit all ${opts.odds.keep} tracked passive${opts.odds.keep === 1 ? '' : 's'} (pool of ${opts.odds.pool}). Expect ≈${Math.max(1, Math.round(1 / opts.odds.p))} eggs. ${opts.odds.rp ? 'Partner passives from your roster are included.' : 'Assumes a passive-free partner.'} Assumes a regular Cake — a Special Cake improves the odds. Community-measured.`;
     o.title = expl;
     o.setAttribute('aria-expanded', 'false');
@@ -606,7 +600,7 @@ function stepEl(s, opts = {}) {
     const boxId = 'wild-' + (++wildSeq);
     const {bredAt, skips} = chainSkips(opts.chain, s);
     const w = document.createElement('button'); w.type = 'button'; w.className = 'odds wild';
-    w.textContent = '📍 Where?';
+    w.append(lucide('mapPin', 13), 'Where?');
     w.title = 'Where to catch a ' + pb.n;
     w.setAttribute('aria-label', 'Where to catch a ' + pb.n);
     w.setAttribute('aria-expanded', 'false');
@@ -719,7 +713,7 @@ function wildInfo(box, p, bredAt = -1, skips = []) {
     g.textContent = sum.lo > myLevel ? `${sum.lo - myLevel} above you` : 'at or below your level';
     head.insertBefore(g, cnt);
   }
-  if (sum.night) { const t = document.createElement('span'); t.className = 'wtag'; t.textContent = '🌙 Night only'; head.appendChild(t); }
+  if (sum.night) { const t = document.createElement('span'); t.className = 'wtag'; t.append(lucide('moon', 13), 'Night only'); head.appendChild(t); }
   if (sum.dungeonOnly) { const t = document.createElement('span'); t.className = 'wtag'; t.textContent = 'Dungeons only'; head.appendChild(t); }
 
   // Reuse the Map's statue ranking — areas within 1.2 km, not raw distance —
@@ -965,7 +959,7 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
     if (withOdds.length) {
       const eggs = withOdds.reduce((a, o) => a + 1 / o.p, 0);
       const agg = document.createElement('div'); agg.className = 'mathline';
-      agg.textContent = `🎲 Expected eggs across the chain: ≈${Math.ceil(eggs)} to keep all tracked passives at every step (community-measured estimate).`;
+      agg.append(itemIcon('egg', 16), `Expected eggs across the chain: ≈${Math.ceil(eggs)} to keep all tracked passives at every step (community-measured estimate).`);
       out.appendChild(agg);
     }
   }
