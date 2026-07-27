@@ -388,13 +388,15 @@ recoloring/filters).
 python -m http.server 8848
 # console-error smoke test
 msedge --headless=new --disable-gpu --enable-logging=stderr --virtual-time-budget=5000 --dump-dom http://localhost:8848/index.html
-# axe + interaction harness: tools/e2e/lib.js (Playwright + axe-core, installed in
-# tools/node_modules — no scratch npm install). require() it by absolute path from a
-# scratch script; open({viewport, hash}) returns a page with console errors, pageerrors
-# and 404s captured and the service worker cleared. axe loads from
-# tools/node_modules/axe-core/axe.min.js; settle animations before axe.run (see
-# tools/e2e/a11y.js — mid-fade sampling flakes contrast checks).
-# The save reader's own state matrix is already scripted: node tools/e2e/a11y.js
+# the standing gate — the whole-app state matrix (axe + overflow + focus, cold and
+# lived-in, every view/modal/popover, mobile pass): node tools/e2e/states.js
+# The save reader's own state matrix: node tools/e2e/a11y.js
+# Both build on tools/e2e/lib.js + audit.js (Playwright + axe-core, installed in
+# tools/node_modules — no scratch npm install). For states beyond the matrix,
+# require() lib.js by absolute path from a scratch script; open({viewport, hash})
+# returns a page with console errors, pageerrors and 404s captured and the service
+# worker cleared. audit.js settles animations before axe.run — mid-fade sampling
+# flakes contrast checks.
 # Canonical viewports: 320 · 360 · 390 · 768 · 1366 (320 is the 1.4.10 reflow floor).
 # Seed lived-in state via localStorage keys:
 #   palbreed_owned (array of species keys), palbreed_roster, palbreed_plans, palbreed_tipseen='1'

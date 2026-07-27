@@ -20,14 +20,15 @@ Your verdict blocks or clears a commit — be rigorous and honest.
    `require()` the harness by absolute path; `open({viewport, hash})` captures
    console errors and 404s and clears the service worker. Settle animations before
    `axe.run` (see the note in `tools/e2e/a11y.js`) or contrast checks flake mid-fade.
-3. **axe pass** (`runOnly: wcag2a, wcag2aa, wcag21a, wcag21aa`) in these states, cold
-   AND lived-in (seed keys in DESIGN.md §10): every tab; breed with result;
-   picker popover open; pal modal open; roster editor open (incl. validation error
-   shown); planner with computed route; odds explanation expanded; saved plan with
-   tree open; map with a marker selected and with a spawn overlay drawn. The save
-   reader's own eight-state matrix is already scripted — `node tools/e2e/a11y.js`
-   runs axe + overflow + focus across it; run it instead of re-scripting those
-   states. Viewports 360 and 1366.
+3. **axe pass**: the standard matrix is already scripted — run `node
+   tools/e2e/states.js` (whole app: every tab cold and lived-in, breed results,
+   picker, pal modal, roster editor + validation error, planner route/odds/saved
+   plan tree, map marker + spawn overlay, mobile pass) and `node tools/e2e/a11y.js`
+   (the save reader's eight states) instead of re-scripting any of it. Script only
+   states the change adds that neither suite reaches, using lib.js + audit.js from
+   a scratch dir. If the change renamed a control a suite drives, the suite fails
+   as UNREACHABLE — updating it is part of the change, same contract as the sw.js
+   SHELL array.
 4. **WCAG 2.2 AA manual checks** on changed surfaces:
    - 2.5.8 Target size: every new/changed target ≥24×24 CSS px (measure rects;
      spacing exception applies only if genuinely isolated). 44px preferred for

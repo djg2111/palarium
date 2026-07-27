@@ -328,7 +328,11 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 /* Colour is never the only signal: the triangle glyph and the visible .why text
    both carry it. The reason is ALSO in the chip's aria-label, because an
    .sr-only child would be pruned by that label and never announced. */
-.pgroup .tchip.warn{color:var(--danger);border-color:var(--danger-line);background:var(--danger-tint)}
+/* a warn chip carries a sentence, not a name — like .needrow's catch chips it
+   wraps inside its own border instead of pushing the row past the viewport
+   (385px of nowrap chip was the page's width at 320) */
+.pgroup .tchip.warn{color:var(--danger);border-color:var(--danger-line);background:var(--danger-tint);
+  white-space:normal;text-align:left}
 .pgroup .tchip .why{font-size:var(--fs-xs);font-weight:600;opacity:.9}
 .pgroup .tchip .why::before{content:'— ';}
 .wglyph{flex:none;width:16px;height:16px}

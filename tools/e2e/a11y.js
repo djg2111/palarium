@@ -9,54 +9,13 @@
  *   7 the roster after an import (level chips, in-game names, 200 tiles)
  */
 const {open, problems} = require('./lib');
+const {makeChecks} = require('./audit');
 const path = require('path');
 const fs = require('fs');
-const AXE = fs.readFileSync(path.join(__dirname, '..', 'node_modules', 'axe-core', 'axe.min.js'), 'utf8');
 const TESTS = path.join(__dirname, '..', '..', 'tests');
 const REAL = path.join(__dirname, '..', 'saves', 'Level.sav');
 
-const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
-let failures = 0;
-
-async function audit(page, label) {
-  // .modal animates in from opacity:0 (@keyframes pop, since ffe460f). axe
-  // sampling mid-fade composites every label over the scrim and reports
-  // colour-contrast failures on text that passes when still — which made this
-  // suite flake 1-2 violations a run. Settle first, then measure.
-  await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
-  await page.evaluate(AXE);
-  const res = await page.evaluate(tags => axe.run(document, {runOnly: {type: 'tag', values: tags}})
-    .then(r => r.violations.map(v => ({id: v.id, impact: v.impact, n: v.nodes.length,
-      target: v.nodes[0] && v.nodes[0].target.join(' ')}))), TAGS);
-  if (res.length) { failures++; console.log(`  ✗ ${label}: ${res.length} violation(s)`); res.forEach(v => console.log(`      ${v.id} (${v.impact}) ×${v.n} — ${v.target}`)); }
-  else console.log(`  ✓ ${label}: axe clean`);
-  return res;
-}
-async function overflow(page, label) {
-  const bad = [];
-  for (const w of [320, 390, 768, 1280]) {
-    await page.setViewportSize({width: w, height: 900});
-    await page.waitForTimeout(220);
-    const over = await page.evaluate(() => ({
-      doc: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-      sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
-    }));
-    if (over.doc) bad.push(`${w}px (${over.sw} > ${over.cw})`);
-  }
-  await page.setViewportSize({width: 1280, height: 900});
-  await page.waitForTimeout(150);
-  if (bad.length) { failures++; console.log(`  ✗ ${label}: horizontal overflow at ${bad.join(', ')}`); }
-  else console.log(`  ✓ ${label}: no horizontal overflow at 320 / 390 / 768 / 1280`);
-}
-async function focusSane(page, label) {
-  const who = await page.evaluate(() => {
-    const a = document.activeElement;
-    return a ? (a.tagName + (a.id ? '#' + a.id : '') + (a.className ? '.' + String(a.className).split(' ')[0] : '')) : 'null';
-  });
-  const lost = who === 'BODY' || who === 'null';
-  if (lost) { failures++; console.log(`  ✗ ${label}: focus fell to ${who}`); }
-  else console.log(`  ✓ ${label}: focus on ${who}`);
-}
+const {audit, overflow, focusSane, fail, failed} = makeChecks();
 
 (async () => {
   const h = await open();
@@ -135,7 +94,7 @@ async function focusSane(page, label) {
     await focusSane(page, 'cancel returns focus to the picker');
     const back = await page.$eval('#smPick', e => !e.hidden);
     console.log(back ? '  ✓ cancel returns to the picker' : '  ✗ cancel did not return to the picker');
-    if (!back) failures++;
+    if (!back) fail();
   } else console.log('  (skipped — run b6-scale.js first to build the big save)');
 
   console.log('\nSTATE 3 — the preview, nothing to decide');
@@ -178,7 +137,7 @@ async function focusSane(page, label) {
   await page.waitForTimeout(250);
   const chosen = await page.$eval('#smConflicts .confseg button.on', b => b.textContent);
   console.log('  keyboard changed the collision choice to:', chosen);
-  if (chosen === 'Combine') { failures++; console.log('  ✗ Enter did not change the choice'); }
+  if (chosen === 'Combine') { fail(); console.log('  ✗ Enter did not change the choice'); }
   await focusSane(page, 'after choosing with the keyboard');
 
   console.log('\nSTATE 6 — the error state');
@@ -227,8 +186,8 @@ async function focusSane(page, label) {
 
   const probs = problems(h);
   console.log('\nproblems:', probs.length ? probs : 'none');
-  if (probs.length) failures++;
+  if (probs.length) fail();
   await h.browser.close();
-  console.log(failures ? `\n${failures} FAILED` : '\nall states clean');
-  process.exit(failures ? 1 : 0);
+  console.log(failed() ? `\n${failed()} FAILED` : '\nall states clean');
+  process.exit(failed() ? 1 : 0);
 })();

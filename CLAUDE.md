@@ -14,10 +14,13 @@ forward into a later one. Not ES modules — `type="module"` is CORS-blocked ove
 Serve with `python -m http.server 8848` — the port `tools/e2e` expects — or open
 `index.html` directly. Syntax check: `node --check js/<file>.js`. Browser regression
 suite: `tools/e2e/` (Playwright + axe-core, already installed in `tools/node_modules`
-— never npm-install a browser harness elsewhere); `tools/e2e/lib.js` is the shared
-harness, `node tools/e2e/a11y.js` runs the save-reader a11y matrix. Synthetic save
-fixtures live in `tests/` (`tools/make-fixture.js`). Adding a JS file means adding it
-to both `index.html` and the `SHELL` array in `sw.js`, plus bumping `VERSION`.
+— never npm-install a browser harness elsewhere). `node tools/e2e/states.js` runs the
+whole-app axe/overflow/focus matrix — **run it before committing any UI change**;
+`node tools/e2e/a11y.js` runs the save reader's. The suites reach states through deep
+links and the fixed ids in `index.html`; renaming an id a suite drives means updating
+the suite in the same commit — the same contract as `index.html` + the `SHELL` array
+in `sw.js` (plus bumping `VERSION`) when adding a JS file. Synthetic save fixtures
+live in `tests/` (`tools/make-fixture.js`).
 
 ## Design workflow (this is the point — follow it)
 
