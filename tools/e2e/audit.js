@@ -1,87 +1,109 @@
-// Shared checks for the browser suites: axe, horizontal overflow, focus sanity.
-// One implementation for a11y.js (save reader) and states.js (the rest of the
-// app) — a check fixed in one must not silently stay broken in the other.
+#!/usr/bin/env node
+/* The runner and the CLI for the browser suites.
+ *
+ * Point of this file: an agent auditing a change should run one command and
+ * read one file, not author a Playwright script, debug it, and re-run it. That
+ * round trip was the slowest part of a review, and it was model time, not
+ * browser time.
+ *
+ *   node tools/e2e/audit.js --list
+ *   node tools/e2e/audit.js                                  everything
+ *   node tools/e2e/audit.js --suite states --groups roster,dex
+ *   node tools/e2e/audit.js --json .audit/run.json           artifact for both readers
+ *
+ * Needs the app served: python -m http.server 8848 from the repo root.
+ *
+ * Each group runs in its own context, seeded before the first paint, so the
+ * groups a run selects are the only ones it pays for.
+ */
 const path = require('path');
-const fs = require('fs');
-const AXE = fs.readFileSync(path.join(__dirname, '..', 'node_modules', 'axe-core', 'axe.min.js'), 'utf8');
-const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
+const {chromium} = require('../node_modules/playwright');
+const {open, problems, close, BASE} = require('./lib');
+const {makeReport} = require('./report');
 
-function makeChecks() {
-  let failures = 0;
+// Required lazily: a suite's bottom line calls back into main() so that
+// `node states.js` still works, and eager loading would be a require cycle.
+const SUITES = {states: './states', a11y: './a11y'};
 
-  async function audit(page, label) {
-    // .modal animates in from opacity:0 (@keyframes pop, since ffe460f). axe
-    // sampling mid-fade composites every label over the scrim and reports
-    // colour-contrast failures on text that passes when still — which made this
-    // suite flake 1-2 violations a run. Settle first, then measure.
-    await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
-    await page.evaluate(AXE);
-    const res = await page.evaluate(tags => axe.run(document, {runOnly: {type: 'tag', values: tags}})
-      .then(r => r.violations.map(v => ({id: v.id, impact: v.impact, n: v.nodes.length,
-        target: v.nodes[0] && v.nodes[0].target.join(' ')}))), TAGS);
-    if (res.length) { failures++; console.log(`  ✗ ${label}: ${res.length} violation(s)`); res.forEach(v => console.log(`      ${v.id} (${v.impact}) ×${v.n} — ${v.target}`)); }
-    else console.log(`  ✓ ${label}: axe clean`);
-    return res;
+function parseArgs(argv) {
+  const o = {suite: 'all', groups: null, json: null, viewport: {width: 1280, height: 900}, list: false};
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i], next = () => argv[++i];
+    if (a === '--list') o.list = true;
+    else if (a === '--suite') o.suite = next();
+    else if (a === '--groups' || a === '--group') o.groups = next().split(',').map(s => s.trim()).filter(Boolean);
+    else if (a === '--json') o.json = next();
+    else if (a === '--viewport') { const [w, h] = next().split('x').map(Number); o.viewport = {width: w, height: h}; }
+    else { console.error(`unknown argument: ${a}`); process.exit(2); }
   }
-
-  async function overflow(page, label) {
-    const bad = [];
-    for (const w of [320, 390, 768, 1280]) {
-      await page.setViewportSize({width: w, height: 900});
-      await page.waitForTimeout(220);
-      const over = await page.evaluate(() => ({
-        doc: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-        sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
-      }));
-      if (over.doc) bad.push(`${w}px (${over.sw} > ${over.cw})`);
-    }
-    await page.setViewportSize({width: 1280, height: 900});
-    await page.waitForTimeout(150);
-    if (bad.length) { failures++; console.log(`  ✗ ${label}: horizontal overflow at ${bad.join(', ')}`); }
-    else console.log(`  ✓ ${label}: no horizontal overflow at 320 / 390 / 768 / 1280`);
-  }
-
-  async function focusSane(page, label) {
-    const who = await page.evaluate(() => {
-      const a = document.activeElement;
-      return a ? (a.tagName + (a.id ? '#' + a.id : '') + (a.className ? '.' + String(a.className).split(' ')[0] : '')) : 'null';
-    });
-    const lost = who === 'BODY' || who === 'null';
-    if (lost) { failures++; console.log(`  ✗ ${label}: focus fell to ${who}`); }
-    else console.log(`  ✓ ${label}: focus on ${who}`);
-  }
-
-  // focusSane only asks whether focus EXISTS. Twice now a hand-off has put focus
-  // on a real control that an author-initiated scroll then carried off-screen and
-  // left there — focus present, indicator invisible, and the next Tab jumping the
-  // page hundreds of px. This asks whether the user can actually see it (2.4.11).
-  async function focusVisible(page, label) {
-    const m = await page.evaluate(() => {
-      const a = document.activeElement;
-      if (!a || a === document.body) return null;
-      const r = a.getBoundingClientRect();
-      const hd = document.querySelector('header');
-      // A sticky header covering the control counts as not visible — but only
-      // when it is actually in front of it. Inside an open dialog it is not:
-      // the overlay is z-index 100 to the header's 50, and clamping anyway
-      // reported "✕ focused but only 18px of 37px on screen" for every entry
-      // into the pal card.
-      // ...and nothing inside the header is obscured BY the header — the tab bar
-      // lives in it, so clamping reported every hand-off to a tab as 0px visible.
-      const exempt = a.closest('header') || [...document.querySelectorAll('.overlay.open')].some(o => o.contains(a));
-      const hb = hd && !exempt ? hd.getBoundingClientRect().bottom : 0;
-      const top = Math.max(r.top, hb);
-      return {who: a.tagName + (a.id ? '#' + a.id : '') + (a.className ? '.' + String(a.className).split(' ')[0] : ''),
-        px: Math.round(Math.max(0, Math.min(r.bottom, innerHeight) - top)), h: Math.round(r.height)};
-    });
-    if (!m) { failures++; console.log(`  ✗ ${label}: focus fell to <body>`); return; }
-    // half the control, or 24px — the §8 target-size floor
-    const need = Math.min(24, m.h / 2);
-    if (m.px < need) { failures++; console.log(`  ✗ ${label}: ${m.who} is focused but only ${m.px}px of ${m.h}px is on screen`); }
-    else console.log(`  ✓ ${label}: ${m.who} focused and visible (${m.px}px of ${m.h}px)`);
-  }
-
-  return {audit, overflow, focusSane, focusVisible, fail: () => { failures++; }, failed: () => failures};
+  return o;
 }
 
-module.exports = {makeChecks, TAGS};
+function load(names) {
+  return names.map(n => {
+    const s = require(SUITES[n]);
+    if (!s || !s.groups) { console.error(`suite "${n}" has no groups`); process.exit(2); }
+    return s;
+  });
+}
+
+async function main(argv) {
+  const o = parseArgs(argv);
+  const names = o.suite === 'all' ? Object.keys(SUITES) : o.suite.split(',').map(s => s.trim());
+  for (const n of names) if (!SUITES[n]) { console.error(`unknown suite: ${n} (have ${Object.keys(SUITES).join(', ')})`); process.exit(2); }
+  const suites = load(names);
+
+  if (o.list) {
+    for (const s of suites) console.log(`${s.name}: ${s.groups.map(g => g.name).join(', ')}`);
+    return 0;
+  }
+
+  // A selection that matches nothing is a typo, not an empty run that passes.
+  if (o.groups) {
+    const have = new Set(suites.flatMap(s => s.groups.map(g => g.name)));
+    const miss = o.groups.filter(g => !have.has(g));
+    if (miss.length) { console.error(`unknown group(s): ${miss.join(', ')}\nhave: ${[...have].join(', ')}`); process.exit(2); }
+  }
+
+  const report = makeReport();
+  report.begin();
+  report.hook();
+
+  const browser = await chromium.launch({channel: 'chrome'});
+  let ran = 0;
+  const allProblems = [];
+  for (const suite of suites) {
+    const groups = suite.groups.filter(g => !o.groups || o.groups.includes(g.name));
+    for (const g of groups) {
+      ran++;
+      report.group(`${suite.name}/${g.name}`);
+      console.log(`\n${g.title}`);
+      const h = await open({browser, storage: suite.seeds[g.seed], viewport: o.viewport});
+      suite.bind(h.page);
+      try {
+        await g.run();
+      } catch (e) {
+        suite.fail();
+        console.log(`  ✗ GROUP CRASHED — ${g.name}: ${String(e).split('\n')[0]}`);
+      }
+      const probs = problems(h);
+      if (probs.length) { suite.fail(); allProblems.push(...probs.map(p => `${g.name}: ${p}`)); console.log(`  ✗ ${g.name}: ${probs.join(' | ')}`); }
+      await close(h);
+    }
+  }
+  await browser.close();
+  report.unhook();
+
+  const failed = suites.reduce((n, s) => n + s.failed(), 0);
+  console.log('\nproblems:', allProblems.length ? allProblems : 'none');
+  if (o.json) {
+    const out = report.write(o.json, {suites: names, groups: o.groups || 'all', groupsRun: ran, base: BASE});
+    console.log(`wrote ${path.resolve(o.json)} — ${out.checks} checks, ${out.failed} failed`);
+  }
+  console.log(failed ? `\n${failed} FAILED` : '\nall states clean');
+  return failed ? 1 : 0;
+}
+
+module.exports = {main: argv => main(argv).then(c => process.exit(c), e => { console.error(e); process.exit(1); })};
+
+if (require.main === module) module.exports.main(process.argv.slice(2));

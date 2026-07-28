@@ -16,11 +16,15 @@ Serve with `python -m http.server 8848` — the port `tools/e2e` expects — or 
 suite: `tools/e2e/` (Playwright + axe-core, already installed in `tools/node_modules`
 — never npm-install a browser harness elsewhere). `node tools/e2e/states.js` runs the
 whole-app axe/overflow/focus matrix — **run it before committing any UI change**;
-`node tools/e2e/a11y.js` runs the save reader's. The suites reach states through deep
-links and the fixed ids in `index.html`; renaming an id a suite drives means updating
-the suite in the same commit — the same contract as `index.html` + the `SHELL` array
-in `sw.js` (plus bumping `VERSION`) when adding a JS file. Synthetic save fixtures
-live in `tests/` (`tools/make-fixture.js`).
+`node tools/e2e/a11y.js` runs the save reader's. Both are lists of self-contained
+state groups over one runner, `tools/e2e/audit.js`, which is also the command line:
+`--list` names the groups, `--groups a,b` runs only those, `--json <path>` writes the
+results so one run can answer several reviewers instead of each driving its own
+browser. The suites reach states through deep links and the fixed ids in
+`index.html`; renaming an id a suite drives means updating the suite in the same
+commit — the same contract as `index.html` + the `SHELL` array in `sw.js` (plus
+bumping `VERSION`) when adding a JS file. Synthetic save fixtures live in `tests/`
+(`tools/make-fixture.js`).
 
 ## Design workflow (this is the point — follow it)
 

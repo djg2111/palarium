@@ -8,8 +8,7 @@
  *   5 the ambiguous-match preview           6 the error state
  *   7 the roster after an import (level chips, in-game names, 200 tiles)
  */
-const {open, problems} = require('./lib');
-const {makeChecks} = require('./audit');
+const {makeChecks} = require('./checks');
 const path = require('path');
 const fs = require('fs');
 const TESTS = path.join(__dirname, '..', '..', 'tests');
@@ -17,16 +16,20 @@ const REAL = path.join(__dirname, '..', 'saves', 'Level.sav');
 
 const {audit, overflow, focusSane, fail, failed} = makeChecks();
 
-(async () => {
-  const h = await open();
-  const {page} = h;
-  await page.evaluate(() => localStorage.clear());
-  await page.reload({waitUntil: 'load'});
-  await page.waitForTimeout(400);
+// Rebound by the runner before each group — see the note in states.js.
+let page = null;
+
+// Every group opens on the roster with an empty store, which is where the
+// import button lives; the seeding itself is the runner's job now.
+const onRoster = async () => {
   await page.evaluate(() => location.hash = '#/roster');
   await page.waitForTimeout(300);
+};
 
-  console.log('\nSTATE 0 — the import dialog, the world list, and the backup stage');
+const GROUPS = [
+
+{name: 'import-dialog', seed: 'cold', title: 'STATE 0 — the import dialog, the world list, and the backup stage', run: async () => {
+  await onRoster();
   // A real folder on disk: Playwright can drive <input webkitdirectory> with a
   // directory path, so this is the actual mechanism rather than a stand-in.
   const fakeRoot = path.join(require('os').tmpdir(), 'palarium-a11y-saves');
@@ -60,13 +63,10 @@ const {audit, overflow, focusSane, fail, failed} = makeChecks();
   await overflow(page, 'backup confirm');
   await page.click('#smClose');
   await page.waitForTimeout(200);
-  await page.evaluate(() => localStorage.clear());
-  await page.reload({waitUntil: 'load'});
-  await page.waitForTimeout(400);
-  await page.evaluate(() => location.hash = '#/roster');
-  await page.waitForTimeout(250);
+}},
 
-  console.log('\nSTATE 1 — the picker');
+{name: 'picker', seed: 'cold', title: 'STATE 1 — the picker', run: async () => {
+  await onRoster();
   await page.click('#importBtn');
   await page.waitForSelector('#smPick:not([hidden])');
   await focusSane(page, 'opening the dialog moves focus into it');
@@ -81,7 +81,12 @@ const {audit, overflow, focusSane, fail, failed} = makeChecks();
   await audit(page, 'picker with the save-location disclosure open');
   await overflow(page, 'picker with disclosure open');
 
-  console.log('\nSTATE 2 — reading, with progress and cancel');
+}},
+
+{name: 'reading', seed: 'cold', title: 'STATE 2 — reading, with progress and cancel', run: async () => {
+  await onRoster();
+  await page.click('#importBtn');
+  await page.waitForSelector('#smPick:not([hidden])');
   // a big file so the busy state is observable
   const big = path.join(require('os').tmpdir(), 'palarium-scale-400-3000.sav');
   if (fs.existsSync(big)) {
@@ -97,7 +102,12 @@ const {audit, overflow, focusSane, fail, failed} = makeChecks();
     if (!back) fail();
   } else console.log('  (skipped — run b6-scale.js first to build the big save)');
 
-  console.log('\nSTATE 3 — the preview, nothing to decide');
+}},
+
+{name: 'preview', seed: 'cold', title: 'STATE 3 — the preview, nothing to decide', run: async () => {
+  await onRoster();
+  await page.click('#importBtn');
+  await page.waitForSelector('#smPick:not([hidden])');
   await page.setInputFiles('#saveFile', path.join(TESTS, 'fixture-before.sav'));
   await page.waitForSelector('#smResult:not([hidden])');
   await focusSane(page, 'preview moves focus into the result');
@@ -144,7 +154,10 @@ const {audit, overflow, focusSane, fail, failed} = makeChecks();
   await page.waitForTimeout(300);
   await focusSane(page, 'closing when the opener has been hidden underneath');
 
-  console.log('\nSTATE 4+5 — the preview with collisions, one of them ambiguous');
+}},
+
+{name: 'collisions', seed: 'cold', title: 'STATE 4+5 — the preview with collisions, one of them ambiguous', run: async () => {
+  await onRoster();
   await page.evaluate(() => {
     localStorage.setItem('palbreed_roster', JSON.stringify([
       {id: 'h1', k: 'SheepBall', ps: ['Musclehead'], g: 'M', nick: 'Woolly', note: 'my first pal', iv: null},
@@ -173,8 +186,10 @@ const {audit, overflow, focusSane, fail, failed} = makeChecks();
   if (chosen === 'Combine') { fail(); console.log('  ✗ Enter did not change the choice'); }
   await focusSane(page, 'after choosing with the keyboard');
 
-  console.log('\nSTATE 6 — the error state');
-  await page.click('#smClose'); await page.waitForTimeout(150);
+}},
+
+{name: 'error', seed: 'cold', title: 'STATE 6 — the error state', run: async () => {
+  await onRoster();
   await page.click('#importBtn');
   await page.setInputFiles('#saveFile', path.join(TESTS, 'fixture-notasave.sav'));
   await page.waitForSelector('#smError:not([hidden])');
@@ -183,13 +198,11 @@ const {audit, overflow, focusSane, fail, failed} = makeChecks();
   await overflow(page, 'error');
   await page.click('#smClose'); await page.waitForTimeout(200);
 
-  console.log('\nSTATE 7 — the roster after a real import');
+}},
+
+{name: 'imported-roster', seed: 'cold', title: 'STATE 7 — the roster after a real import', run: async () => {
   if (fs.existsSync(REAL)) {
-    await page.evaluate(() => localStorage.clear());
-    await page.reload({waitUntil: 'load'});
-    await page.waitForTimeout(400);
-    await page.evaluate(() => location.hash = '#/roster');
-    await page.waitForTimeout(250);
+    await onRoster();
     await page.click('#importBtn');
     await page.setInputFiles('#saveFile', REAL);
     await page.waitForSelector('#smResult:not([hidden])', {timeout: 60000});
@@ -216,11 +229,16 @@ const {audit, overflow, focusSane, fail, failed} = makeChecks();
     await audit(page, 'roster tiles with a species panel open');
     await overflow(page, 'roster tiles with a panel open');
   } else console.log('  (skipped — no real save available)');
+}},
 
-  const probs = problems(h);
-  console.log('\nproblems:', probs.length ? probs : 'none');
-  if (probs.length) fail();
-  await h.browser.close();
-  console.log(failed() ? `\n${failed()} FAILED` : '\nall states clean');
-  process.exit(failed() ? 1 : 0);
-})();
+];
+
+module.exports = {
+  name: 'a11y',
+  groups: GROUPS,
+  seeds: {cold: {}},
+  bind: p => { page = p; },
+  fail, failed,
+};
+
+if (require.main === module) require('./audit').main(['--suite', 'a11y', ...process.argv.slice(2)]);

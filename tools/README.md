@@ -380,8 +380,26 @@ node e2e/b5-b6-rest.js [Level.sav]    # benchmarks 5-6: planner, and the failure
 node e2e/b6-scale.js 400 3000         # time and peak memory on a 400 MB save
 node e2e/cancel-test.js               # cancelling a big read must not clobber the next one
 node e2e/b7-folder.js [SaveGames dir] # the folder picker and the world list
-node e2e/a11y.js                      # axe, keyboard and overflow across nine states
+node e2e/states.js                    # axe/overflow/focus across the whole app
+node e2e/a11y.js                      # the same, for the save reader's states
 ```
+
+`states.js` and `a11y.js` are lists of state groups; `e2e/audit.js` is the runner
+and the command line over both. A group is self-contained — its own browser
+context, seeded before the first paint — so a run can take just the ones a change
+could have touched instead of replaying the app to reach them:
+
+```bash
+node e2e/audit.js --list                          # the group names
+node e2e/audit.js                                 # both suites, every group
+node e2e/audit.js --suite states --groups roster,dex
+node e2e/audit.js --json .audit/run.json          # machine-readable results
+```
+
+`--json` is the point of the split: one run answers both the a11y gate and the
+design review, which used to boot Playwright separately and drive the same states
+twice. Every check lands in `results[]` as `{group, ok, message}`, with the axe
+rule ids, the overflowing widths or the measured focus rect attached.
 
 `sav-check.js` is the one to run after touching the reader. It diffs our
 decompression against `oodle-ref` — a different implementation, in a different

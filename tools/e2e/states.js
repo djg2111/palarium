@@ -12,11 +12,21 @@
  * FAILURE, not a skip: rename it here in the same commit, the same contract
  * as index.html + the sw.js SHELL array.
  *
- *   node tools/e2e/states.js          (needs python -m http.server 8848)
+ * The states are grouped, and a group is self-contained: it runs in its own
+ * browser context, seeded before the first paint, so it can be run on its own
+ * without replaying the file to get there. Nothing here drives the browser
+ * itself — audit.js is the runner and the CLI.
+ *
+ *   node tools/e2e/states.js                  (needs python -m http.server 8848)
+ *   node tools/e2e/audit.js --groups roster,dex --json out.json
  */
-const {open, problems} = require('./lib');
-const {makeChecks} = require('./audit');
+const {makeChecks} = require('./checks');
 const {audit, overflow, focusSane, focusVisible, fail, failed} = makeChecks();
+
+// The page the running group is driving. Module-level so that a group body
+// reads exactly as it did when this file was one long script; the runner
+// rebinds it to a fresh, separately seeded context before each group.
+let page = null;
 
 // A state we can't reach is a broken contract, not a skipped test.
 async function reach(page, action, what) {
@@ -46,14 +56,19 @@ const ROSTER = [
 const OWNED = ['SheepBall', 'ElecCat', 'PinkCat', 'Anubis'];
 const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'map', 'guide'];
 
-(async () => {
-  const h = await open();
-  const {page} = h;
+// Every group runs in its own context, seeded before the first paint: 'cold' is
+// an empty localStorage, 'lived-in' the roster above. Independence is the
+// point — a scoped run has to be able to start at any one of these rather than
+// replay the whole file to reach the state it wants.
+const LIVED_IN = {
+  palbreed_roster: JSON.stringify(ROSTER),
+  palbreed_owned: JSON.stringify(OWNED),
+  palbreed_tipseen: '1',
+};
 
-  console.log('\nCOLD START — every tab, empty states, first-visit tip bar');
-  await page.evaluate(() => localStorage.clear());
-  await page.reload({waitUntil: 'load'});
-  await page.waitForTimeout(500);
+const GROUPS = [
+
+{name: 'cold', seed: 'cold', title: 'COLD START — every tab, empty states, first-visit tip bar', run: async () => {
   for (const t of TABS) {
     await nav(page, '#/' + t, t === 'map' ? 1200 : 350);
     await audit(page, `cold ${t}`);
@@ -113,17 +128,9 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     }
   }
 
-  console.log('\nLIVED-IN — seeding a roster and reloading');
-  await page.evaluate(([roster, owned]) => {
-    localStorage.clear();
-    localStorage.setItem('palbreed_roster', JSON.stringify(roster));
-    localStorage.setItem('palbreed_owned', JSON.stringify(owned));
-    localStorage.setItem('palbreed_tipseen', '1');
-  }, [ROSTER, OWNED]);
-  await page.reload({waitUntil: 'load'});
-  await page.waitForTimeout(500);
+}},
 
-  console.log('\nBREED — result, gender-dependent result, open picker');
+{name: 'breed', seed: 'lived-in', title: 'BREED — result, gender-dependent result, open picker', run: async () => {
   await nav(page, '#/breed/SheepBall/ElecCat');
   await audit(page, 'breed with a result');
   await overflow(page, 'breed with a result');
@@ -182,8 +189,10 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     } else { console.log(`  ✗ Tab from the picker does not reach a clear: ${JSON.stringify(onClear)}`); fail(); }
   }
 
-  // the chain card is a Breed state reachable only through the Planner
-  console.log('\nBREED CHAIN — arriving from the Planner, and stepping');
+}},
+
+// the chain card is a Breed state reachable only through the Planner
+{name: 'chain', seed: 'lived-in', title: 'BREED CHAIN — arriving from the Planner, and stepping', run: async () => {
   await nav(page, '#/plan/SheepBall+ElecCat/Anubis', 900);
   if (await reach(page, async () => {
     await page.click('#view-plan .stepopen');
@@ -201,7 +210,9 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     else { console.log('  ✗ the status sentence lost its step prefix: ' + JSON.stringify(said)); fail(); }
   }
 
-  console.log('\nPAL MODAL — stepping, the Tab trap, the star');
+}},
+
+{name: 'modal', seed: 'lived-in', title: 'PAL MODAL — stepping, the Tab trap, the star', run: async () => {
   await nav(page, '#/pal/Anubis', 500);
   if (await reach(page, () => page.waitForSelector('#overlay.open', {timeout: 3000}), 'the pal modal')) {
     await audit(page, 'pal modal open');
@@ -307,9 +318,11 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await focusVisible(page, `a deep-linked card closed by ${how}`);
   }
 
-  // The card carries the roster row's own actions. They run with the card
-  // closing under them, so renderRoster's focus restore has nothing to read.
-  console.log('\nPAL CARD ACTIONS — the four roster actions land somewhere real');
+}},
+
+// The card carries the roster row's own actions. They run with the card
+// closing under them, so renderRoster's focus restore has nothing to read.
+{name: 'card-actions', seed: 'lived-in', title: 'PAL CARD ACTIONS — the four roster actions land somewhere real', run: async () => {
   for (const act of ['✎ Edit', '⧉ Duplicate', 'Use as planner start', '✕ Remove']) {
     // ✎ leaves the editor open over the list
     await page.keyboard.press('Escape');
@@ -334,7 +347,9 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await page.waitForTimeout(400);
   }
 
-  console.log('\nFIND PARENTS — target set, owned-only toggle');
+}},
+
+{name: 'reverse', seed: 'lived-in', title: 'FIND PARENTS — target set, owned-only toggle', run: async () => {
   await nav(page, '#/reverse/Anubis', 500);
   await audit(page, 'find parents with a target');
   await overflow(page, 'find parents with a target');
@@ -345,7 +360,9 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await page.waitForTimeout(200);
   }
 
-  console.log('\nROSTER — tiles, open species panel, rows, editor, validation error');
+}},
+
+{name: 'roster', seed: 'lived-in', title: 'ROSTER — tiles, open species panel, rows, editor, validation error', run: async () => {
   await nav(page, '#/roster', 500);
   await audit(page, 'roster tiles (with the all-male gender chip)');
   await overflow(page, 'roster tiles');
@@ -435,7 +452,11 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await focusSane(page, 'leaving selection mode returns focus');
   }
 
-  console.log('\nPLANNER — computed route, odds explanation, saved plan with tree');
+}},
+
+// The passive-cap block below depends on this one having saved a plan, so the
+// two stay one group.
+{name: 'planner', seed: 'lived-in', title: 'PLANNER — computed route, odds explanation, saved plan with tree', run: async () => {
   await nav(page, '#/plan/SheepBall+ElecCat/Anubis', 900);
   await audit(page, 'planner with a computed route');
   await overflow(page, 'planner with a computed route');
@@ -605,7 +626,9 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     if (/Legend/.test(at4.status)) { console.log('  ✗ the status names a passive the route does not carry'); fail(); }
   }
 
-  console.log('\nBREEDABLE NOW — results, expanded pairs');
+}},
+
+{name: 'hatch', seed: 'lived-in', title: 'BREEDABLE NOW — results, expanded pairs', run: async () => {
   await nav(page, '#/hatch', 600);
   await audit(page, 'breedable now with results');
   // §4: a grid board is ONE tab stop with a roving tabindex. The full contract
@@ -678,6 +701,13 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
   }
   // "Plan this route" crosses tabs, then the route it renders 600ms later scrolls
   // itself into view — the hand-off has to survive that scroll (WCAG 2.4.11)
+  //
+  // It is also the destructive press: it replaces four start slots, their
+  // passives and genders, the target and both modes, so it owes an Undo — but
+  // only when there was work to lose (hadWork, js/hatch.js). Give it some.
+  // Until the states were grouped this passed on a leftover route from the
+  // PLANNER block, which is to say it was not really testing the overwrite.
+  await nav(page, '#/plan/SheepBall+ElecCat/Anubis', 900);
   await nav(page, '#/hatch', 600);
   await page.evaluate(() => setHatchDepth(0));
   await page.waitForTimeout(900);
@@ -704,7 +734,9 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     else { console.log('  ✗ the planner overwrite offers no Undo'); fail(); }
   }
 
-  console.log('\nPALDEX — gallery with owned tiles, table, unique combos');
+}},
+
+{name: 'dex', seed: 'lived-in', title: 'PALDEX — gallery with owned tiles, table, unique combos', run: async () => {
   await nav(page, '#/dex', 600);
   await audit(page, 'paldex gallery, lived-in');
   await overflow(page, 'paldex gallery');
@@ -816,7 +848,9 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await page.waitForTimeout(300);
   }
 
-  console.log('\nGUIDE — its jumps out, and its jump within');
+}},
+
+{name: 'guide', seed: 'lived-in', title: 'GUIDE — its jumps out, and its jump within', run: async () => {
   await nav(page, '#/guide', 500);
   await audit(page, 'guide');
   await overflow(page, 'guide');
@@ -848,7 +882,9 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
   await audit(page, 'guide, every section open');
   await overflow(page, 'guide, every section open');
 
-  console.log('SKILLS — all three sections');
+}},
+
+{name: 'skills', seed: 'lived-in', title: 'SKILLS — all three sections', run: async () => {
   for (const m of ['auras', 'partner', 'passives']) {
     await nav(page, '#/skills/' + m, 500);
     await audit(page, `skills · ${m}`);
@@ -926,7 +962,9 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await page.waitForTimeout(400);
   }
 
-  console.log('\nMAP — base, marker selected, spawn overlay');
+}},
+
+{name: 'map', seed: 'lived-in', title: 'MAP — base, marker selected, spawn overlay', run: async () => {
   await nav(page, '#/map', 1200);
   await audit(page, 'map');
   await overflow(page, 'map');
@@ -1029,7 +1067,9 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await page.waitForTimeout(300);
   }
 
-  console.log('\nTOAST — a bad deep link says so, and the widest toast at 320');
+}},
+
+{name: 'toast', seed: 'lived-in', title: 'TOAST — a bad deep link says so, and the widest toast at 320', run: async () => {
   await nav(page, '#/pal/Xyzzy', 400);
   if (await reach(page, () => page.waitForSelector('#toasts .toast', {timeout: 3000}), 'the bad-link toast')) {
     await audit(page, 'toast visible');
@@ -1059,7 +1099,9 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
   await page.setViewportSize({width: 1280, height: 900});
   await page.waitForTimeout(150);
 
-  console.log('\nMOBILE (360px) — tab bar, more sheet, icon-grid picker');
+}},
+
+{name: 'mobile', seed: 'lived-in', title: 'MOBILE (360px) — tab bar, more sheet, icon-grid picker', run: async () => {
   await page.setViewportSize({width: 360, height: 740});
   await nav(page, '#/breed/SheepBall/ElecCat', 500);
   await audit(page, 'breed at 360');
@@ -1142,10 +1184,16 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await audit(page, 'roster after undo at 360');
   }
 
-  const probs = problems(h);
-  console.log('\nproblems:', probs.length ? probs : 'none');
-  if (probs.length) fail();
-  await h.browser.close();
-  console.log(failed() ? `\n${failed()} FAILED` : '\nall states clean');
-  process.exit(failed() ? 1 : 0);
-})();
+}},
+
+];
+
+module.exports = {
+  name: 'states',
+  groups: GROUPS,
+  seeds: {cold: {}, 'lived-in': LIVED_IN},
+  bind: p => { page = p; },
+  fail, failed,
+};
+
+if (require.main === module) require('./audit').main(['--suite', 'states', ...process.argv.slice(2)]);
