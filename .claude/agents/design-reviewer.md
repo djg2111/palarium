@@ -18,15 +18,27 @@ defect — cite which.
 
 1. `git diff` / `git log` to scope what changed; read the touched code.
 2. Serve the app (`python -m http.server 8848` from the repo root — if the port is
-   already bound, a parallel agent started it; reuse it, don't kill it) and exercise
-   the changed surface with the in-repo harness `tools/e2e/lib.js` (Playwright +
-   axe-core, already installed in `tools/node_modules` — never npm-install anything).
-   Your scratch scripts `require()` the harness by absolute path; `open({viewport,
-   hash})` captures console errors and 404s and clears the service worker. Recipes
-   in DESIGN.md §10.
-3. Test BOTH cold start (`localStorage.clear()`) and a lived-in state (seed
-   `palbreed_owned`/`palbreed_roster`/`palbreed_plans` — see DESIGN.md §10), at 360
-   and 1366px minimum; 320/390/768 when layout is affected (canonical list: §10).
+   already bound, a parallel agent started it; reuse it, don't kill it), then run
+   the harness rather than writing one:
+
+   ```bash
+   node tools/e2e/audit.js --changed --json .audit/run.json
+   ```
+
+   This is the same command a11y-auditor runs. **If `.audit/run.json` already
+   exists and its `commit` + `dirty` fields match the tree you are reviewing,
+   read it instead of running again** — one browser run, two readers. It covers
+   axe, horizontal overflow at 320/390/768/1280, and focus hand-offs across
+   every state, both cold and lived-in (the group seeds do that for you). Start
+   from its `results[]`: anything already red there is established, and you can
+   spend your own browser time on what it cannot see.
+3. What the artifact does **not** cover is your actual job — hierarchy, token
+   discipline, copy, density, visual regressions. For those, drive the app
+   yourself with `tools/e2e/lib.js` (Playwright, installed in
+   `tools/node_modules` — never npm-install anything): `open({viewport, hash,
+   storage})` seeds localStorage before first paint, captures console errors and
+   404s, and blocks the service worker. Recipes in DESIGN.md §10. Check 360 and
+   1366px minimum; 320/390/768 when layout is affected (canonical list: §10).
 4. Measure, don't eyeball: `getBoundingClientRect` for sizes/overflow (no horizontal
    page scroll ≤640px; targets ≥24px, 44px for primary mobile actions),
    `getComputedStyle` for token compliance, computed ratios for any new color pairing.

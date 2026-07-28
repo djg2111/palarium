@@ -16,20 +16,17 @@ const REAL = path.join(__dirname, '..', 'saves', 'Level.sav');
 
 const {audit, overflow, focusSane, fail, failed} = makeChecks();
 
-// Rebound by the runner before each group — see the note in states.js.
-let page = null;
-
 // Every group opens on the roster with an empty store, which is where the
 // import button lives; the seeding itself is the runner's job now.
-const onRoster = async () => {
+const onRoster = async page => {
   await page.evaluate(() => location.hash = '#/roster');
   await page.waitForTimeout(300);
 };
 
 const GROUPS = [
 
-{name: 'import-dialog', seed: 'cold', title: 'STATE 0 — the import dialog, the world list, and the backup stage', run: async () => {
-  await onRoster();
+{name: 'import-dialog', seed: 'cold', title: 'STATE 0 — the import dialog, the world list, and the backup stage', run: async (page) => {
+  await onRoster(page);
   // A real folder on disk: Playwright can drive <input webkitdirectory> with a
   // directory path, so this is the actual mechanism rather than a stand-in.
   const fakeRoot = path.join(require('os').tmpdir(), 'palarium-a11y-saves');
@@ -65,8 +62,8 @@ const GROUPS = [
   await page.waitForTimeout(200);
 }},
 
-{name: 'picker', seed: 'cold', title: 'STATE 1 — the picker', run: async () => {
-  await onRoster();
+{name: 'picker', seed: 'cold', title: 'STATE 1 — the picker', run: async (page) => {
+  await onRoster(page);
   await page.click('#importBtn');
   await page.waitForSelector('#smPick:not([hidden])');
   await focusSane(page, 'opening the dialog moves focus into it');
@@ -83,8 +80,8 @@ const GROUPS = [
 
 }},
 
-{name: 'reading', seed: 'cold', title: 'STATE 2 — reading, with progress and cancel', run: async () => {
-  await onRoster();
+{name: 'reading', seed: 'cold', title: 'STATE 2 — reading, with progress and cancel', run: async (page) => {
+  await onRoster(page);
   await page.click('#importBtn');
   await page.waitForSelector('#smPick:not([hidden])');
   // a big file so the busy state is observable
@@ -104,8 +101,8 @@ const GROUPS = [
 
 }},
 
-{name: 'preview', seed: 'cold', title: 'STATE 3 — the preview, nothing to decide', run: async () => {
-  await onRoster();
+{name: 'preview', seed: 'cold', title: 'STATE 3 — the preview, nothing to decide', run: async (page) => {
+  await onRoster(page);
   await page.click('#importBtn');
   await page.waitForSelector('#smPick:not([hidden])');
   await page.setInputFiles('#saveFile', path.join(TESTS, 'fixture-before.sav'));
@@ -156,8 +153,8 @@ const GROUPS = [
 
 }},
 
-{name: 'collisions', seed: 'cold', title: 'STATE 4+5 — the preview with collisions, one of them ambiguous', run: async () => {
-  await onRoster();
+{name: 'collisions', seed: 'cold', title: 'STATE 4+5 — the preview with collisions, one of them ambiguous', run: async (page) => {
+  await onRoster(page);
   await page.evaluate(() => {
     localStorage.setItem('palbreed_roster', JSON.stringify([
       {id: 'h1', k: 'SheepBall', ps: ['Musclehead'], g: 'M', nick: 'Woolly', note: 'my first pal', iv: null},
@@ -188,8 +185,8 @@ const GROUPS = [
 
 }},
 
-{name: 'error', seed: 'cold', title: 'STATE 6 — the error state', run: async () => {
-  await onRoster();
+{name: 'error', seed: 'cold', title: 'STATE 6 — the error state', run: async (page) => {
+  await onRoster(page);
   await page.click('#importBtn');
   await page.setInputFiles('#saveFile', path.join(TESTS, 'fixture-notasave.sav'));
   await page.waitForSelector('#smError:not([hidden])');
@@ -200,9 +197,9 @@ const GROUPS = [
 
 }},
 
-{name: 'imported-roster', seed: 'cold', title: 'STATE 7 — the roster after a real import', run: async () => {
+{name: 'imported-roster', seed: 'cold', title: 'STATE 7 — the roster after a real import', run: async (page) => {
   if (fs.existsSync(REAL)) {
-    await onRoster();
+    await onRoster(page);
     await page.click('#importBtn');
     await page.setInputFiles('#saveFile', REAL);
     await page.waitForSelector('#smResult:not([hidden])', {timeout: 60000});
@@ -237,7 +234,6 @@ module.exports = {
   name: 'a11y',
   groups: GROUPS,
   seeds: {cold: {}},
-  bind: p => { page = p; },
   fail, failed,
 };
 

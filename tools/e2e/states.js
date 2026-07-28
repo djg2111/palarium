@@ -23,11 +23,6 @@
 const {makeChecks} = require('./checks');
 const {audit, overflow, focusSane, focusVisible, fail, failed} = makeChecks();
 
-// The page the running group is driving. Module-level so that a group body
-// reads exactly as it did when this file was one long script; the runner
-// rebinds it to a fresh, separately seeded context before each group.
-let page = null;
-
 // A state we can't reach is a broken contract, not a skipped test.
 async function reach(page, action, what) {
   try { await action(); return true; }
@@ -68,7 +63,7 @@ const LIVED_IN = {
 
 const GROUPS = [
 
-{name: 'cold', seed: 'cold', title: 'COLD START — every tab, empty states, first-visit tip bar', run: async () => {
+{name: 'cold', seed: 'cold', title: 'COLD START — every tab, empty states, first-visit tip bar', run: async (page) => {
   for (const t of TABS) {
     await nav(page, '#/' + t, t === 'map' ? 1200 : 350);
     await audit(page, `cold ${t}`);
@@ -130,7 +125,7 @@ const GROUPS = [
 
 }},
 
-{name: 'breed', seed: 'lived-in', title: 'BREED — result, gender-dependent result, open picker', run: async () => {
+{name: 'breed', seed: 'lived-in', title: 'BREED — result, gender-dependent result, open picker', run: async (page) => {
   await nav(page, '#/breed/SheepBall/ElecCat');
   await audit(page, 'breed with a result');
   await overflow(page, 'breed with a result');
@@ -192,7 +187,7 @@ const GROUPS = [
 }},
 
 // the chain card is a Breed state reachable only through the Planner
-{name: 'chain', seed: 'lived-in', title: 'BREED CHAIN — arriving from the Planner, and stepping', run: async () => {
+{name: 'chain', seed: 'lived-in', title: 'BREED CHAIN — arriving from the Planner, and stepping', run: async (page) => {
   await nav(page, '#/plan/SheepBall+ElecCat/Anubis', 900);
   if (await reach(page, async () => {
     await page.click('#view-plan .stepopen');
@@ -212,7 +207,7 @@ const GROUPS = [
 
 }},
 
-{name: 'modal', seed: 'lived-in', title: 'PAL MODAL — stepping, the Tab trap, the star', run: async () => {
+{name: 'modal', seed: 'lived-in', title: 'PAL MODAL — stepping, the Tab trap, the star', run: async (page) => {
   await nav(page, '#/pal/Anubis', 500);
   if (await reach(page, () => page.waitForSelector('#overlay.open', {timeout: 3000}), 'the pal modal')) {
     await audit(page, 'pal modal open');
@@ -322,7 +317,7 @@ const GROUPS = [
 
 // The card carries the roster row's own actions. They run with the card
 // closing under them, so renderRoster's focus restore has nothing to read.
-{name: 'card-actions', seed: 'lived-in', title: 'PAL CARD ACTIONS — the four roster actions land somewhere real', run: async () => {
+{name: 'card-actions', seed: 'lived-in', title: 'PAL CARD ACTIONS — the four roster actions land somewhere real', run: async (page) => {
   for (const act of ['✎ Edit', '⧉ Duplicate', 'Use as planner start', '✕ Remove']) {
     // ✎ leaves the editor open over the list
     await page.keyboard.press('Escape');
@@ -349,7 +344,7 @@ const GROUPS = [
 
 }},
 
-{name: 'reverse', seed: 'lived-in', title: 'FIND PARENTS — target set, owned-only toggle', run: async () => {
+{name: 'reverse', seed: 'lived-in', title: 'FIND PARENTS — target set, owned-only toggle', run: async (page) => {
   await nav(page, '#/reverse/Anubis', 500);
   await audit(page, 'find parents with a target');
   await overflow(page, 'find parents with a target');
@@ -362,7 +357,7 @@ const GROUPS = [
 
 }},
 
-{name: 'roster', seed: 'lived-in', title: 'ROSTER — tiles, open species panel, rows, editor, validation error', run: async () => {
+{name: 'roster', seed: 'lived-in', title: 'ROSTER — tiles, open species panel, rows, editor, validation error', run: async (page) => {
   await nav(page, '#/roster', 500);
   await audit(page, 'roster tiles (with the all-male gender chip)');
   await overflow(page, 'roster tiles');
@@ -456,7 +451,7 @@ const GROUPS = [
 
 // The passive-cap block below depends on this one having saved a plan, so the
 // two stay one group.
-{name: 'planner', seed: 'lived-in', title: 'PLANNER — computed route, odds explanation, saved plan with tree', run: async () => {
+{name: 'planner', seed: 'lived-in', title: 'PLANNER — computed route, odds explanation, saved plan with tree', run: async (page) => {
   await nav(page, '#/plan/SheepBall+ElecCat/Anubis', 900);
   await audit(page, 'planner with a computed route');
   await overflow(page, 'planner with a computed route');
@@ -628,7 +623,7 @@ const GROUPS = [
 
 }},
 
-{name: 'hatch', seed: 'lived-in', title: 'BREEDABLE NOW — results, expanded pairs', run: async () => {
+{name: 'hatch', seed: 'lived-in', title: 'BREEDABLE NOW — results, expanded pairs', run: async (page) => {
   await nav(page, '#/hatch', 600);
   await audit(page, 'breedable now with results');
   // §4: a grid board is ONE tab stop with a roving tabindex. The full contract
@@ -736,7 +731,7 @@ const GROUPS = [
 
 }},
 
-{name: 'dex', seed: 'lived-in', title: 'PALDEX — gallery with owned tiles, table, unique combos', run: async () => {
+{name: 'dex', seed: 'lived-in', title: 'PALDEX — gallery with owned tiles, table, unique combos', run: async (page) => {
   await nav(page, '#/dex', 600);
   await audit(page, 'paldex gallery, lived-in');
   await overflow(page, 'paldex gallery');
@@ -850,7 +845,7 @@ const GROUPS = [
 
 }},
 
-{name: 'guide', seed: 'lived-in', title: 'GUIDE — its jumps out, and its jump within', run: async () => {
+{name: 'guide', seed: 'lived-in', title: 'GUIDE — its jumps out, and its jump within', run: async (page) => {
   await nav(page, '#/guide', 500);
   await audit(page, 'guide');
   await overflow(page, 'guide');
@@ -884,7 +879,7 @@ const GROUPS = [
 
 }},
 
-{name: 'skills', seed: 'lived-in', title: 'SKILLS — all three sections', run: async () => {
+{name: 'skills', seed: 'lived-in', title: 'SKILLS — all three sections', run: async (page) => {
   for (const m of ['auras', 'partner', 'passives']) {
     await nav(page, '#/skills/' + m, 500);
     await audit(page, `skills · ${m}`);
@@ -964,7 +959,7 @@ const GROUPS = [
 
 }},
 
-{name: 'map', seed: 'lived-in', title: 'MAP — base, marker selected, spawn overlay', run: async () => {
+{name: 'map', seed: 'lived-in', title: 'MAP — base, marker selected, spawn overlay', run: async (page) => {
   await nav(page, '#/map', 1200);
   await audit(page, 'map');
   await overflow(page, 'map');
@@ -1069,7 +1064,7 @@ const GROUPS = [
 
 }},
 
-{name: 'toast', seed: 'lived-in', title: 'TOAST — a bad deep link says so, and the widest toast at 320', run: async () => {
+{name: 'toast', seed: 'lived-in', title: 'TOAST — a bad deep link says so, and the widest toast at 320', run: async (page) => {
   await nav(page, '#/pal/Xyzzy', 400);
   if (await reach(page, () => page.waitForSelector('#toasts .toast', {timeout: 3000}), 'the bad-link toast')) {
     await audit(page, 'toast visible');
@@ -1101,7 +1096,7 @@ const GROUPS = [
 
 }},
 
-{name: 'mobile', seed: 'lived-in', title: 'MOBILE (360px) — tab bar, more sheet, icon-grid picker', run: async () => {
+{name: 'mobile', seed: 'lived-in', title: 'MOBILE (360px) — tab bar, more sheet, icon-grid picker', run: async (page) => {
   await page.setViewportSize({width: 360, height: 740});
   await nav(page, '#/breed/SheepBall/ElecCat', 500);
   await audit(page, 'breed at 360');
@@ -1192,7 +1187,6 @@ module.exports = {
   name: 'states',
   groups: GROUPS,
   seeds: {cold: {}, 'lived-in': LIVED_IN},
-  bind: p => { page = p; },
   fail, failed,
 };
 

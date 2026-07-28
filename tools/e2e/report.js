@@ -11,45 +11,69 @@
 // disagree with what the console said.
 const fs = require('fs');
 const path = require('path');
+const {AsyncLocalStorage} = require('async_hooks');
 const checks = require('./checks');
 
 function makeReport() {
   const records = [];
-  const sink = {pending: null};
-  checks.setSink(sink);
-  let group = null, orig = null, started = 0;
+  // Groups run concurrently, so a global "current group" would attribute half
+  // the lines to whichever group happened to be awaiting. The async context is
+  // the only thing that knows which group a console.log came from.
+  const als = new AsyncLocalStorage();
+  let orig = null, started = 0;
 
-  function parse(line) {
+  function parse(line, store) {
     const m = /^ {2}(✓|✗) ([\s\S]*)$/.exec(line);
     if (!m) return;
-    const rec = {group, ok: m[1] === '✓', message: m[2]};
+    const rec = {group: store.group, ok: m[1] === '✓', message: m[2]};
     if (/^UNREACHABLE — /.test(rec.message)) rec.kind = 'unreachable';
-    if (sink.pending) Object.assign(rec, sink.pending);
-    sink.pending = null;
+    if (store.pending) Object.assign(rec, store.pending);
+    store.pending = null;
     records.push(rec);
   }
+
+  const out = (...a) => (orig || console.log)(...a);
 
   return {
     hook() {
       if (orig) return;
       orig = console.log;
-      console.log = (...a) => { try { parse(a.map(String).join(' ')); } catch (e) {} orig(...a); };
+      checks.setSink(() => als.getStore());
+      console.log = (...a) => {
+        const store = als.getStore();
+        if (!store) return orig(...a);           // the runner's own output
+        const line = a.map(String).join(' ');
+        try { parse(line, store); } catch (e) {}
+        store.lines.push(line);                  // held until the group finishes
+      };
     },
-    unhook() { if (orig) { console.log = orig; orig = null; } },
-    group(name) { group = name; },
+    unhook() { if (orig) { console.log = orig; orig = null; } checks.setSink(null); },
+
+    // Run one group in its own async context, buffering its output so that
+    // concurrent groups print as whole blocks instead of interleaving line by
+    // line into something no one can read.
+    async run(group, title, fn) {
+      const store = {group, pending: null, lines: []};
+      try {
+        return await als.run(store, fn);
+      } finally {
+        out(title);
+        for (const l of store.lines) out(l);
+      }
+    },
+
     begin() { started = Date.now(); },
     records: () => records,
     summary() {
-      const failed = records.filter(r => !r.ok);
       const groups = {};
       for (const r of records) {
         const g = groups[r.group] = groups[r.group] || {checks: 0, failed: 0};
         g.checks++; if (!r.ok) g.failed++;
       }
-      return {checks: records.length, failed: failed.length, groups};
+      return {checks: records.length, failed: records.filter(r => !r.ok).length, groups};
     },
     write(file, meta) {
-      const out = {
+      const doc = {
         tool: 'palarium-audit', version: 1,
         ...meta,
         elapsedMs: started ? Date.now() - started : null,
@@ -57,8 +81,8 @@ function makeReport() {
         results: records,
       };
       fs.mkdirSync(path.dirname(path.resolve(file)), {recursive: true});
-      fs.writeFileSync(file, JSON.stringify(out, null, 2));
-      return out;
+      fs.writeFileSync(file, JSON.stringify(doc, null, 2));
+      return doc;
     },
   };
 }

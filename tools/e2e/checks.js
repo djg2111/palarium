@@ -14,9 +14,12 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 // 1300 lines of hand-written assertions each learn to report themselves twice.
 // The one thing a line cannot carry is the axe detail, so it is handed over out
 // of band: whatever is parked here belongs to the next line printed.
-let sink = null;
-const setSink = s => { sink = s; };
-const park = d => { if (sink) sink.pending = d; };
+//
+// setSink takes a function, not an object, because groups run concurrently:
+// "the current group" is a question only the caller's async context can answer.
+let store = null;
+const setSink = fn => { store = fn; };
+const park = d => { const s = store && store(); if (s) s.pending = d; };
 
 function makeChecks() {
   let failures = 0;

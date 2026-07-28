@@ -11,23 +11,36 @@ Your verdict blocks or clears a commit — be rigorous and honest.
 
 ## Procedure
 
-1. Scope the change with `git diff`; audit at minimum every changed surface, at best
-   the standard state matrix.
+1. Scope the change with `git diff`.
 2. Serve with `python -m http.server 8848` from the repo root (if the port is
-   already bound, a parallel agent started it; reuse it, don't kill it). Drive the
-   in-repo harness `tools/e2e/lib.js` (Playwright + axe-core, already installed in
-   `tools/node_modules` — never npm-install anything). Your scratch scripts
-   `require()` the harness by absolute path; `open({viewport, hash})` captures
-   console errors and 404s and clears the service worker. Settle animations before
-   `axe.run` (see the note in `tools/e2e/a11y.js`) or contrast checks flake mid-fade.
-3. **axe pass**: the standard matrix is already scripted — run `node
-   tools/e2e/states.js` (whole app: every tab cold and lived-in, breed results,
-   picker, pal modal, roster editor + validation error, planner route/odds/saved
-   plan tree, map marker + spawn overlay, mobile pass) and `node tools/e2e/a11y.js`
-   (the save reader's eight states) instead of re-scripting any of it. Script only
-   states the change adds that neither suite reaches, using lib.js + audit.js from
-   a scratch dir. If the change renamed a control a suite drives, the suite fails
-   as UNREACHABLE — updating it is part of the change, same contract as the sw.js
+   already bound, a parallel agent started it; reuse it, don't kill it).
+3. **axe pass — run the harness, don't write one.** Everything below is already
+   scripted; `tools/e2e/audit.js` is the runner and the CLI (Playwright +
+   axe-core, installed in `tools/node_modules` — never npm-install anything):
+
+   ```bash
+   node tools/e2e/audit.js --changed --json .audit/run.json
+   ```
+
+   `--changed` maps the diff to the groups it could have broken and runs only
+   those; a shared or unrecognised file runs everything, so it never quietly
+   under-tests. Drop `--changed` to force the full matrix. `--list` names the
+   groups, `--groups a,b` picks them by hand.
+
+   **Check for an existing artifact first.** design-reviewer runs the same
+   command. If `.audit/run.json` exists and its `commit` + `dirty` fields match
+   the tree you are auditing, read it instead of running again — one browser
+   run, two readers. Otherwise run it yourself and leave the artifact for them.
+
+   Read the results out of the JSON: every check is a `{group, ok, message}` in
+   `results[]`, with axe rule ids under `violations`, overflowing widths under
+   `bad`, and measured focus rects on the focus checks. `failed` and `groups`
+   give you the rollup.
+
+   Script something yourself **only** for a state neither suite reaches — and
+   then the right fix is usually to add a group to `states.js`, not a scratch
+   file. If the change renamed a control a suite drives, the group fails as
+   UNREACHABLE — updating it is part of the change, same contract as the sw.js
    SHELL array.
 4. **WCAG 2.2 AA manual checks** on changed surfaces:
    - 2.5.8 Target size: every new/changed target ≥24×24 CSS px (measure rects;

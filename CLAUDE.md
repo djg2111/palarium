@@ -18,9 +18,12 @@ suite: `tools/e2e/` (Playwright + axe-core, already installed in `tools/node_mod
 whole-app axe/overflow/focus matrix — **run it before committing any UI change**;
 `node tools/e2e/a11y.js` runs the save reader's. Both are lists of self-contained
 state groups over one runner, `tools/e2e/audit.js`, which is also the command line:
-`--list` names the groups, `--groups a,b` runs only those, `--json <path>` writes the
-results so one run can answer several reviewers instead of each driving its own
-browser. The suites reach states through deep links and the fixed ids in
+`--list` names the groups, `--changed` runs only the groups the current diff can
+have broken (mapping in `tools/e2e/scope.js`; a shared or unmapped file runs
+everything), `--groups a,b` picks by hand, `--json <path>` writes the results so one
+run can answer several reviewers instead of each driving its own browser. Groups run
+six at a time; both suites take ~50s. Adding a view means adding a group to the suite
+**and** a line to `scope.js`. The suites reach states through deep links and the fixed ids in
 `index.html`; renaming an id a suite drives means updating the suite in the same
 commit — the same contract as `index.html` + the `SHELL` array in `sw.js` (plus
 bumping `VERSION`) when adding a JS file. Synthetic save fixtures live in `tests/`
@@ -37,9 +40,19 @@ WCAG commitments). For any user-facing change:
    copy lexicon (§6), icon policy (§7 — game assets first, Lucide SVG for generic
    UI, no new emoji). No new one-off styles without documenting them in DESIGN.md in
    the same change.
-3. **Before committing UI changes** → run **design-reviewer** and **a11y-auditor**
-   (they can run in parallel). Fix P0/P1 findings and any a11y FAIL before commit;
-   note deliberately skipped P2/P3 in the commit message.
+3. **Before committing UI changes** → run the audit once, from here, then hand both
+   reviewers the artifact:
+
+   ```bash
+   node tools/e2e/audit.js --changed --json .audit/run.json
+   ```
+
+   Then run **design-reviewer** and **a11y-auditor** in parallel; both read
+   `.audit/run.json` rather than driving their own browser. Running it here is what
+   makes that true — two agents starting together would each find no artifact and
+   each run the matrix, which is the duplication this replaced. Fix P0/P1 findings
+   and any a11y FAIL before commit; note deliberately skipped P2/P3 in the commit
+   message.
 4. If a change makes DESIGN.md wrong, amend DESIGN.md in the same commit.
 
 Trivial non-visual changes (data regen, README, comments) skip the agents.

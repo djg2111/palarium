@@ -392,14 +392,29 @@ could have touched instead of replaying the app to reach them:
 ```bash
 node e2e/audit.js --list                          # the group names
 node e2e/audit.js                                 # both suites, every group
+node e2e/audit.js --changed                       # only what the diff can have broken
 node e2e/audit.js --suite states --groups roster,dex
 node e2e/audit.js --json .audit/run.json          # machine-readable results
+node e2e/audit.js --concurrency 1                 # serial, for debugging
 ```
+
+Groups run six at a time by default (`min(6, cores-2)`), each in its own context,
+with the output buffered per group so concurrent blocks stay readable. Both suites
+together take ~50s.
+
+`--changed` reads `git diff` and maps files to groups via `e2e/scope.js` — the
+view files are close to 1:1 with the states, so `js/roster.js` audits `roster` and
+`card-actions` and nothing else. The default is what makes it safe: a shared file
+(`index.html`, `css/`, `core.js`, `router.js`, `init.js`, `data.js`) or any file
+not in the map runs *everything*. An unclassified file is not evidence that
+nothing broke. Adding a view means adding a line to `scope.js`.
 
 `--json` is the point of the split: one run answers both the a11y gate and the
 design review, which used to boot Playwright separately and drive the same states
 twice. Every check lands in `results[]` as `{group, ok, message}`, with the axe
-rule ids, the overflowing widths or the measured focus rect attached.
+rule ids, the overflowing widths or the measured focus rect attached; `commit` and
+`dirty` stamp the tree it described, so a second reader can tell whether the
+artifact it found is still current.
 
 `sav-check.js` is the one to run after touching the reader. It diffs our
 decompression against `oodle-ref` — a different implementation, in a different
