@@ -790,3 +790,44 @@ is still a 2.4.11 failure — which is how it shipped twice.
   species and pal apart everywhere else. `Your "Woolly"` or `This pal` says what it
   is, but the honest fix may be listing the siblings — which is a layout question
   inside an already long card, so it needs a spec.
+
+- **§6's 15-word microcopy cap versus the save reader's explainer prose.** Seven
+  strings in that dialog run 16–27 words: the privacy promise (23), *"Browsers
+  can't open that folder for you…"* (27), the truncated-save error (26),
+  `#smConflictNote` (22), the ambiguous-match sentence (22), *"Close the game
+  first…"* (22). Four are genuinely two sentences and should be split whatever
+  else is decided. But the cap is written for labels, and a privacy promise and
+  a where-is-my-file guide are not labels — this dialog is a second longform
+  surface whether or not §6 admits it. Either §6 names the save reader's
+  explainer prose at the Guide's 25-word cap, or the prose moves into the Guide
+  and the dialog links to it. The doc should say which rather than let the code
+  drift against it silently.
+
+- **The save reader's component family is undocumented in §4.** `.privacy`,
+  `.smsum`, `.smh3`, `.smlist`/`.smitem`, `.smacts`, `.smchoose`, `.confrow`,
+  `.pbar` and `.smerr` were all one-offs; `.smerr` is gone (it was `.warnbox`
+  one type step smaller and without its triangle) and `.confrow` changed in
+  0954b69, but the rest still have no entry, against §4's own "a new class gets
+  documented here". One table pass, ideally alongside whatever next touches
+  those recipes.
+
+- **A 400 MB save reads silently for anyone not watching the bar.** `.pbar` has
+  no `role="progressbar"` or `aria-valuenow`, and `#smBusyMsg` is written once
+  ("Reading …sav (400.0 MB)…") and never again — only `bar.style.width` moves.
+  Sighted users get continuous feedback; everyone else gets one utterance and
+  then nothing until it finishes. Either put the role and values on `.pbar`, or
+  update the polite message at coarse milestones (25/50/75%). Coarse, because a
+  live region driven by a progress bar is a stream of interruptions.
+
+- **The toast dwell is not a conformant 2.2.1 "extend" mechanism, deliberately.**
+  Hover and focus pause it and re-arm the full duration, and Alt+Z reaches it,
+  but 3.5s/8s with no warning is not the 20-second-plus-ten-extensions the SC
+  describes. §4's "feedback ≤8s" is the standing position and Undo is never the
+  only route to the action — recorded here so it stays a decision rather than an
+  oversight.
+
+- **`.bottomnav`'s top border is invisible.** `--border` against the composited
+  bar surface measures 1.30–1.49:1 depending on what is scrolled underneath. It
+  is decorative — the bar's own fill separates it — so 1.4.11 doesn't bite, but
+  the hairline is doing nothing at the darker backdrops and either wants
+  `--border-strong` or wants dropping.
