@@ -21,6 +21,12 @@
   /* element colors — data-viz identity, used as chip bg with --ink text */
   --neutral:#9aa5b1; --fire:#ff8a5c; --water:#5cb3ff; --electric:#ffd75c;
   --grass:#7ed67e; --dark:#b78aff; --dragon:#8f7dff; --ground:#d9a066; --ice:#7fe3e3;
+  /* three element hues are borrowed by the rarity and catch-difficulty ramps,
+     which are not element typing — so they take the same two alphas every
+     other tinted role does, instead of six hand-written rgba()s (§1). */
+  --neutral-tint:rgba(154,165,177,.08); --neutral-line:rgba(154,165,177,.35);
+  --water-tint:rgba(92,179,255,.08); --water-line:rgba(92,179,255,.35);
+  --dark-tint:rgba(183,138,255,.08); --dark-line:rgba(183,138,255,.35);
   /* type — 7 sizes; heading jumps 15→19→24 (≥1.26×) */
   --fs-xs:11px; --fs-sm:12.5px; --fs-md:14px; --fs-base:15px;
   --fs-lg:17px; --fs-h2:19px; --fs-h1:24px;
@@ -116,7 +122,13 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .moresheet{display:none}
 @media(max-width:640px){
   .tabs{display:none}
-  .bottomnav{position:fixed;left:0;right:0;bottom:0;z-index:90;display:flex;background:rgba(13,17,23,.94);backdrop-filter:blur(8px);border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom)}
+  /* The bar composites rgba(13,17,23,.94) over whatever is scrolling under it,
+     so the hairline's contrast is a range, not a number: --border measured
+     1.33-1.49:1 (1.49 over the surface ladder, 1.33 over the Paldex's pal art)
+     — a line drawing nothing at the bottom of that. --border-strong is
+     1.78-1.99 over the same range. Decorative either way (the bar's own fill is
+     what separates it), so this is legibility, not 1.4.11. */
+  .bottomnav{position:fixed;left:0;right:0;bottom:0;z-index:90;display:flex;background:rgba(13,17,23,.94);backdrop-filter:blur(8px);border-top:1px solid var(--border-strong);padding-bottom:env(safe-area-inset-bottom)}
   .bottomnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px 10px;font-size:var(--fs-xs);font-weight:600;color:var(--muted);border-radius:0}
   .bottomnav button .bi{display:block}
   /* The top tabs mark the current one with a raised fill AND an inset ring; down
@@ -204,9 +216,12 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .mchip{font-size:var(--fs-sm);font-weight:600;padding:2px 10px;border-radius:var(--r-full);background:var(--bg);border:1px solid var(--border-strong);color:var(--muted);
   display:inline-flex;align-items:center;gap:6px}
 .tier{font-size:var(--fs-xs);font-weight:700;letter-spacing:.4px;padding:1px 8px;border-radius:var(--r-sm);text-transform:uppercase}
-.tier.common{background:rgba(154,165,177,.14);color:var(--neutral)}
-.tier.rare{background:rgba(92,179,255,.14);color:var(--water)}
-.tier.epic{background:rgba(183,138,255,.14);color:var(--dark)}
+/* the rarity ramp is the game's own ladder (grey -> blue -> purple -> gold), so
+   the hues are recognition, not decoration. The uppercase word is the signal;
+   the tint is atmosphere at 1.13:1 against the plain surface. */
+.tier.common{background:var(--neutral-tint);color:var(--neutral)}
+.tier.rare{background:var(--water-tint);color:var(--water)}
+.tier.epic{background:var(--dark-tint);color:var(--dark)}
 .tier.legendary{background:var(--gold-tint);color:var(--gold)}
 
 /* ---------- breed view ---------- */
@@ -272,7 +287,7 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .child-card .pico{width:84px;height:84px;font-size:30px}
 .child-card h3{font-size:var(--fs-h1);line-height:1.2}
 .child-card .zk{color:var(--muted);font-weight:400;font-size:var(--fs-base)}
-.crow{display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap}
+.crow{display:flex;align-items:center;gap:var(--sp-2);margin-top:var(--sp-2);flex-wrap:wrap}
 .badge{font-size:var(--fs-xs);font-weight:700;letter-spacing:.6px;padding:3px 10px;border-radius:var(--r-sm);text-transform:uppercase}
 .badge.unique{background:var(--gold-tint);color:var(--gold);border:1px solid var(--gold-line)}
 .badge.same{background:var(--success-tint);color:var(--success);border:1px solid var(--success-line)}
@@ -547,16 +562,19 @@ tbody tr:hover{background:var(--surface)}
 .mhead h2{font-size:var(--fs-h1);display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap}
 /* --fs-lg, not a bare 16px: 16 is not on the type scale (§3) */
 .mhead .zk{color:var(--muted);font-size:var(--fs-lg);font-weight:400}
-.mdesc{margin-top:16px;color:var(--text-2);font-size:var(--fs-md);background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 16px;font-style:italic}
-.msec{margin-top:18px}
-.msec h3{font-size:var(--fs-sm);letter-spacing:.7px;text-transform:uppercase;color:var(--accent);margin-bottom:9px;font-weight:700}
-.statgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
-.stat{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);padding:7px 12px}
+.mdesc{margin-top:var(--sp-4);color:var(--text-2);font-size:var(--fs-md);background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--sp-3) var(--sp-4);font-style:italic}
+/* The card's section interiors predate the §2 scale. Moved onto it here rather
+   than inside a functional change, because it is a 1-2px shift across seven
+   rules and the visual diff is worth reading on its own. */
+.msec{margin-top:var(--sp-5)}
+.msec h3{font-size:var(--fs-sm);letter-spacing:.7px;text-transform:uppercase;color:var(--accent);margin-bottom:var(--sp-2);font-weight:700}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:var(--sp-2)}
+.stat{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);padding:var(--sp-2) var(--sp-3)}
 .stat .lb{font-size:var(--fs-xs);color:var(--muted)}
 .stat .vl{font-weight:700;font-size:var(--fs-base)}
-.pskill{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 16px}
+.pskill{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--sp-4)}
 .pskill .psn{font-weight:700;color:var(--gold);font-size:var(--fs-base)}
-.pskill .pst{display:flex;gap:6px;flex-wrap:wrap;margin:7px 0}
+.pskill .pst{display:flex;gap:6px;flex-wrap:wrap;margin:var(--sp-2) 0}
 .pskill .psd{color:var(--text-2);font-size:var(--fs-md)}
 .pskill .psn .badge{margin-left:8px;vertical-align:1px}
 /* The rank table can be wider than a phone card; it pans inside itself rather
@@ -580,8 +598,8 @@ tbody tr:hover{background:var(--surface)}
 .rosentry .row1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .rosentry .row1 .g{font-size:var(--fs-base)}
 .rosentry .rnote{color:var(--muted);font-size:var(--fs-sm);font-style:italic}
-.mbtns{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
-.mbtns .alink{padding:9px 18px}
+.mbtns{display:flex;gap:var(--sp-3);margin-top:var(--sp-5);flex-wrap:wrap}
+.mbtns .alink{padding:var(--sp-2) var(--sp-5)}
 .droplist{display:flex;gap:8px;flex-wrap:wrap}
 .breedmeta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 
@@ -1014,10 +1032,10 @@ select#genderSel{padding:10px 12px}
    different kind of answer. */
 .accb{font-size:var(--fs-xs);font-weight:700;letter-spacing:.3px;padding:1px 8px;border-radius:var(--r-sm);white-space:nowrap}
 .accb.easy{background:var(--success-tint);color:var(--success);border:1px solid var(--success-line)}
-.accb.mid{background:rgba(154,165,177,.12);color:var(--neutral);border:1px solid var(--border-strong)}
+.accb.mid{background:var(--neutral-tint);color:var(--neutral);border:1px solid var(--border-strong)}
 .accb.hard{background:var(--gold-tint);color:var(--gold);border:1px solid var(--gold-line)}
 .accb.grind{background:var(--danger-tint);color:var(--danger);border:1px solid var(--danger-line)}
-.accb.alpha{background:rgba(183,138,255,.12);color:var(--dark);border:1px solid rgba(183,138,255,.35)}
+.accb.alpha{background:var(--dark-tint);color:var(--dark);border:1px solid var(--dark-line)}
 .accb.none{background:transparent;color:var(--muted);border:1px dashed var(--border-strong)}
 .accr{font-size:var(--fs-xs);font-weight:500;color:var(--muted);white-space:nowrap}
 .wildinfo .accb{flex-shrink:0}
@@ -1468,7 +1486,7 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 .skillcard .psn{font-weight:700;color:var(--gold);font-size:var(--fs-base)}
 .skillcard .pst{display:flex;gap:6px;flex-wrap:wrap}
 .flatnote{color:var(--muted);font-size:var(--fs-sm)}
-.pskill .flatnote{margin-top:7px}
+.pskill .flatnote{margin-top:var(--sp-2)}
 /* a number the game's own description ships without — see psDesc */
 .phold{display:inline-block;min-width:1.1em;text-align:center;color:var(--muted);
   background:var(--raised);border:1px dashed var(--border-strong);border-radius:var(--r-sm);
@@ -1747,9 +1765,9 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   /* the same grid .mbtns gets two sections below — it was a 3-line, 127px
      staircase against an aligned block */
   .rentacts{display:grid;grid-template-columns:1fr 1fr;margin-left:0;width:100%}
-  .rentacts .alink{text-align:center;padding:9px 10px}
+  .rentacts .alink{text-align:center;padding:var(--sp-2)}
   .mbtns{display:grid;grid-template-columns:1fr 1fr}
-  .mbtns .alink{text-align:center;padding:9px 10px}
+  .mbtns .alink{text-align:center;padding:var(--sp-2)}
 
   /* --- picker grid: a ★ made starred cells a whole row taller --- */
   .pop .row{position:relative}

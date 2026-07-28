@@ -58,6 +58,37 @@ Never add a token without a role and a contrast entry here.**
 `--<name>-tint` (`.08`, fills) and `--<name>-line` (`.35`, borders) — defined for
 `accent`, `success`, `gold`, `danger`. Don't write a new `rgba()` in a rule.
 
+**An element colour used outside element typing takes the same two alphas.** Two
+ramps borrow from the element palette and are not element typing: the rarity
+ladder (`.tier.common/rare/epic/legendary` — grey → blue → purple → gold, the
+game's own ordering, so the hues are recognition rather than decoration) and the
+catch-difficulty ramp (`.accb`, green → neutral → gold → pink, with `alpha`
+purple off that scale as a different kind of answer, not a harder one). Between
+them they carried six hand-written `rgba()`s — five fills at `.12`/`.14` and one
+border at `.35`; `--neutral-tint/line`, `--water-tint/line` and `--dark-tint/line`
+now cover them at the standard alphas. Only `--dark-line` has a consumer today
+(`.accb.alpha`'s border): `--neutral-line` and `--water-line` are declared for
+recipe symmetry, because "exactly two alphas and no others" is the rule and a
+hue with a tint but no line is the asymmetry that lets the next `rgba()` in.
+Nothing else may reach into the element palette — an element colour on anything
+that is not an element, a rarity or a catch tier needs a role and a matrix row
+here first. Moving to `.08` *raised* every ratio (epic on `--raised` went 4.80 →
+5.34), so this cost nothing but the drift; what it does cost is fill delta —
+those tints are now 1.11–1.16:1 against a plain surface, firmly atmosphere, and
+the uppercase word in the badge is what carries the meaning. **`.accb` never
+renders on `--surface`**: `.tchip` is `--bg` and `.wildinfo` sits inside
+`.rstep`, also `--bg`, so its governing numbers are the `--bg` column (6.78 and
+6.57), not the surface one.
+
+**One backdrop in the app is not flat, and the matrix cannot describe it.**
+`#mapInfo` is `rgba(22,27,34,.96)` with `blur(8px)` over map art, so axe returns
+`incomplete` for anything inside it ("background could not be determined") and
+**the suite structurally cannot gate it** — a clean run is not a clearance here.
+Measured by pixel it is 5.91 at 1280 and 5.85 at 360; the analytic worst case,
+pure white map art under the `.96` panel, is 5.28. AA holds, but a pairing whose
+`--surface` number is already near 4.5 must be checked against that 5.28 ceiling
+before it goes in this panel.
+
 **Elevation = lighter surface, never shadow alone.** The ladder is
 bg → surface → raised → overlay; popovers/toasts sit on raised/overlay with a border
 plus shadow. Don't invent intermediate grays.
@@ -106,7 +137,10 @@ not in this table needs a computed ratio before merge:
 | `--danger` on `--danger-tint` over `--bg` | 7.48 | — | — | — | AA — the legacy-plan `.mchip.warn` |
 | `--text` on `--gold-tint` over `--surface` | — | 14.15 | — | — | AA — the owned Paldex tile |
 | `--muted` on `--gold-tint` over `--surface` | — | 5.70 | — | — | AA — a tinted fill costs ~0.2 against the plain surface |
-| `--border-strong` | 1.99 | 1.82 | 1.66 | 1.50 | **Decorative only** — a border below 3:1 must never be the sole indicator of a control's boundary or state; pair with a fill, icon, or text change |
+| `--neutral` on `--neutral-tint` | 6.78 | 6.08 | 5.50 | 4.95 | AA — `.tier.common` (Paldex `th`, so **`--bg`**; `--surface` when the row is hovered) and `.accb.mid` (**`--bg`** — see the `.accb` note below) |
+| `--water` on `--water-tint` | 7.50 | 6.73 | 6.07 | 5.46 | AA — `.tier.rare` |
+| `--dark` on `--dark-tint` | 6.57 | 5.90 | 5.34 | 4.80 | AA — `.tier.epic`, `.accb.alpha`. The tightest of the three, and the reason this is a matrix **row** and not one number: a `.tier` sits on the pal card's `--surface` (5.90) and on `.hcard`'s `--raised` (5.34), and `.accb.alpha` on `--bg` (6.57) — 1.23 apart end to end |
+| `--border-strong` | 1.99 | 1.82 | 1.66 | 1.50 | **Decorative only** — a border below 3:1 must never be the sole indicator of a control's boundary or state; pair with a fill, icon, or text change. On the phone tab bar it is also the *floor*: `--border` measured **1.33–1.49:1** against `.bottomnav`'s composited fill depending on what scrolled under it (1.49 over the surface ladder, 1.33 over the Paldex's pal art), a hairline drawing nothing; `--border-strong` measures **1.78–1.99** over the same range. A composited bar's contrast is always a range — sample it over real scrolled content, not over the four flat surfaces |
 
 Dark-theme rules: accents stay in this desaturated range — no saturated pure hues
 (they vibrate on dark). Text is dimmed white (`--text`), never `#fff`. Large solid
@@ -138,6 +172,16 @@ opportunistically when a rule is already being touched — no mass rewrites. One
 deliberate exception: the roster's `.rosband` / `.rosselall` / `.rosrow.selectable`
 share `padding-left:15px` so all three checkbox levels sit on one vertical rule.
 Alignment across components outranks the scale; don't "fix" one of the three.
+
+**A gutter between two focusable siblings wants more than `--sp-2`.** The focus
+ring is `outline:2px` at `offset:2px` — 4px of bleed per side, so at an 8px gap
+two adjacent rings touch exactly and read as one box. `.mbtns` takes `--sp-3` for
+this reason and is the pal card's only 12px gutter; `.rentacts` beside it is 8px
+and its rings do touch. Don't unify them downward. This is also why a
+migration's *horizontal* step needs checking at 320 even when the vertical one
+is safe: `.mbtns .alink`/`.rentacts .alink` went `9px 10px` → `8px 12px`, and
+the 2px of extra horizontal padding put four of seven buttons onto two lines at
+320 (`.mbtns` 215px → 234px) while 360 and 390 showed nothing at all.
 
 Radius tokens — reuse the nearest, don't add new ones:
 

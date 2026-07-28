@@ -8,15 +8,6 @@ canonical repo-wide: "DESIGN.md §11" means this file.
 
 ## 11 · Known-clunky backlog (ux-designer: start here)
 
-- **`.accb.mid` / `.accb.alpha` and `.tier.common/rare/epic` carry six raw
-  `rgba()`s** between them, outside §1's two-alpha tint recipe, and use
-  `--neutral`/`--water`/`--dark` (*element* colours) for catch difficulty and
-  rarity. Computed 6.33 / 6.15 / 5.98 / 5.31:1 over `--surface`, so this is token
-  discipline, not contrast — wants `--neutral-tint/line` and `--dark-tint/line`
-  and matrix rows. Note the ratios move with the fill underneath: on `.hcard`'s
-  `--raised` they are 5.39 (rare) and 4.80 (epic), still AA but with epic down to
-  0.30 of headroom, which is the argument for matrix rows rather than one number.
-
 - **The Paldex table is 598 tab stops** — 299 `tr[tabindex="0"]` rows plus 299
   stars — in the same view whose gallery is **one**, over the same 299 species.
   §4 settles that a grid board is one stop, but a data table is a different
@@ -113,15 +104,6 @@ canonical repo-wide: "DESIGN.md §11" means this file.
   (7.66:1) and focus (14.64:1) both clear 3:1 — but if any route-choice view ever
   grows past two options, the resting affordance needs revisiting first.
 
-- **The pal card's CSS carries a dozen off-scale values.** §2's scale is 4·8·12·16·20·24·32
-  and the card predates it: `.msec{margin-top:18px}`, `.msec h3{margin-bottom:9px}`,
-  `.stat{padding:7px 12px}`, `.pskill{padding:14px 16px}`, `.mbtns{gap:10px}`,
-  `.mbtns .alink{padding:9px 18px}`, `.crow{gap:7px;margin-top:7px}`. The dialog
-  chrome was moved onto tokens in 302765a (`.overlay`, `.modal`, `.mbar`, `.mnav`,
-  `.mtitle`, and `.zk`'s off-scale 16px → `--fs-lg`); the section interiors were
-  left alone deliberately, because each is a 1–2px change across seven rules and
-  the visual diff is worth reviewing on its own rather than buried in a focus fix.
-
 - **`pretty()` leaves the index glued to internal item ids.** The card's drop chips
   read `Pal Upgrade Stone3`, `Exp Boost 04`, `World Tree Relic 01`, `Technology
   Book G2`. `pretty()` (`js/core.js`) splits camelCase and underscores but has no
@@ -171,9 +153,3 @@ canonical repo-wide: "DESIGN.md §11" means this file.
   describes. §4's "feedback ≤8s" is the standing position and Undo is never the
   only route to the action — recorded here so it stays a decision rather than an
   oversight.
-
-- **`.bottomnav`'s top border is invisible.** `--border` against the composited
-  bar surface measures 1.30–1.49:1 depending on what is scrolled underneath. It
-  is decorative — the bar's own fill separates it — so 1.4.11 doesn't bite, but
-  the hairline is doing nothing at the darker backdrops and either wants
-  `--border-strong` or wants dropping.
