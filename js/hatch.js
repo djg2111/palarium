@@ -290,8 +290,7 @@ function hatchPanel(r) {
       pickA.set(a, true); pickB.set(b, true); renderBreed(); navTab('breed');
       // navTab hides the row that was pressed, so focus fell to <body> — the
       // same defect the "Plan this route" hand-off fixed one function away
-      const el = document.querySelector('#pickA .picker-btn');
-      if (el) el.focus({preventScroll: true});
+      landAfterNav('#pickA .picker-btn');
     });
     wrap.appendChild(row);
   }
@@ -302,8 +301,10 @@ function hatchPanel(r) {
   all.title = 'Open Find parents with every pair, not just your pals';
   all.addEventListener('click', () => {
     pickT.set(r.p, true); reverseShown = {}; renderReverse(); navTab('reverse');
-    const el = document.querySelector('#pickT .picker-btn');
-    if (el) el.focus({preventScroll: true});
+    // landAfterNav, not a raw focus: pressed from a card far down the board,
+    // preventScroll left this picker 1974px above the viewport at 360 — focused,
+    // and entirely off-screen (2.4.11)
+    landAfterNav('#pickT .picker-btn');
   });
   lr.appendChild(all);
   panel.appendChild(lr);

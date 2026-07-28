@@ -402,6 +402,12 @@ no looping/attention animation, ever.
 - The Paldex counts **species**; the Roster counts **pals**. Never say "pals"
   for a Paldex count — 299 is a species total, not an individual one.
 - Sentence case for all labels, buttons, and tab names. Title Case is not used.
+- **The ≤15-word cap is for microcopy** — labels, buttons, status lines, hints,
+  empty states. The Guide is the app's only longform surface: prose there caps at
+  **25 words**, and anything past that gets split. Measured over the Guide's 90
+  sentences the median is 14, so the cap is the exception, not the rule.
+- **"child", not "baby"**, for what hatches — except in the Guide's first card,
+  whose register is deliberately plainer than the rest of the app. Nowhere else.
 - Empty states: 1 sentence of what this is + 1 action button. Errors: what happened +
   the next step, colored `--danger` *plus* text (never color alone).
 - Icons & glyphs: see §7. Emoji are last-resort placeholders, never design elements
@@ -449,10 +455,21 @@ sits beside an icon must keep that text **inside** its accessible name — an
 2.5.3 Label in Name, and axe cannot see it (`label-content-name-mismatch` is
 experimental and off by default, so a clean suite is not a clearance).
 
-**`↗` means this control leaves the view you are on.** Breed, Breedable now and
-the Planner all mark their cross-tab jumps with it; an in-page jump (the Guide's
-"See the new cakes", which only opens a section below) stays bare. Every one of
-them also lands focus on the control it set — see `landAfterNav`.
+**`↗` means this control leaves the view you are on.** Breed, Breedable now, the
+Planner and the Guide all mark their cross-tab jumps with it; an in-page jump (the
+Guide's "See the new cakes", which only opens a section below) stays bare.
+
+**Every such jump goes through `landAfterNav(selector)`** — never a raw
+`focus({preventScroll:true})`. `navTab` hides the control that was pressed, so a
+bare jump ends on `<body>`; and `preventScroll` alone is not enough either,
+because the page keeps the scroll position of the view you left — pressed from a
+card far down Breedable now, a raw focus left the Find-parents picker **1974px
+above the viewport at 360**, focused and entirely off-screen. `landAfterNav`
+scrolls only when the target is out of sight. **A jump that names a sub-view has
+to select it too**: "See breeding power in the Paldex" landed on the gallery,
+which shows no breeding power, and "Browse every passive" landed on whichever
+Skills section was last used — Base auras on a cold start, with no passive on
+screen. Gate these with `focusVisible`, never `focusSane`.
 
 Plain **text symbols** (★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×) are typography, not emoji — they
 render monochrome, inherit color, and remain allowed where established (ownership
@@ -628,6 +645,25 @@ is still a 2.4.11 failure — which is how it shipped twice.
   non-interactive role. axe is clean, so it is not a gate — but "make only the
   name cell a button, as `.dextile-open` already is" is the option that removes
   that as well as the stops.
+
+- **The Guide's Deep dive hides 82% of itself behind five presses** — 6,399
+  characters across six `<details>`, of which 1,143 are visible at rest, and
+  nothing persists across a reload. It also has no per-section address: the app
+  navigates to `#g-mutations` itself (Breed's footnote does), but a reader
+  cannot link to one. Wants an `Expand all` and a `#/guide/<id>` route, at which
+  point Breed's footnote becomes a plain hash navigation.
+- **Should a `<summary>` carry an `<h3>`?** The Guide is 1,440 words behind two
+  headings, so heading navigation gets "Breeding, start here" and "Deep dive"
+  and nothing about which of six sections is which. Wrapping the summary text in
+  an `<h3>` was measured in Chrome to keep `role=DisclosureTriangle`, `expanded`,
+  the accessible name and Enter/Space — while adding six level-3 landmarks. It
+  collides with §4's reasoning for `.cardopen` ("buried an `h3` in a button"),
+  so this needs a §4 ruling, not a patch.
+- **`.recipe` is a `<div>` of `<span>`s** — five ingredient lists AT cannot count
+  or navigate, with no "Recipe" noun anywhere. `<ul aria-label="Cake recipe">` +
+  `<li class="mchip">` costs nothing; `.recipe{display:flex}` already handles it.
+  The Ancient Breeding Facility's ingredients are inline prose while the five
+  cakes are chips — same content, two presentations (§4 reuse-first).
 
 - **Duplicate uses `⧉` (U+29C9), which is not on §7's plain-symbol allowlist**
   (`★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×`), and §7 says not to add one where a Lucide icon

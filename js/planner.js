@@ -852,6 +852,17 @@ function wildInfo(box, p, bredAt = -1, skips = []) {
   };
   const mapLink = (label, hash) => {
     const a = document.createElement('a'); a.className = 'wlink'; a.href = hash; a.textContent = label;
+    // The hash change hides the view this link lives in, so following it left
+    // focus on <body> (DESIGN.md §4). Deferred to the hashchange, not the click:
+    // the router applies the route on that event, so landing synchronously here
+    // would aim at a #mapSearch the Map view has not shown yet.
+    a.addEventListener('click', () => {
+      // ...and past navApply, which defers applyHash by a timer of its own to
+      // coalesce hashchange with popstate. Our listener runs first otherwise,
+      // and aims at a Map view that has not been shown yet.
+      addEventListener('hashchange',
+        () => setTimeout(() => landAfterNav('#mapSearch'), 0), {once: true});
+    });
     box.appendChild(a);
   };
   if (bredAt >= 0) {

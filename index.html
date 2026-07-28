@@ -414,7 +414,7 @@
     <div class="guide">
 
       <div class="gcard">
-        <h2><img class="uii" src="assets/items/cake.webp" alt="" width="22" height="22" loading="lazy" decoding="async">Breeding, explained like you're 5</h2>
+        <h2><img class="uii" src="assets/items/cake.webp" alt="" width="22" height="22" loading="lazy" decoding="async">Breeding, start here</h2>
         <div class="sub">The short version — everything you need to hatch your first eggs.</div>
         <ol>
           <li><b>Build a Breeding Farm</b> (Technology level 19). Also build an <b>Egg Incubator</b> (level 7, needs Paldium).</li>
@@ -428,24 +428,24 @@
             <ul>
               <li>Same species parents → <b>same species baby</b>. Lamball + Lamball = Lamball.</li>
               <li>Different species → the game does secret math (see the deep dive). Just use the <b>Breed</b> tab — it tells you exactly what you'll get. <button type="button" class="alink gjump" data-nav="breed">Open Breed ↗</button></li>
-              <li>A few pairs are <span class="gold">special recipes</span> that ignore the math — they're marked with a gold <b>UNIQUE</b> badge in this app. Example: Relaxaurus + Sparkit = Relaxaurus Lux. <button type="button" class="alink gjump" data-nav="combos">Browse all unique combos ↗</button></li>
+              <li>A few pairs are <span class="gold">special recipes</span> that ignore the math — they're marked with a gold <span class="gold">UNIQUE COMBO</span> badge in this app. Example: Relaxaurus + Sparkit = Relaxaurus Lux. <button type="button" class="alink gjump" data-nav="combos">Browse all unique combos ↗</button></li>
             </ul>
           </li>
-          <li><b>Why bother?</b> Babies can <b>inherit passive skills</b> from both parents. Breed a pal with great passives into a strong species and you get a super-pal you could never catch in the wild.</li>
+          <li><b>Why bother?</b> Babies can <b>inherit passive skills</b> from both parents. Breed a pal with great passives into a strong species and you get a pal you could never catch in the wild.</li>
         </ol>
         <div class="note">Legendary pals (Jetragon, Frostallion, Paladius, Necromus…) can't be created by mixing other pals — the only way to breed one is <b>two of the same legendary</b>. Their entries say "unique only" in the Paldex.</div>
       </div>
 
       <div class="gcard">
         <h2><svg class="lui" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>Deep dive</h2>
-        <div class="sub">How the game actually decides what hatches — the same rules this calculator runs.</div>
+        <div class="sub">How the game actually decides what hatches — the same rules this app runs.</div>
 
         <details open id="g-formula"><summary>The species formula (breeding power)</summary><div>
           <p>Every species has a hidden number called <b>breeding power</b> (internally <code>CombiRank</code> — you can see it for every pal in the Paldex tab). When two different species breed:</p>
           <p><code>target = floor((powerA + powerB + 1) ÷ 2)</code></p>
           <p>The child is the species whose breeding power is <b>closest to that target</b>. If two species are exactly equally close, a hidden priority value decides the winner. That's it — the whole species system is one averaging formula. <button type="button" class="alink gjump" data-nav="dex">See breeding power in the Paldex ↗</button></p>
           <ul>
-            <li>Not every pal can be a "math result": <b>legendaries and all sub-species</b> (Relaxaurus Lux, Incineram Noct, etc.) are excluded from the pool — only 183 of the 299 species can hatch from averaging. The excluded ones need their unique recipe or same-species parents.</li>
+            <li>Not every pal can be a "math result": <b>legendaries, raid bosses, collab pals and every sub-species</b> (Relaxaurus Lux, Incineram Noct, etc.) are excluded from the pool — only 183 of the 299 species can hatch from averaging. The excluded ones need their unique recipe or same-species parents.</li>
             <li><b>Unique recipes override the math.</b> This app checks them first, exactly like the game.</li>
             <li>A handful of recipes are <b>gender-dependent</b>: Katress ♀ × Wixen ♂ gives Katress Ignis, but Katress ♂ × Wixen ♀ gives Wixen Noct. The Breed tab shows both outcomes when it matters.</li>
             <li>Because it's an average, you can often reach the same child from hundreds of different pairs — that's what the <b>Find parents</b> tab enumerates. <button type="button" class="alink gjump" data-nav="reverse">Open Find parents ↗</button></li>
@@ -457,7 +457,7 @@
           <ul>
             <li><b>Cake</b> — the baseline. One egg, normal odds (recipe above).</li>
             <li><b>Mushroom Cake</b> · Tech 30 — slightly better stat (IV) rolls on the child.
-              <div class="recipe"><span class="mchip" data-item="Flour">5× Flour</span><span class="mchip" data-item="Mushroom">5× Mushrooms</span><span class="mchip">3× Cavern Mushrooms</span><span class="mchip" data-item="Egg">8× Eggs</span><span class="mchip" data-item="Honey">2× Honey</span></div></li>
+              <div class="recipe"><span class="mchip" data-item="Flour">5× Flour</span><span class="mchip" data-item="Mushroom">5× Mushrooms</span><span class="mchip" data-item="CaveMushroom">3× Cavern Mushrooms</span><span class="mchip" data-item="Egg">8× Eggs</span><span class="mchip" data-item="Honey">2× Honey</span></div></li>
             <li><b>Vegetable Cake</b> · Tech 47 — <b>two eggs</b> per breeding cycle. Doubles throughput, and each egg rolls its mutation chance separately.
               <div class="recipe"><span class="mchip" data-item="Flour">8× Flour</span><span class="mchip" data-item="Tomato">8× Tomatoes</span><span class="mchip" data-item="Lettuce">7× Lettuce</span><span class="mchip" data-item="Egg">8× Eggs</span><span class="mchip" data-item="Honey">4× Honey</span></div></li>
             <li><b>Extravagant Vegetable Cake</b> · Tech 60 — mutation chance rises to <b>~3%</b> per egg, plus better stat rolls. The mutation-hunting pick.
@@ -468,12 +468,13 @@
           <div class="note">Rule of thumb: building a passive line → <b>Special</b> · hunting mutations → <b>Extravagant Vegetable</b> · mass production → <b>Vegetable</b> · stat polish on a budget → <b>Mushroom</b>.</div>
         </div></details>
 
-        <details id="g-passives"><summary>Passive skill inheritance (the real endgame)</summary><div>
+        <details id="g-passives"><summary>Passive skill inheritance</summary><div>
           <p>The child can inherit up to <b>4 passive skills</b> drawn from the combined pool of both parents' passives, and it can also roll <b>random passives</b> that neither parent has.</p>
           <ul>
             <li>Roughly speaking (community-measured, the game doesn't show the odds): if the parents together have <i>exactly</i> the 4 passives you want and nothing else, about <b>1 in 10</b> eggs is a perfect 4/4 baby.</li>
-            <li>Every junk passive on either parent <b>dilutes the pool</b> and tanks your odds. The meta strategy is to breed "clean" parents first: pals whose only passives are ones you want.</li>
+            <li>Every junk passive on either parent <b>dilutes the pool</b>. The meta strategy is to breed "clean" parents first: pals whose only passives are ones you want.</li>
             <li>Classic workflow: combine 2 desired passives on one parent, 2 on the other → hatch until a child has 3–4 → use that child as a new parent. Passives have no gender, so any keeper can pair with any opposite-gender partner of the right species chain.</li>
+            <li>The <b>Planner</b> does this for you: give it your starting pals and the passives you want to keep, and it works out the chain and the odds per step. A pal holds four passives, so it asks which four to carry. <button type="button" class="alink gjump" data-nav="plan">Plan a passive line ↗</button></li>
             <li>Popular combat set: <b>Legend</b> (from legendaries — yes, it inherits!), <b>Musclehead</b>, <b>Ferocious</b>, <b>element +20%</b>. Work set: <b>Artisan</b>, <b>Serious</b>, <b>Lucky</b>, <b>Work Slave</b>.</li>
             <li>Endgame: the <b>Special Cake</b> (Tech 74) sharply raises how much of the parents' pool carries over. The odds shown in this app assume a regular Cake — treat them as a floor once you're baking Special Cakes.</li>
             <li>Which passives are worth the effort — and which 15 are worth breeding <i>out</i> — is the <b>Skills</b> tab, with every effect in numbers. <button type="button" class="alink gjump" data-nav="skills">Browse every passive ↗</button></li>
@@ -483,7 +484,7 @@
         <details id="g-ivs"><summary>IVs, genders, stats and active skills</summary><div>
           <ul>
             <li>Each pal has hidden <b>IVs (0–100)</b> for HP, Attack and Defense — worth roughly <b>+30%</b> to a stat at max. Community testing says each stat usually copies one parent's value, at least one stat always comes from a parent, and the rest can roll fresh — so hatch several keepers and compare. A <b>Mushroom</b> or <b>Extravagant Vegetable Cake</b> nudges the rolls upward.</li>
-            <li><b>Active skills (changed in 1.0):</b> the child's inherited attack skills are drawn from the three skills <b>equipped</b> on the parents at breeding time — set both parents' movesets before dropping them in the farm.</li>
+            <li><b>Active skills (changed in 1.0):</b> the child's inherited attack skills come from the three skills <b>equipped</b> on the parents at breeding time. Set both movesets before dropping them in the farm.</li>
             <li><b>Gender is rolled per species</b> — every pal card in this app shows the ♂/♀ odds. Some species are heavily skewed (useful to know when you need a specific gender for a gender-locked recipe or your next pairing).</li>
             <li>Alpha (oversized) status does <b>not</b> inherit; the <b>Lucky</b> passive from lucky pals inherits like any other passive.</li>
           </ul>
@@ -496,7 +497,7 @@
             <li>Every bred egg has a <b>~1% chance to mutate</b> — <b>~3%</b> if you use an <b>Extravagant Vegetable Cake</b> instead of a regular Cake. A <b>Vegetable Cake</b>'s two eggs each roll separately, so it's ≈2% per breeding cycle at the base rate.</li>
             <li>Mutated eggs are <b>visibly different</b> — purple with a distinct pattern — so you'll know before it hatches.</li>
             <li>A mutated pal can come with any of: up to <b>2 free condensation levels</b>, <b>Alpha</b> (oversized) status, one or more <b>mutation-exclusive passives</b>, or even hatch as a <b>different species</b> than the normal child.</li>
-            <li>The exclusive passives (marked <img class="uii" src="assets/ui/egg/mutation.webp" alt="" width="16" height="16" loading="lazy" decoding="async"> in this app's passive picker) can't be rolled any other way: <b>Babysitter</b> (+30% egg production &amp; incubation speed at base — the breeding meta pick), <b>Idiosyncratic</b>, <b>Immortality</b>, <b>Heavily Armored</b>, <b>Skymarcher</b>. Once obtained they inherit like normal passives.</li>
+            <li>The exclusive passives (marked <img class="uii" src="assets/ui/egg/mutation.webp" alt="a mutation-egg icon" width="16" height="16" loading="lazy" decoding="async"> in this app's passive picker) can't be rolled any other way: <b>Babysitter</b> (+30% egg production &amp; incubation speed at base — the breeding meta pick), <b>Idiosyncratic</b>, <b>Immortality</b>, <b>Heavily Armored</b>, <b>Skymarcher</b>. Once obtained they inherit like normal passives.</li>
             <li>Which species a mutated egg can turn into is <i>not fully understood yet</i> — community data collection is ongoing, so this app doesn't pretend to predict it. Treat species mutations as a lottery bonus.</li>
           </ul>
         </div></details>
@@ -508,7 +509,7 @@
             <li><b>1.0 halved default incubation times</b> in newly created Normal and Hard worlds — existing saves keep whatever they had. The world setting <code>PalEggDefaultHatchingTime</code> still scales everything; many servers set it to 0–2 h.</li>
             <li>One farm produces <b>one egg per cake per ~5 minutes</b> while both parents are assigned and fed (two eggs with a Vegetable Cake). Build multiple breeding farms to parallelize.</li>
             <li>Cakes stored in the breeding farm's chest <b>never spoil</b> — stock it up.</li>
-            <li>True endgame: the <b>Ancient Breeding Facility</b> (Tech 76 · 100× Pal Metal Ingot, 50× AI Core, 30× Ancient Parts, 30× Ancient Core) automates the whole loop — assign two pals, pick a cake, and it breeds <i>and hatches</i> continuously with no separate incubator.</li>
+            <li>The <b>Ancient Breeding Facility</b> (Tech 76) automates the whole loop: assign two pals, pick a cake, and it breeds <i>and hatches</i> continuously with no separate incubator. It costs 100× Pal Metal Ingot, 50× AI Core, 30× Ancient Parts and 30× Ancient Core.</li>
           </ul>
         </div></details>
       </div>

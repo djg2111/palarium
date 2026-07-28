@@ -19,17 +19,27 @@ const GUIDE_LANDING = {
   reverse: '#pickT .picker-btn',
   dex: '#dexSearch',
   combos: '#comboSearch',
-  skills: '#skillMode button.active',
+  plan: '#pickS1 .picker-btn',
+  // the sentence that owns this button is about passives, so land in Passives —
+  // and on its search box, not the sub-tab, which reads as "you are in auras"
+  skills: '#pvSearch',
 };
 document.querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', () => {
   const n = b.dataset.nav;
   // Both Paldex links name a sub-pane, so both have to select it. "dex" used to
   // only call navTab, so after following "Browse all unique combos" it landed on
   // the Paldex still showing combos — with #dexSearch hidden, so nowhere at all.
+  // Every jump that names a sub-view has to select it. Breeding power exists
+  // only in the Paldex TABLE — the gallery shows a name and a number and no
+  // power at all — and the Skills tab restores whichever section you last had,
+  // which on a cold start is Base auras, with no passive on screen.
   if (n === 'combos') { navTab('dex'); setDexMode('combos'); }
-  else if (n === 'dex') { navTab('dex'); setDexMode('pals'); }
+  else if (n === 'dex') { navTab('dex'); setDexMode('pals'); setDexView('table'); }
+  else if (n === 'skills') { navTab('skills'); setSkillMode('passives'); }
   else navTab(n);
-  landAfterNav(GUIDE_LANDING[n] || '#tabs button.active');
+  // #tabs is display:none at ≤640, so a fallback pointing there would be the
+  // very bug this handler fixes. #bottomnav is the tab bar at those widths.
+  landAfterNav(GUIDE_LANDING[n] || '#tabs button.active, #bottomnav button.active');
 }));
 // in-guide anchors: open the referenced <details> section and scroll to it —
 // then move focus onto the summary. Left on the button, focus sat above the

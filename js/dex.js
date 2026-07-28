@@ -71,11 +71,15 @@ document.getElementById('dexShow').addEventListener('click', e => {
   setSeg(document.getElementById('dexShow'), dexShow, 'v');
   save(); renderDex();
 });
+// gallery vs table, so a caller that needs one can ask for it by name
+function setDexView(v) {
+  dexView = v;
+  setSeg(document.getElementById('dexView'), v, 'v');
+  save(); renderDex();
+}
 document.getElementById('dexView').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  dexView = b.dataset.v;
-  setSeg(document.getElementById('dexView'), dexView, 'v');
-  save(); renderDex();
+  setDexView(b.dataset.v);
   b.focus();   // the pressed segment survives the re-render; keep focus on it
 });
 function clearDexFilters() {

@@ -560,12 +560,18 @@ tbody tr:hover{background:var(--surface)}
 /* ---------- guide ---------- */
 .guide{max-width:780px;margin:0 auto}
 .gcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:26px 30px;margin-bottom:22px}
-.gcard>h2{font-size:var(--fs-h2);margin-bottom:6px}
-.gcard>h2 span{margin-right:9px}
+/* inline-flex + gap, §7's own prescription: the margin below targeted a <span>
+   neither heading has carried since they became an <img> and an <svg>, so the
+   cake art sat flush against the "B" at 0.0px */
+.gcard>h2{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-h2);margin-bottom:6px}
 .gcard .sub{color:var(--muted);font-size:var(--fs-md);margin-bottom:16px}
 .gcard ol,.gcard ul{margin:10px 0 10px 22px;display:flex;flex-direction:column;gap:8px}
 .gcard p{margin:10px 0}
-.gcard b{color:var(--accent)}
+/* --text, not --accent: §1 reserves the accent for interactive things, and this
+   view had 71 bold prose runs in it against six real buttons at --muted 12.5px —
+   the only controls in the view were dimmer and smaller than the emphasis beside
+   them. Emphasis comes from weight, which is §3's mechanism. */
+.gcard b{color:var(--text)}
 .gcard .gold{color:var(--gold)}
 /* box-decoration-break keeps each wrapped fragment a complete pill instead of
    splitting one border across two lines (the breeding formula on narrow screens) */
@@ -975,7 +981,12 @@ select#genderSel{padding:10px 12px}
 .mylv input{width:74px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);
   padding:7px 9px;color:var(--text);font:inherit;font-weight:600}
 .mylv input:hover{border-color:var(--border-strong)}
-.gjump{padding:3px 12px;font-size:var(--fs-sm);margin-left:4px}
+/* --fs-md, not --fs-sm: a control should not be the smallest text in its own
+   sentence. --accent gives it a real cue against the --muted prose it sits in —
+   §1 forbids a 1.36:1 border being the sole boundary, and inline mid-paragraph
+   there is no .linkrow grouping to carry it. */
+.gjump{padding:3px 12px;font-size:var(--fs-md);margin-left:4px;color:var(--accent)}
+.gjump:hover{color:var(--accent-hover)}
 .slotlb.mt{margin-top:12px}
 #reverseResult .slotlb.lead{font-size:var(--fs-sm);color:var(--text-2)}
 @media (min-width:641px){#reverseResult .slotlb.mt{margin-top:var(--sp-5)}}
