@@ -840,11 +840,35 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await page.waitForTimeout(300);
   }
 
-  console.log('\nTOAST — a bad deep link says so');
+  console.log('\nTOAST — a bad deep link says so, and the widest toast at 320');
   await nav(page, '#/pal/Xyzzy', 400);
   if (await reach(page, () => page.waitForSelector('#toasts .toast', {timeout: 3000}), 'the bad-link toast')) {
     await audit(page, 'toast visible');
   }
+  // The longest real message the app can produce, with both actions, at the
+  // narrowest supported width. The actions used to be squeezed to 27px there
+  // and rendered as a column of single letters.
+  await page.setViewportSize({width: 320, height: 760});
+  await page.waitForTimeout(200);
+  await page.evaluate(() => {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    toast('Removed Woolly the Lamball from your roster — the species is still ★ owned in the Paldex',
+      () => {}, {label: 'Un-star Lamball', fn: () => {}});
+  });
+  await page.waitForTimeout(350);
+  await audit(page, 'a long two-action toast at 320');
+  const tw = await page.evaluate(() => {
+    const t = document.querySelector('.toast');
+    // +2: scrollWidth is an integer and the rect is fractional, so a button
+    // sized exactly to its text reads as 36 vs 37
+    return {narrow: [...t.querySelectorAll('button')].filter(b => b.getBoundingClientRect().width + 2 < b.scrollWidth).map(b => b.textContent.trim()),
+      lines: Math.round(t.querySelector('span').getBoundingClientRect().height / 20)};
+  });
+  if (!tw.narrow.length && tw.lines <= 4) console.log(`  ✓ its actions keep their labels and the message stays ${tw.lines} lines`);
+  else { console.log(`  ✗ toast at 320: clipped ${JSON.stringify(tw.narrow)}, message ${tw.lines} lines`); fail(); }
+  await page.evaluate(() => document.querySelectorAll('.toast').forEach(t => t.remove()));
+  await page.setViewportSize({width: 1280, height: 900});
+  await page.waitForTimeout(150);
 
   console.log('\nMOBILE (360px) — tab bar, more sheet, icon-grid picker');
   await page.setViewportSize({width: 360, height: 740});

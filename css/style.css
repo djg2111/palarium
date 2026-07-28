@@ -906,7 +906,17 @@ select#genderSel{padding:10px 12px}
 .toast{pointer-events:auto;display:flex;align-items:center;gap:14px;background:var(--overlay);border:1px solid var(--border-strong);border-radius:var(--r-lg);padding:11px 16px;box-shadow:0 10px 34px rgba(0,0,0,.55);font-size:var(--fs-md);animation:pop var(--t-base) var(--ease-out);max-width:min(480px,92vw)}
 /* both measured under the 24px floor of WCAG 2.2 2.5.8 — the Undo at 36×21 and
    the dismiss at 23×25 — on the one control the whole Alt+Z route exists to reach */
-.toast .undo,.toast .tx{min-width:24px;min-height:24px;display:inline-flex;align-items:center;justify-content:center}
+/* At 320 a long message ate the row: "Un-star Lamball" was squeezed to 27px and
+   rendered as a column of single letters, and Undo sat on its 24px min-width
+   with the word inside it clipped. The actions travel as one .tacts block that
+   never shrinks, so when the message needs the width the block drops to a row
+   of its own (two flex items, so it wraps whole) rather than the message being
+   crushed to 15 lines to keep the buttons beside it. No breakpoint: the wrap
+   happens exactly when the two no longer fit, at whatever width that is. */
+.toast{flex-wrap:wrap}
+.toast > span{flex:1 1 auto;min-width:0}
+.tacts{display:flex;align-items:center;gap:10px;margin-left:auto;flex:none}
+.toast .undo,.toast .tx{min-width:24px;min-height:24px;display:inline-flex;align-items:center;justify-content:center;flex:none;white-space:nowrap}
 .toast .undo{color:var(--accent);font-weight:700}
 .toast .undo:hover{text-decoration:underline}
 /* the quiet tier, one rule for both its homes (DESIGN.md §4) */

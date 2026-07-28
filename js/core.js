@@ -214,19 +214,24 @@ function toast(msg, undoFn, action, opts = {}) {
     clearTimeout(timer); t.remove(); syncToastRegion();
     if (stray) restoreFromToast();
   };
+  // The actions travel as one block, so a long message can take a row of its
+  // own instead of squeezing them: at 320 "Un-star Lamball" was pressed down to
+  // 27px and rendered as a column of single letters. See .tacts in the CSS.
+  const acts = document.createElement('div'); acts.className = 'tacts';
   if (undoFn) {
     const u = document.createElement('button'); u.className = 'undo'; u.textContent = 'Undo';
     u.addEventListener('click', fire(undoFn));
-    t.appendChild(u);
+    acts.appendChild(u);
   }
   if (action) {
     const a = document.createElement('button'); a.className = 'undo'; a.textContent = action.label;
     a.addEventListener('click', fire(action.fn));
-    t.appendChild(a);
+    acts.appendChild(a);
   }
   const x = document.createElement('button'); x.className = 'tx'; x.textContent = '✕'; x.setAttribute('aria-label', 'Dismiss notification');
   x.addEventListener('click', close);
-  t.appendChild(x);
+  acts.appendChild(x);
+  t.appendChild(acts);
   t.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
   arm();
   toastsEl.appendChild(t); syncToastRegion();
