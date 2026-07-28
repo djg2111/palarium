@@ -119,7 +119,7 @@
           <input type="file" id="saveDir" webkitdirectory multiple style="display:none">
         </div>
       </div>
-      <div class="sub">Your roster tracks <b>individual pals</b> — passives, gender, IVs. Adding one automatically stars ★ its species as owned; the Planner and the Breedable now tab use both.</div>
+      <div class="sub">Your roster tracks <b>individual pals</b> — passives, gender, IVs. Adding one stars ★ its species as owned. The Planner and Breedable now use both.</div>
       <div class="dex-controls roscontrols">
         <div class="ctl"><label for="rosterSearch">Search</label>
           <input type="search" class="search-inp" id="rosterSearch" placeholder="Name, nickname or passive…"></div>
@@ -646,7 +646,15 @@
   <p class="dlgwhy" id="rosterWhy" hidden>Only need it marked as owned? A ★ in the Paldex already covers every “owned” filter. An entry here earns its keep when you care about <b>this pal’s</b> passives, gender or IVs.</p>
   <div class="carrynote" id="carryNote" hidden><span id="carryText"></span><button class="alink" type="button" id="carryClear">Start fresh</button></div>
   <div class="vform">
-    <div class="fld"><label>Species</label><div id="pickR"></div></div>
+    <div class="fld"><label>Species</label><div id="pickR"></div>
+      <!-- Inside the Species field, not at the foot of the form. It was 355px
+           below the control it describes, with six fields between them — and
+           once the submit handler started focusing the picker, the browser
+           scrolled the dialog to the top and left the message 0px visible at
+           360. aria-describedby fixed the AT association; proximity is the
+           sighted one. -->
+      <div class="warnbox" id="rosterErr" aria-live="polite" hidden><svg class="lui" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Pick a species first — the roster needs to know which pal this is.</div>
+    </div>
     <div class="fld"><label id="genderLbl">Gender <span class="opt">· optional</span></label>
       <div class="segrow" id="genderSeg" role="group" aria-labelledby="genderLbl">
         <button type="button" data-g="" class="on" aria-pressed="true">Unknown</button>
@@ -672,7 +680,6 @@
       </div>
     </details>
   </div>
-  <div class="warnbox" id="rosterErr" aria-live="polite" hidden><svg class="lui" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Pick a species first — the roster needs to know which pal this is.</div>
   <div class="formacts">
     <button class="alink primary" id="rosterAdd">+ Add to roster</button>
     <button class="alink" id="rosterAddAnother">+ Save &amp; add another</button>

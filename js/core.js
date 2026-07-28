@@ -144,8 +144,14 @@ function restoreFromToast() {
   const btn = next && next.querySelector('.undo, .tx');
   if (btn) { btn.focus(); return; }
   if (toastReturn && toastReturn !== document.body && document.contains(toastReturn)) { toastReturn.focus(); return; }
-  // last resort: the current tab button, which always exists
-  document.querySelector('#tabs button.active')?.focus();
+  // Last resort. #tabs exists in the DOM at every width but is display:none at
+  // ≤640, so focus() there was a silent no-op and every undo that reached this
+  // line dropped the user on <body> on a phone (2.4.3). The bottom nav is the
+  // tab bar at those widths — fall through to whichever one is really showing.
+  const bar = document.querySelector('#tabs button.active')
+    || document.querySelector('#bottomnav button.active')
+    || document.querySelector('#bottomnav button');
+  if (bar && bar.offsetParent) bar.focus();
 }
 // opts.ms overrides the dwell — a bulk Undo covers more than one record and
 // needs longer to notice, read and reach (DESIGN.md §4)

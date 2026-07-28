@@ -111,6 +111,12 @@ genderSeg.addEventListener('click', e => { const b = e.target.closest('button');
 const rosterAddBtn = document.getElementById('rosterAdd');
 const rosterCancelBtn = document.getElementById('rosterCancel');
 const gsymR = g => g === 'M' ? '♂' : g === 'F' ? '♀' : '';
+// The name this entry actually SHOWS, in the order mkRow renders it. The row's
+// own button already honoured gname — a pal renamed in your save — while the
+// toolbar, its three actions, the editor title, the remove toast and the name
+// sort all fell back to the species. So a row reading “Sparky” answered Remove
+// with "Removed Sparkit from roster".
+const entryName = r => r.nick || r.gname || byKey.get(r.k).n;
 let editingId = null;
 // ---------- add another: carry the batch-level fields forward ----------
 // A breeding line is by definition a run of pals that share their passives, so
@@ -152,7 +158,7 @@ function openRosterEditor(entry, presetPal) {
     nickInp.value = entry.nick || ''; noteInp.value = entry.note || '';
     ivEls.forEach((e, i) => e.value = entry.iv && entry.iv[i] !== null ? entry.iv[i] : '');
     moreDetails.open = !!(entry.iv || entry.note);
-    rmTitle.textContent = '✎ Editing ' + (entry.nick || p.n);
+    rmTitle.textContent = '✎ Editing ' + entryName(entry);
     rosterAddBtn.textContent = '✓ Save changes';
   } else {
     pickR.set(presetPal || null, true); rosterPassives.clear(); setGender('');
@@ -560,10 +566,16 @@ function duplicateEntry(r) {
   roster.splice(at < 1 ? roster.length : at, 0, copy);
   if (!owned.has(copy.k)) toggleOwned(copy.k);
   saveRoster(); renderRoster(); renderDex(); renderReverse();
-  toast('Added another ' + p.n, () => {
+  toast('Added another ' + entryName(r), () => {
     const i = roster.findIndex(x => x.id === copy.id);
     if (i >= 0) roster.splice(i, 1);
     saveRoster(); renderRoster(); renderDex(); renderReverse();
+    // the copy is gone, so land on the original it was made from
+    const row = rosterList.querySelector(`.rosrow[data-id="${CSS.escape(r.id)}"]`);
+    const el = (row && (row.querySelector('[data-act="dup"]') || row.querySelector('.nm')))
+      || rosterList.querySelector('.rostile')
+      || document.getElementById('rosterOpenAdd');
+    if (el) el.focus();
   }, {label: 'Edit it', fn: () => { const e2 = roster.find(x => x.id === copy.id); if (e2) openRosterEditor(e2); }});
 }
 // One Undo for the whole batch. Capture in ascending original index, splice
@@ -627,8 +639,15 @@ function removeEntry(r) {
   const undo = () => {
     roster.splice(Math.min(idx, roster.length), 0, removed);
     saveRoster(); renderRoster(); renderDex(); renderReverse();
+    // land on the row that just came back, rather than leaving it to toast()'s
+    // last resort — the batch undo already does this (see removeEntries)
+    const row = rosterList.querySelector(`.rosrow[data-id="${CSS.escape(removed.id)}"]`);
+    const el = (row && (row.querySelector('[data-act="remove"]') || row.querySelector('.nm')))
+      || rosterList.querySelector('.rostile')
+      || document.getElementById('rosterOpenAdd');
+    if (el) el.focus();
   };
-  const name = removed.nick || byKey.get(removed.k).n;
+  const name = entryName(removed);
   // last roster entry of a species: offer to also drop the owned ★
   if (!roster.some(x => x.k === removed.k) && owned.has(removed.k)) {
     toast('Removed ' + name + ' — species still ★ owned', undo, {
@@ -655,7 +674,9 @@ const ROSTER_SORTS = {
 // they fall through to "newest first" — the sibling you just hatched.
 const ROW_SORTS = {
   z: (a, b) => +b.id.slice(0, 13) - +a.id.slice(0, 13),
-  n: (a, b) => (a.nick || '').localeCompare(b.nick || '') || +b.id.slice(0, 13) - +a.id.slice(0, 13),
+  // sort on the name the row shows, or a save-imported “Sparky” sorted as if
+  // it had no name at all
+  n: (a, b) => entryName(a).localeCompare(entryName(b)) || +b.id.slice(0, 13) - +a.id.slice(0, 13),
   new: (a, b) => +b.id.slice(0, 13) - +a.id.slice(0, 13),
   ps: (a, b) => b.ps.length - a.ps.length,
   iv: (a, b) => ivSum(b) - ivSum(a),
@@ -672,6 +693,11 @@ const SECTION_RANK = {
 function renderRoster() {
   const list = document.getElementById('rosterList');
   const stats = document.getElementById('rosterStats');
+  // #rosterStats is aria-live, so writing it unconditionally re-announced the
+  // same sentence on every keystroke of the search field — 10 mutations for
+  // "Musclehead", 8 of them identical. syncSelectUI already guards bulkCount
+  // this way (4.1.3).
+  const say = txt => { if (stats.textContent !== txt) stats.textContent = txt; };
 
   // A re-render throws the whole list away, so remember what had focus and
   // hand it back afterwards — DESIGN.md §7. Every caller gets this for free.
@@ -705,10 +731,10 @@ function renderRoster() {
   });
 
   const shownSpecies = new Set(rows.map(r => r.k));
-  stats.textContent = !roster.length ? ''
+  say(!roster.length ? ''
     : filtering
       ? `${rows.length} of ${roster.length} pal${roster.length === 1 ? '' : 's'} · ${shownSpecies.size} species`
-      : `${roster.length} pal${roster.length === 1 ? '' : 's'} · ${new Set(roster.map(r => r.k)).size} species`;
+      : `${roster.length} pal${roster.length === 1 ? '' : 's'} · ${new Set(roster.map(r => r.k)).size} species`);
 
   const controls = document.querySelector('.roscontrols');
   if (controls) controls.hidden = !roster.length;
@@ -717,8 +743,11 @@ function renderRoster() {
   rosterViewEl.hidden = !roster.length || selecting;
   rosterSelectBtn.hidden = !roster.length || selecting;
   bulkBar.hidden = !selecting;
-  // nothing for it to compact until a panel or the Rows view supplies rows
-  denseToggle.disabled = rosterView === 'tiles' && !openSpecies;
+  // nothing for it to compact until a panel or the Rows view supplies rows —
+  // and a control that ships disabled has to say why (DESIGN.md §6)
+  const noRows = rosterView === 'tiles' && !openSpecies;
+  denseToggle.disabled = noRows;
+  denseToggle.title = noRows ? 'Open a species, or switch to Rows, to compact them' : '';
   setSeg(rosterViewEl, rosterView, 'v');
   list.classList.toggle('tileview', rosterView === 'tiles');
   list.classList.toggle('rowview', rosterView !== 'tiles');
@@ -732,7 +761,7 @@ function renderRoster() {
       // an empty state without a way out is a dead end (DESIGN.md §4).
       // The count stays a count — the sentence belongs to the hint, and the
       // header is the only place that says how much you actually own.
-      stats.textContent = `0 of ${roster.length} pal${roster.length === 1 ? '' : 's'}`;
+      say(`0 of ${roster.length} pal${roster.length === 1 ? '' : 's'}`);
       h.append('No pals match these filters. ');
       const b = document.createElement('button'); b.className = 'alink'; b.textContent = 'Clear filters';
       b.addEventListener('click', () => {
@@ -743,20 +772,17 @@ function renderRoster() {
       h.appendChild(b);
     } else {
       h.append('No pals in your roster yet. ');
-      const b = document.createElement('button'); b.className = 'alink primary'; b.textContent = '+ Add your first pal';
+      // not .primary: the header's own "+ Add pal" is present in every roster
+      // state and is the view's one primary (DESIGN.md §4)
+      const b = document.createElement('button'); b.className = 'alink'; b.textContent = '+ Add your first pal';
       b.addEventListener('click', () => openRosterEditor(null));
       h.appendChild(b);
-      h.append(' Or use “Add to roster” on any pal card.');
-      // the cheapest improvement for someone about to grind the dialog for
-      // pals they only need marked as owned is telling them not to
-      const w = document.createElement('div'); w.className = 'emptywhy';
-      const wt = document.createElement('span');
-      wt.textContent = 'You don’t need an entry for every pal. Star a species ★ in the Paldex to satisfy every owned filter. An entry is for when one pal’s passives, gender or IVs matter.';
-      w.appendChild(wt);
-      const b2 = document.createElement('button'); b2.className = 'alink'; b2.textContent = 'Open the Paldex';
-      b2.addEventListener('click', () => navTab('dex'));
-      w.appendChild(b2);
-      h.appendChild(w);
+      // The "you may not need an entry" paragraph that used to sit here said the
+      // same thing as #rosterWhy, which this very button reveals 300ms later —
+      // inside the dialog, where it can still change the decision, and which
+      // shows for exactly the users who need it (roster.length < 3). Three
+      // centred blocks and five sentences for an empty state; §6 asks for one
+      // sentence and one action.
     }
     list.appendChild(h);
     // an early return is still a re-render — focus must not land on <body>
@@ -785,7 +811,7 @@ function renderRoster() {
   // ---- one row's action cluster: a single tab stop, arrows move inside ----
   const mkActs = r => {
     const p = byKey.get(r.k);
-    const who = r.nick || p.n;
+    const who = entryName(r);
     const acts = document.createElement('div');
     acts.className = 'acts'; acts.setAttribute('role', 'toolbar');
     acts.setAttribute('aria-label', 'Actions for ' + who);
@@ -882,6 +908,11 @@ function renderRoster() {
     // the nick field, because a pal renamed in-game must not overwrite the name
     // you typed — and hiding the disagreement would be worse than showing it.
     else if (r.gname) { const gn = document.createElement('span'); gn.className = 'gname'; gn.textContent = '“' + r.gname + '”'; gn.title = 'Name from your save file'; nm.appendChild(gn); }
+    // Nothing to call it: no nickname, no save name, and no level chip beside it
+    // to act as a handle. Rather than a lone 25px glyph in a 240px track — two
+    // ♂ siblings rendering identically — fall back to the species, in --muted at
+    // 400 so it reads as a fallback and not as the band's name repeated.
+    else if (!r.lv) { const fb = document.createElement('span'); fb.className = 'nmfb'; fb.textContent = p.n; nm.appendChild(fb); }
     nm.addEventListener('click', () => openModal(p, r));
     who.appendChild(nm);
     if (r.lv) {
@@ -936,7 +967,10 @@ function renderRoster() {
       const oneSided = gi.n >= 2 && !gi.U && (!gi.M || !gi.F);
       const chip = document.createElement('span');
       chip.className = 'mchip' + (oneSided ? ' warn' : '');
-      const tally = [gi.M ? gi.M + '♂' : '', gi.F ? gi.F + '♀' : '', gi.U ? gi.U + ' ?' : ''].filter(Boolean).join(' · ');
+      // the ? is appended as a node below, not folded into this string: genderize
+      // gives ♂/♀ a spoken word, so a bare "1 ?" was the one segment that
+      // announced as "1" — the row 40px away already solved this with .gu
+      const tally = [gi.M ? gi.M + '♂' : '', gi.F ? gi.F + '♀' : ''].filter(Boolean).join(' · ');
       // "all 3:", not "of all 3:" — the count badge right before it already says
       // "1 pal of 3", and the two "of" clauses ran together in one breath
       const counts = entries.length < total ? `all ${total}: ${tally}` : tally;
@@ -947,6 +981,15 @@ function renderRoster() {
       chip.appendChild(genderize(!oneSided ? counts
         : tile ? `all ${gi.n} ${gi.M ? '♂' : '♀'}`
         : `${counts} · can’t pair with each other`));
+      // oneSided requires !gi.U, so this only ever lands on the plain tally
+      if (gi.U) {
+        if (tally) chip.append(' · ');
+        const u = document.createElement('span');
+        u.setAttribute('role', 'img');
+        u.setAttribute('aria-label', gi.U + ' gender not recorded');
+        u.textContent = gi.U + ' ?';
+        chip.appendChild(u);
+      }
       if (oneSided && tile) {
         const sr = document.createElement('span'); sr.className = 'sr-only';
         sr.textContent = ' — can’t pair with each other';
@@ -1110,8 +1153,12 @@ function renderRoster() {
         close.type = 'button'; close.className = 'pclose'; close.textContent = '✕';
         close.setAttribute('aria-label', 'Close ' + p.n);
         close.addEventListener('click', () => closePanel());
-        b.h.appendChild(close);
         panel.appendChild(b.h);
+        // after the <h3>, not inside it: a control is not part of a heading's
+        // name, and nested it made the heading announce "Lamball 3 pals 3 male
+        // · can't pair with each other Close Lamball". Same ruling the band
+        // checkbox already follows.
+        b.h.after(close);
         const ul = document.createElement('ul'); ul.className = 'roslist';
         for (const r of entries) ul.appendChild(mkRow(r));
         panel.appendChild(ul);
@@ -1180,7 +1227,7 @@ function renderRosterStrip() {
     // decorative: the name sits right beside it, and a non-decorative alt made a
     // pal with no nickname announce its species twice (DESIGN.md §4)
     chip.appendChild(icon(p, 30, false, true));
-    const nm = document.createElement('span'); nm.textContent = r.nick || p.n; chip.appendChild(nm);
+    const nm = document.createElement('span'); nm.textContent = entryName(r); chip.appendChild(nm);
     if (r.g) chip.appendChild(gEl(gsymR(r.g)));
     // the count's meaning lived only in a title, which touch never shows. The
     // glyph stays — it is compact typography, not an emoji — but it is

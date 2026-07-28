@@ -415,7 +415,13 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .roscontrols .search-inp{max-width:none;width:100%}
 .dex-controls .isel{flex:0 1 auto}
 @media(max-width:640px){.dex-controls select,.dex-controls .isel{flex:1;min-width:140px}}
-select{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);color:var(--text);padding:10px 14px;outline:none;cursor:pointer}
+select{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);color:var(--text);padding:var(--sp-3) 14px;outline:none;cursor:pointer;
+  /* Without the font-size a select inherits the UA's 13.333px — off §3's scale
+     entirely — and came out 39px against .search-inp and .isel-btn at 44.5px,
+     which is what pushed .roscontrols' bottom-aligned labels out of line.
+     Chrome clamps line-height on a select, so the last 5px comes from padding:
+     --sp-3 lands it at 45px, within half a pixel of its siblings. */
+  font-size:var(--fs-base)}
 select:focus{border-color:var(--accent)}
 
 /* Dropdowns that show an icon. A native <option> can't hold an image, so the
@@ -654,8 +660,6 @@ select#genderSel{padding:10px 12px}
   .mchip.warn .whytail{position:absolute;width:1px;height:1px;margin:-1px;padding:0;
     overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 }
-.emptywhy{max-width:52ch;margin:14px auto 0;font-size:var(--fs-sm);line-height:1.6}
-.emptywhy>span{display:block;margin-bottom:9px}
 .vform{display:flex;flex-direction:column;gap:15px}
 .fld label{display:block;font-size:var(--fs-xs);letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;font-weight:700}
 .fld label .opt{text-transform:none;letter-spacing:0;font-weight:400;opacity:.75}
@@ -770,11 +774,15 @@ select#genderSel{padding:10px 12px}
 .rostile[aria-expanded="true"] .tchev{transform:rotate(180deg);color:var(--accent)}
 @media (max-width:640px){
   /* the ✕ takes ~32px and .gname2 is the only shrinkable child, so the name
-     was ellipsised to "Lam…" — give it the first line to itself */
-  .rospanel .rosband{flex-wrap:wrap;row-gap:4px}
-  .rospanel .rosband .gname2{flex:1 1 auto}
+     was ellipsised to "Lam…" — give it the first line to itself.
+     Unscoped: §4 says .rosband is one implementation with two homes, and only
+     the panel got this. In a Rows section the one-gender warn chip ate the row
+     the same way, so at 360 a section header read "La…" and nothing on screen
+     named the species. */
+  .rosband{flex-wrap:wrap;row-gap:4px}
+  .rosband .gname2{flex:1 1 auto}
   .rospanel .rosband .pclose{order:2}
-  .rospanel .rosband .chiprow{order:3;flex:1 1 100%}
+  .rosband .chiprow{order:3;flex:1 1 100%}
   .rostile{padding:8px 6px 16px;gap:2px}
   .rostile .pico{--ico:44px}
 }
@@ -819,6 +827,9 @@ select#genderSel{padding:10px 12px}
 .rosrow.editing{box-shadow:inset 2px 0 0 var(--accent);background:var(--accent-tint)}
 .rosrow .who{display:flex;align-items:center;gap:2px;min-width:0;flex-wrap:wrap}
 .rosrow .nm{font-weight:600;font-size:var(--fs-md);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* the species standing in for a name the entry doesn't have — --muted at 400 so
+   it reads as a fallback, not as the band's name (--text/700) repeated */
+.rosrow .nm .nmfb{color:var(--muted);font-weight:400}
 /* gender not recorded — same slot and weight as ♂/♀, so the column still aligns */
 .rosrow .gu{color:var(--muted);font-weight:700}
 .rosrow .pscol{min-width:0}
@@ -1048,7 +1059,11 @@ select#genderSel{padding:10px 12px}
 .plan .rstep.done .badge,.plan .rstep.done .carrier,.plan .rstep.done .pico{opacity:.55}
 /* one checkbox recipe, used by the plan's step ticks and the roster's selection
    mode. Promoted from .plan .rstep .chk rather than forked (DESIGN.md §4). */
-.plan .rstep .chk,.rchk{appearance:none;-webkit-appearance:none;width:22px;height:22px;margin:0;border-radius:var(--r-sm);background:var(--raised);border:1px solid var(--border-strong);cursor:pointer;flex-shrink:0;transition:background var(--t-fast),border-color var(--t-fast)}
+/* --muted, not --border-strong: the resting box has no fill delta from its row
+   (--raised on --surface is 1.10:1), so its border is the sole thing saying a
+   control is there — and §1 forbids a sub-3:1 border in that role. --muted is
+   5.90:1 on --surface, and was already the :hover value below. */
+.plan .rstep .chk,.rchk{appearance:none;-webkit-appearance:none;width:22px;height:22px;margin:0;border-radius:var(--r-sm);background:var(--raised);border:1px solid var(--muted);cursor:pointer;flex-shrink:0;transition:background var(--t-fast),border-color var(--t-fast)}
 .plan .rstep .chk:hover,.rchk:hover{border-color:var(--muted)}
 .plan .rstep .chk:checked,.rchk:checked{border-color:var(--success);background:var(--success) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="%230d1117" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>') center/14px no-repeat}
 /* the third state the two tristate levels need: a dash, not a tick */
@@ -1471,6 +1486,12 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
      the whole rule, and that would take the search span down with it. */
   .dexcontrols>.ctl:first-child,.dexcontrols>.ctlwide,
   .dexcontrols>.rstats,.dexcontrols>.alink{grid-column:1/-1}
+  /* The roster's four controls stacked to 275px, putting the first tile at
+     y=632 on a 360 screen — the same problem, and §9 already settles the shape.
+     Search spans; Passive, Sort and Compact rows pair up underneath. */
+  .roscontrols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+  .roscontrols>.ctl{width:auto;min-width:0}
+  .roscontrols>.ctl:first-child{grid-column:1/-1;max-width:none}
   .dexcontrols #dexShow button{padding:9px 4px;min-width:0}
   /* Three columns: star, pal, and whatever the sort is. Anything wider makes
      .tablewrap pan, and a panning wrap breaks the sticky header. */

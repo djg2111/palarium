@@ -507,6 +507,21 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
   }
   await nav(page, '#/roster', 500);
   await audit(page, 'roster at 360');
+  // Undo, at a width where the desktop tab bar is display:none. toast()'s last
+  // resort focused #tabs button.active, which exists but is unfocusable there,
+  // so every undo that reached it dropped the user on <body> — and the suite
+  // never pressed Undo, so nothing caught it.
+  if (await reach(page, async () => {
+    await page.click('#rosterView button[data-v="rows"]');
+    await page.waitForTimeout(400);
+    await page.click('.rosrow .acts button[data-act="remove"]');
+    await page.waitForSelector('.toast .undo', {timeout: 3000});
+  }, 'a roster remove and its Undo at 360')) {
+    await page.click('.toast .undo');
+    await page.waitForTimeout(700);
+    await focusVisible(page, 'Undo at 360 lands on the restored row');
+    await audit(page, 'roster after undo at 360');
+  }
 
   const probs = problems(h);
   console.log('\nproblems:', probs.length ? probs : 'none');
