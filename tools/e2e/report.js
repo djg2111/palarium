@@ -20,6 +20,7 @@ function makeReport() {
   // the lines to whichever group happened to be awaiting. The async context is
   // the only thing that knows which group a console.log came from.
   const als = new AsyncLocalStorage();
+  const times = {};
   let orig = null, started = 0;
 
   function parse(line, store) {
@@ -54,9 +55,11 @@ function makeReport() {
     // line into something no one can read.
     async run(group, title, fn) {
       const store = {group, pending: null, lines: []};
+      const t0 = Date.now();
       try {
         return await als.run(store, fn);
       } finally {
+        times[group] = Date.now() - t0;
         out(title);
         for (const l of store.lines) out(l);
       }
@@ -70,6 +73,9 @@ function makeReport() {
         const g = groups[r.group] = groups[r.group] || {checks: 0, failed: 0};
         g.checks++; if (!r.ok) g.failed++;
       }
+      // The slowest group is the floor for the whole run, however many workers
+      // there are — so it is the only number worth optimising against.
+      for (const [k, ms] of Object.entries(times)) if (groups[k]) groups[k].ms = ms;
       return {checks: records.length, failed: records.filter(r => !r.ok).length, groups};
     },
     write(file, meta) {

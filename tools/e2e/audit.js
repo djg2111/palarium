@@ -21,6 +21,7 @@
  */
 const path = require('path');
 const os = require('os');
+const fs = require('fs');
 const {execSync} = require('child_process');
 const {chromium} = require('../node_modules/playwright');
 const {open, problems, close, BASE} = require('./lib');
@@ -34,6 +35,21 @@ const SUITES = {states: './states', a11y: './a11y'};
 // Each context is a Chrome tab running axe over a 299-pal DOM, so this is
 // bounded by memory rather than cores.
 const DEFAULT_CONCURRENCY = Math.max(1, Math.min(6, os.cpus().length - 2));
+
+// How long each group took last time, used only to order the queue. Advisory:
+// a missing, stale or corrupt file costs nothing but the old ordering.
+const TIMINGS = path.join(__dirname, '..', '..', '.audit', 'timings.json');
+function readTimings() {
+  try { return JSON.parse(fs.readFileSync(TIMINGS, 'utf8')); } catch (e) { return null; }
+}
+function writeTimings(groups) {
+  try {
+    const prev = readTimings() || {};
+    for (const [k, v] of Object.entries(groups)) if (v.ms) prev[k] = v.ms;
+    fs.mkdirSync(path.dirname(TIMINGS), {recursive: true});
+    fs.writeFileSync(TIMINGS, JSON.stringify(prev, null, 2));
+  } catch (e) { /* advisory only */ }
+}
 
 // Stamped into the artifact so a second reader can tell whether the run it
 // found still describes the working tree, instead of trusting a stale file.
@@ -99,6 +115,13 @@ async function main(argv) {
   }
 
   const queue = suites.flatMap(s => s.groups.filter(g => !o.groups || o.groups.includes(g.name)).map(g => ({suite: s, g})));
+
+  // Longest-processing-time-first. With groups of 1s to 25s, declaration order
+  // leaves a long one starting last and every other worker idling behind it —
+  // worth ~8s of a 43s run. Ordering is free because groups are independent;
+  // the timings come from the previous run and fall back to declaration order.
+  const hints = readTimings();
+  if (hints) queue.sort((a, b) => (hints[`${b.suite.name}/${b.g.name}`] || 0) - (hints[`${a.suite.name}/${a.g.name}`] || 0));
   const report = makeReport();
   report.begin();
   report.hook();
@@ -132,6 +155,7 @@ async function main(argv) {
   report.unhook();
 
   const failed = suites.reduce((n, s) => n + s.failed(), 0);
+  writeTimings(report.summary().groups);
   console.log('\nproblems:', allProblems.length ? allProblems : 'none');
   if (o.json) {
     const doc = report.write(o.json, {suites: names, groups: o.groups || 'all', groupsRun: queue.length,

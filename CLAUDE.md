@@ -22,7 +22,7 @@ state groups over one runner, `tools/e2e/audit.js`, which is also the command li
 have broken (mapping in `tools/e2e/scope.js`; a shared or unmapped file runs
 everything), `--groups a,b` picks by hand, `--json <path>` writes the results so one
 run can answer several reviewers instead of each driving its own browser. Groups run
-six at a time; both suites take ~50s. Adding a view means adding a group to the suite
+six at a time, longest first; both suites take ~35s. Adding a view means adding a group to the suite
 **and** a line to `scope.js`. The suites reach states through deep links and the fixed ids in
 `index.html`; renaming an id a suite drives means updating the suite in the same
 commit — the same contract as `index.html` + the `SHELL` array in `sw.js` (plus

@@ -400,7 +400,9 @@ node e2e/audit.js --concurrency 1                 # serial, for debugging
 
 Groups run six at a time by default (`min(6, cores-2)`), each in its own context,
 with the output buffered per group so concurrent blocks stay readable. Both suites
-together take ~50s.
+together take ~35s. Group durations are recorded to `.audit/timings.json` and used
+to start the longest group first next time — with groups ranging 1s to 25s,
+declaration order left one long group starting last while five workers idled.
 
 `--changed` reads `git diff` and maps files to groups via `e2e/scope.js` — the
 view files are close to 1:1 with the states, so `js/roster.js` audits `roster` and

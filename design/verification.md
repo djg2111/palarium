@@ -23,7 +23,7 @@ script to do what it already does.**
 ```sh
 node tools/e2e/audit.js --list                     # the group names
 node tools/e2e/audit.js --changed --json .audit/run.json
-node tools/e2e/audit.js                            # both suites, every group (~50s)
+node tools/e2e/audit.js                            # both suites, every group (~35s)
 node tools/e2e/audit.js --suite states --groups roster,dex
 node tools/e2e/audit.js --concurrency 1            # serial, when debugging a group
 ```

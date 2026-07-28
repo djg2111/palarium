@@ -21,6 +21,27 @@ let store = null;
 const setSink = fn => { store = fn; };
 const park = d => { const s = store && store(); if (s) s.pending = d; };
 
+// Wait for the layout to stop moving instead of guessing how long it needs.
+// Capped by the fixed wait it replaces, so this is never slower than the sleep
+// it stands in for — it just usually returns in three frames instead of 220ms.
+//
+// Only safe where the thing being waited on IS layout. A debounced recompute
+// can leave the page perfectly still while the answer is still wrong, so the
+// bespoke waits inside the group bodies stay as they are.
+const settled = (page, cap) => page.evaluate(ms => new Promise(done => {
+  const t0 = performance.now();
+  const d = document.documentElement;
+  let last = '', stable = 0;
+  const tick = () => {
+    const sig = `${d.scrollWidth}x${d.scrollHeight}`;
+    stable = sig === last ? stable + 1 : 0;
+    last = sig;
+    if (stable >= 2 || performance.now() - t0 > ms) return done();
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}), cap);
+
 function makeChecks() {
   let failures = 0;
 
@@ -44,7 +65,7 @@ function makeChecks() {
     const bad = [];
     for (const w of [320, 390, 768, 1280]) {
       await page.setViewportSize({width: w, height: 900});
-      await page.waitForTimeout(220);
+      await settled(page, 220);
       const over = await page.evaluate(() => ({
         doc: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
         sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
@@ -52,7 +73,7 @@ function makeChecks() {
       if (over.doc) bad.push(`${w}px (${over.sw} > ${over.cw})`);
     }
     await page.setViewportSize({width: 1280, height: 900});
-    await page.waitForTimeout(150);
+    await settled(page, 150);
     park({check: 'overflow', widths: [320, 390, 768, 1280], bad});
     if (bad.length) { failures++; console.log(`  ✗ ${label}: horizontal overflow at ${bad.join(', ')}`); }
     else console.log(`  ✓ ${label}: no horizontal overflow at 320 / 390 / 768 / 1280`);
