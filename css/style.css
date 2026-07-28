@@ -376,7 +376,12 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 /* ---------- unique combos ----------
    Two tiers per card: the result is the heading (these rows sort by it), the
    recipe is a muted caption. Nothing truncates — the recipe wraps instead. */
-.combos{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:10px}
+/* a <ul> since 78b6b06, so the board reports its size the way .dexgrid does.
+   The <li> is the grid item and the .combo fills it — display:contents on the
+   li would be tidier but drops listitem from the a11y tree in some engines. */
+.combos{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:10px;list-style:none;margin:0;padding:0}
+.combos>li{display:flex}
+.combos>li>.combo{flex:1 1 auto;min-width:0}
 .combo{display:flex;align-items:center;gap:13px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:11px 15px;text-align:left}
 .combo:hover{border-color:var(--border-strong)}
 .combo>.pico{width:40px;height:40px}
@@ -414,6 +419,11 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .roscontrols>.ctl:first-child{flex:1 1 260px;max-width:340px}
 .roscontrols .search-inp{max-width:none;width:100%}
 .dex-controls .isel{flex:0 1 auto}
+/* §4: a segmented choice's consequence line goes UNDER it. On one flex line it
+   sat 13px from #comboCount at the same baseline and colour, so the two read as
+   one string — "Every unique combo in the game. 250 combos". Correct already at
+   ≤640, where .dexcontrols becomes a grid; this makes it true at every width. */
+.dex-controls #comboKindWhy{flex:1 1 100%;margin:0}
 @media(max-width:640px){.dex-controls select,.dex-controls .isel{flex:1;min-width:140px}}
 select{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);color:var(--text);padding:var(--sp-3) 14px;outline:none;cursor:pointer;
   /* Without the font-size a select inherits the UA's 13.333px — off §3's scale
@@ -448,13 +458,22 @@ select:focus{border-color:var(--accent)}
 .isel-row:hover{background:var(--raised);color:var(--text)}
 .isel-row.on{background:var(--accent-tint);color:var(--text);font-weight:600}
 table{width:100%;border-collapse:collapse}
-th{position:sticky;top:var(--hh,64px);background:var(--bg);text-align:left;font-size:var(--fs-sm);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border-strong);cursor:pointer;user-select:none;white-space:nowrap;z-index:5}
-th:hover{color:var(--text)}
-th:not([data-s]){cursor:default}
-th:not([data-s]):hover{color:var(--muted)}
-th .arr{color:var(--accent)}
-.thbtn{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;padding:0}
+/* thead th, not th: this is the sticky COLUMN-header treatment, and unscoped it
+   also landed on any <th scope="row"> in a body — which is why the Paldex table
+   had no row headers at all and .ranktbl carries two lines undoing it. */
+thead th{position:sticky;top:var(--hh,64px);background:var(--bg);text-align:left;font-size:var(--fs-sm);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border-strong);cursor:pointer;user-select:none;white-space:nowrap;z-index:5}
+thead th:hover{color:var(--text)}
+thead th:not([data-s]){cursor:default}
+thead th:not([data-s]):hover{color:var(--muted)}
+thead th .arr{color:var(--accent)}
+/* the click target is the <th>, but the FOCUS RING is this button — 23.6x18.8
+   without a floor. Same recipe .rosrow .thbtn already carries. */
+.thbtn{font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;padding:0;min-height:24px;min-width:24px}
 td{padding:5px 12px;border-bottom:1px solid var(--border);font-size:var(--fs-md)}
+/* the species name is the row's header, so it is a <th scope="row"> — it gets
+   the body-cell treatment, not the sticky column-header one */
+#dexTableWrap tbody th{padding:5px 12px;border-bottom:1px solid var(--border);font-size:var(--fs-md);
+  text-align:left;font-weight:400;color:var(--text);background:none;position:static;white-space:normal}
 /* The metric column exists only for the phone table, where three columns keep
    the table inside its container. .tablewrap only becomes a scrollport when it
    has to pan, and a scrollport is what the sticky <th> resolves against — so
@@ -468,7 +487,13 @@ tbody tr:hover{background:var(--surface)}
    column — nowrap keeps it from breaking into "unique" / "only" */
 .uq{color:var(--muted);font-size:var(--fs-xs);white-space:nowrap;margin-left:5px}
 .tworks b{color:var(--accent);font-weight:700}
-.star{font-size:var(--fs-lg);color:var(--faint);padding:10px 11px;margin:-8px -5px;border-radius:var(--r-sm);line-height:1}
+/* --muted, not --faint: the glyph is this button's entire visual rendering, so
+   it is the state indicator, and §1 reserves --faint for text nobody needs.
+   --faint measured 3.28:1 at rest but 2.99:1 over the --raised hover fill,
+   under 1.4.11's 3:1 floor. --muted is 6.45 / 5.90 / 5.37 on bg/surface/raised.
+   axe cannot see this — it reports the glyph "incomplete" because the content
+   is non-text. */
+.star{font-size:var(--fs-lg);color:var(--muted);padding:10px 11px;margin:-8px -5px;border-radius:var(--r-sm);line-height:1}
 .star.on{color:var(--gold)}
 .star:hover{background:var(--raised)}
 @media(max-width:840px){

@@ -502,14 +502,55 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
       const items = [...document.querySelectorAll('#comboList .combo')];
       return {n: items.length, stops: items.filter(c => c.tabIndex >= 0).length};
     });
-    if (board.n > 1 && board.stops === 1) console.log(`  ✓ the combos board is one tab stop for ${board.n} recipes`);
-    else { console.log(`  ✗ the combos board costs ${board.stops} tab stops for ${board.n} recipes`); fail(); }
+    if (board.n > 1 && board.stops === 1) console.log(`  ✓ the combos board is one tab stop for ${board.n} combos`);
+    else { console.log(`  ✗ the combos board costs ${board.stops} tab stops for ${board.n} combos`); fail(); }
+    // one stop is only half the contract — the board also has to say the arrows
+    // exist, and report its size (§4)
+    const told = await page.evaluate(() => {
+      const l = document.getElementById('comboList');
+      const d = l.getAttribute('aria-describedby');
+      return {tag: l.tagName, named: !!l.getAttribute('aria-label'),
+        help: !!(d && document.getElementById(d))};
+    });
+    if (told.tag === 'UL' && told.named && told.help) console.log('  ✓ the combos board is a named list with keyboard help');
+    else { console.log(`  ✗ the combos board is undocumented: ${JSON.stringify(told)}`); fail(); }
     await page.evaluate(() => document.querySelector('#comboList .combo').focus());
     await page.keyboard.press('ArrowDown');
     await page.waitForTimeout(200);
     const moved = await page.evaluate(() => document.activeElement.classList.contains('combo'));
     if (moved) console.log('  ✓ arrows move within the combos board');
     else { console.log('  ✗ ArrowDown left the combos board'); fail(); }
+    // the board's one action crosses tabs, and navTab hides the control pressed
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(600);
+    await focusVisible(page, 'a combo lands on the pair it loaded');
+    await nav(page, '#/dex', 500);
+    await page.click('#dexMode button[data-m="pals"]');
+    await page.waitForTimeout(300);
+  }
+  // A star under a filter that removes its row: the gallery had the successor
+  // branch, the table swallowed the miss with ?. and dropped focus on <body>.
+  if (await reach(page, async () => {
+    await page.click('#dexView button[data-v="table"]');
+    await page.waitForTimeout(400);
+    await page.click('#dexShow button[data-v="missing"]');
+    await page.waitForSelector('#dexBody tr .star', {timeout: 3000});
+  }, 'the table under Show: missing')) {
+    await page.evaluate(() => { const s = document.querySelector('#dexBody tr .star'); s.focus(); s.click(); });
+    await page.waitForTimeout(600);
+    await focusVisible(page, 'starring a table row under a filter lands on its successor');
+    // and the pal name is the row's header, so a cell is not announced bare
+    const heads = await page.evaluate(() => ({
+      rows: document.querySelectorAll('#dexBody tr').length,
+      headers: document.querySelectorAll('#dexBody th[scope="row"]').length,
+      sticky: getComputedStyle(document.querySelector('#dexBody th')).position}));
+    if (heads.headers === heads.rows && heads.sticky === 'static')
+      console.log(`  ✓ every table row has a row header (${heads.headers}/${heads.rows}), unstyled by the sticky column rule`);
+    else { console.log(`  ✗ table row headers: ${JSON.stringify(heads)}`); fail(); }
+    await page.click('#dexShow button[data-v="all"]');
+    await page.waitForTimeout(300);
+    await page.click('#dexView button[data-v="gallery"]');
+    await page.waitForTimeout(300);
   }
 
   console.log('\nSKILLS — all three sections');

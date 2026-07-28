@@ -256,6 +256,7 @@ second and a table is worst at the first):
 
 | Class | Role |
 |---|---|
+| `.star` | The ownership toggle, in both Paldex views. Every visual and spoken property comes from one `paintStar(star, p)` — a species can be owned two ways (starred here, or held in the roster), and the in-place branch that repaints without a re-render used to read `owned.has()` where the tile read `ownedSpeciesSet()`, leaving a hollow `☆` inside a gold owned tile. **A gold ring beside an empty ☆ reads as a broken control**, so the two must never be painted from different predicates. `aria-pressed` reports only "starred here"; the roster case is carried in words by the accessible name — never `aria-pressed="mixed"`, which means partially pressed. The glyph is the button's entire visual rendering, so it is a state indicator and takes `--muted`, not `--faint` (which measured 2.99:1 over the hover fill). |
 | `.dexgrid` / `.dextile` | The species gallery and one species tile. `.dextile.on` is owned. `.dextile-open` is the whole-tile press target (`::after{inset:0}`); the `.star` sits above it as a sibling, never nested. Arrow keys move between tiles (roving `tabindex`), Tab reaches the focused tile's star — the same two-stops-per-item convention as a roster row. |
 | `.viewseg` | The gallery/table switch. A `.segrow` pinned to the end of a heading block. |
 | `.sr-only` | Visually hidden, still announced. **`.nativehide` is the opposite job** — it hides a control from AT while leaving it on screen. |
@@ -301,8 +302,12 @@ the reason in an `.sr-only` tail, while the header band and the open panel show
 `3♂ · can’t pair with each other` outright. Both keep the tally — a warning that eats
 the number it is warning about leaves nothing to act on.
 
-**Grid boards are one tab stop.** `.roster.tileview` and `.dexgrid` both use a
-roving `tabindex` over their items. Vertical movement is **geometric** — find the
+**Grid boards are one tab stop.** `.roster.tileview`, `.dexgrid` and `.combos`
+all use a roving `tabindex` over their items. **One stop is only half the
+contract**: the board also carries a name and an `.sr-only` line saying the
+arrows exist (`#dexGridHelp`, `#comboListHelp`), and it is a `<ul>` so AT can
+report its size. Removing 249 tab stops without those leaves 249 controls
+depending on a convention nothing states. Vertical movement is **geometric** — find the
 adjacent row by `getBoundingClientRect().top`, then the nearest column by centre
 x — never `index ± columns`, which clamps to the first/last item when a row is
 short and strands you in a column you were never in, and cannot see a full-width
@@ -611,17 +616,13 @@ is still a 2.4.11 failure — which is how it shipped twice.
   stars — in the same view whose gallery is **one**, over the same 299 species.
   §4 settles that a grid board is one stop, but a data table is a different
   component and the rule does not simply transfer: rows also carry AT's own
-  table-navigation mode, so the answer (roving rows? make only the name cell a
-  button, as `.dextile-open` already is? leave it?) is a design decision. The
-  gallery's `gridStep` is right there if roving wins.
-- **The Paldex table has no row headers.** Every cell is a `<td>`, so a cell
-  announces "3050" with no row context; the pal-name cell should be
-  `<th scope="row">`. Not done yet because the global `th` rule is written for
-  the sticky header row (`position:sticky`, uppercase, `--muted`) and a body
-  `<th>` inherits all of it — the fix is scoping that rule to `thead th` and
-  giving `tbody th` the `td` treatment, which also changes the Skills tab's
-  `.ranktbl`, whose own `scope="row"` cells inherit the same rule today. Worth
-  doing with the Skills review rather than blind.
+  table-navigation mode. It cannot be halved either — a `.star` inside a `<td>`
+  becomes keyboard-unreachable the moment it goes to `-1` unless a roving model
+  owns the row too. Note the rows are `role="row"` carrying `tabindex="0"`, an
+  `aria-label` and their own Enter/Space handler: a custom widget on a
+  non-interactive role. axe is clean, so it is not a gate — but "make only the
+  name cell a button, as `.dextile-open` already is" is the option that removes
+  that as well as the stops.
 
 - **Duplicate uses `⧉` (U+29C9), which is not on §7's plain-symbol allowlist**
   (`★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×`), and §7 says not to add one where a Lucide icon

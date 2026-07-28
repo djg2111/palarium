@@ -119,18 +119,30 @@ function dexMetric(p, wk) {
 // A species can be owned two ways: starred here, or held in the roster. The
 // table never showed ownership on the row, so the split was invisible; on a
 // tile the ring and the star sit 6px apart and must not disagree.
-function dexStar(p, onToggle) {
-  const star = document.createElement('button');
+// Every visual and spoken property of a star, in one place. The in-place
+// branch below used to repaint only the glyph and aria-pressed from
+// owned.has(), never re-reading viaRoster — so two presses on a species owned
+// through the roster left a hollow ☆ inside a gold owned tile whose own class
+// came from ownedSpeciesSet(). Two sources of truth 6px apart, and §4 names
+// that exact state as reading like a broken control.
+function paintStar(star, p) {
   const starred = owned.has(p.k);
   const viaRoster = !starred && roster.some(r => r.k === p.k);
   star.className = 'star' + (starred ? ' on' : '') + (viaRoster ? ' viaroster' : '');
-  star.type = 'button';
   star.textContent = starred || viaRoster ? '★' : '☆';
-  star.title = viaRoster ? 'In your roster — already counts as owned' : 'Mark as owned';
+  // title was a word-for-word duplicate of the accessible name, which AT reads
+  // as a description on top of it — the name carries the whole message
+  star.title = viaRoster ? 'In your roster — already counts as owned'
+    : starred ? 'Starred as owned' : 'Mark as owned';
   star.setAttribute('aria-label', viaRoster
     ? p.n + ' is in your roster and already counts as owned'
-    : 'Mark ' + p.n + ' as owned');
+    : (starred ? 'Unmark ' : 'Mark ') + p.n + ' as owned');
   star.setAttribute('aria-pressed', String(starred));
+}
+function dexStar(p, onToggle) {
+  const star = document.createElement('button');
+  star.type = 'button';
+  paintStar(star, p);
   star.addEventListener('click', e => { e.stopPropagation(); onToggle(star); });
   return star;
 }
@@ -171,7 +183,10 @@ function renderDex() {
   document.querySelectorAll('th[data-s]').forEach(th => {
     const base = th.dataset.label || (th.dataset.label = th.textContent);
     const active = dexSort.key === th.dataset.s;
-    th.innerHTML = `<button type="button" class="thbtn" aria-label="Sort by ${base}">${base}` +
+    // data-say, not data-label: data-label caches the VISIBLE text, and "#"
+    // announces as "sort by number sign"
+    const say = th.dataset.say || base;
+    th.innerHTML = `<button type="button" class="thbtn" aria-label="Sort by ${say}">${base}` +
       (active ? ` <span class="arr" aria-hidden="true">${dexSort.dir > 0 ? '▲' : '▼'}</span>` : '') + '</button>';
     th.setAttribute('aria-sort', active ? (dexSort.dir > 0 ? 'ascending' : 'descending') : 'none');
   });
@@ -209,7 +224,8 @@ function renderDex() {
       h.append('You haven’t starred any species yet. Pals in your roster count automatically. ');
       act('Show all species', showAll);
     } else if (dexShow === 'missing' && !(q || ty || wk)) {
-      h.append('You own every species that matches. Nice. ');
+      // this branch runs only when no filter is set, so "that matches" qualified nothing
+      h.append('You own every species. Nice. ');
       act('Show all species', showAll);
     } else {
       h.append('No species match these filters. ');
@@ -241,14 +257,14 @@ function emitGallery(rows, wk, os) {
       // Show=All keeps the tile, so mutate it in place: a re-render would
       // destroy the button under the user's finger and drop focus.
       if (dexShow === 'all') {
-        const now = owned.has(p.k);
-        star.classList.toggle('on', now);
-        star.textContent = now ? '★' : '☆';
-        star.setAttribute('aria-pressed', String(now));
+        paintStar(star, p);
         li.classList.toggle('on', ownedSpeciesSet().has(p.k));
-        const oc = ownedSpeciesSet();
-        liveText('dexOwnedCount', `${oc.size} of ${PALS.length} owned`);
-        document.getElementById('dexIntro').hidden = owned.size > 0;
+        liveText('dexOwnedCount', `${ownedSpeciesSet().size} of ${PALS.length} owned`);
+        // #dexIntro is NOT hidden here. This branch exists so the press doesn't
+        // destroy the button under the user's finger — and hiding a 35px block
+        // above the board in the same handler moved the whole grid up under it,
+        // so a second tap at the same point opened a pal card instead. The
+        // render path drops the intro on the next filter or tab change.
       } else {
         // the tile leaves the set; hand focus to whatever takes its place
         const at = [...dexGrid.children].indexOf(li);
@@ -305,12 +321,21 @@ function emitTable(rows, wk) {
     tr.dataset.k = p.k;
     const td0 = document.createElement('td');
     td0.appendChild(dexStar(p, () => {
+      // Under Show=owned/missing the row leaves the set, so the ?. below found
+      // nothing and swallowed it — focus fell to <body>. The gallery already
+      // had this branch; the table never did.
+      const at = [...dexBody.children].indexOf(tr);
       toggleOwned(p.k); renderDex(); renderReverse();
-      // the re-render destroyed the clicked button — put focus back on its successor
-      dexBody.querySelector(`tr[data-k="${p.k}"] .star`)?.focus();
+      const same = dexBody.querySelector(`tr[data-k="${p.k}"] .star`);
+      if (same) { same.focus(); return; }
+      const next = dexBody.children[Math.min(at, dexBody.children.length - 1)];
+      (next ? next.querySelector('.star')
+        : document.querySelector('#dexEmpty .alink') || dexSearch).focus();
     }));
     const td1 = document.createElement('td'); td1.className = 'tnum'; td1.textContent = zk(p);
-    const td2 = document.createElement('td');
+    // the row's header: every other cell in the row announces with this as its
+    // context instead of a bare "3050"
+    const td2 = document.createElement('th'); td2.scope = 'row';
     const nm = document.createElement('div'); nm.className = 'tname'; nm.appendChild(icon(p, 24, false, true));
     const s = document.createElement('span'); s.textContent = p.n; nm.appendChild(s);
     nm.appendChild(tierBadge(p)); td2.appendChild(nm);

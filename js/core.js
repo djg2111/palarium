@@ -145,6 +145,13 @@ function liveText(el, txt) {
   const n = typeof el === 'string' ? document.getElementById(el) : el;
   if (n && n.textContent !== txt) n.textContent = txt;
 }
+// navTab hides the control that was pressed, so a bare navTab() always ends on
+// <body>. Every cross-tab jump lands on the control the press just set — the
+// rule DESIGN.md §4 states for Breedable now, applied wherever it is needed.
+function landAfterNav(sel) {
+  const el = document.querySelector(sel);
+  if (el) el.focus({preventScroll: true});
+}
 let toastReturn = null;                  // where focus was when Alt+Z was pressed
 function restoreFromToast() {
   const next = toastsEl.lastElementChild;
@@ -606,9 +613,9 @@ function openModal(p, rentry) {
   bs.appendChild(bm);
   const btns = document.createElement('div'); btns.className = 'mbtns';
   const mkBtn = (label, primary, fn) => { const b = document.createElement('button'); b.className = 'alink' + (primary ? ' primary' : ''); b.textContent = label; b.addEventListener('click', fn); return b; };
-  btns.appendChild(mkBtn('Find parents', true, () => { closeModal(true); pickT.set(p, true); reverseShown = {}; renderReverse(); navTab('reverse'); }));
-  btns.appendChild(mkBtn('Set as Parent 1', false, () => { closeModal(true); pickA.set(p, true); renderBreed(); navTab('breed'); }));
-  btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(true); pickB.set(p, true); renderBreed(); navTab('breed'); }));
+  btns.appendChild(mkBtn('Find parents', true, () => { closeModal(true); pickT.set(p, true); reverseShown = {}; renderReverse(); navTab('reverse'); landAfterNav('#pickT .picker-btn'); }));
+  btns.appendChild(mkBtn('Set as Parent 1', false, () => { closeModal(true); pickA.set(p, true); renderBreed(); navTab('breed'); landAfterNav('#pickA .picker-btn'); }));
+  btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(true); pickB.set(p, true); renderBreed(); navTab('breed'); landAfterNav('#pickB .picker-btn'); }));
   btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(true); pickPT.set(p, true); setPlanMode('new'); navTab('plan'); scheduleAuto(); }));
   btns.appendChild(mkBtn('+ Add to roster', false, () => { leaveModal(); openRosterEditor(null, p); }));
   if (MAP) {

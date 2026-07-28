@@ -39,7 +39,7 @@
 <main id="main">
   <div class="setup" id="setupbar" hidden>
     <span class="lb">Get set up:</span>
-    <button type="button" class="step" data-su="star" title="Opens the Paldex — tap ☆ on species you own">★ Star pals you own</button>
+    <button type="button" class="step" data-su="star" title="Opens the Paldex — tap ☆ on species you own">★ Star species you own</button>
     <!-- × as a hidden glyph + a spoken "and" (DESIGN.md §4) — bare, NVDA reads
          "Relaxaurus times Sparkit" -->
     <button type="button" class="step" data-su="breed" title="Loads an example pair in the Breed tab">Try a breed: Relaxaurus <span aria-hidden="true">×</span><span class="sr-only">and</span> Sparkit</button>
@@ -234,7 +234,7 @@
       <button data-m="combos" role="tab" aria-selected="false">Unique combos</button>
     </nav>
     <div id="dexPalsBlock">
-    <div class="viewsub" id="dexIntro">Star ★ a species to mark it as owned — stars power every “Owned” filter across the app. Pals in your Roster count as owned automatically.</div>
+    <div class="viewsub" id="dexIntro">Star ★ a species to mark it as owned. Stars power every “Owned” filter across the app. Pals in your Roster count as owned automatically.</div>
     <div class="dex-controls dexcontrols">
       <div class="ctl"><label for="dexSearch">Search</label>
         <input type="search" class="search-inp" id="dexSearch" placeholder="Name…"></div>
@@ -266,18 +266,19 @@
     <ul class="dexgrid" id="dexGrid" aria-label="Species" aria-describedby="dexGridHelp"></ul>
     <p id="dexGridHelp" class="sr-only">Arrow keys move between species. Press Tab to reach the star for the focused species.</p>
     <div class="tablewrap" id="dexTableWrap" hidden>
-    <table>
+    <table aria-describedby="dexTableHelp">
       <!-- The gallery's <ul> is named "Species"; the table showed the same 299
            rows as an unnamed table. scope="col" makes the association explicit
            rather than inferred. -->
-      <caption class="sr-only">Species — sortable. Press Enter on a row to open that species.</caption>
+      <caption class="sr-only">Species</caption>
       <thead><tr>
         <th scope="col" class="thstar"><span class="sr-only">Owned</span><span aria-hidden="true">★</span></th>
-        <th scope="col" data-s="z">#</th><th scope="col" data-s="n">Pal</th><th scope="col" data-s="t" class="hn">Element</th>
-        <th scope="col" data-s="r">Breeding power</th><th scope="col" data-s="m" class="hn">♂ chance</th><th scope="col" data-s="w">Work suitability</th><th scope="col" class="thmetric" id="dexMetricTh"></th>
+        <th scope="col" data-s="z" data-say="Paldex number">#</th><th scope="col" data-s="n">Species</th><th scope="col" data-s="t" class="hn">Element</th>
+        <th scope="col" data-s="r">Breeding power</th><th scope="col" data-s="m" class="hn">♂ chance</th><th scope="col" data-s="w">Work total</th><th scope="col" class="thmetric" id="dexMetricTh"></th>
       </tr></thead>
       <tbody id="dexBody"></tbody>
     </table>
+    <p id="dexTableHelp" class="sr-only">Sortable. Press Enter on a row to open that species.</p>
     </div>
     <div id="dexEmpty"></div>
     </div>
@@ -285,16 +286,26 @@
       <div class="dex-controls dexcontrols">
         <div class="ctl"><label for="comboSearch">Search</label>
           <input type="search" class="search-inp" id="comboSearch" placeholder="Species name…"></div>
-        <div class="ctl ctlwide"><label id="comboKindLbl">Recipe type</label>
+        <div class="ctl ctlwide"><label id="comboKindLbl">Combo type</label>
           <div class="segrow" id="comboKind" role="group" aria-labelledby="comboKindLbl">
-            <button type="button" data-k="" class="on" aria-pressed="true">All</button>
-            <button type="button" data-k="mix" aria-pressed="false">Two species</button>
-            <button type="button" data-k="self" aria-pressed="false">Two of the same</button>
+            <button type="button" data-k="" class="on" aria-pressed="true" aria-describedby="comboKindWhy">All</button>
+            <button type="button" data-k="mix" aria-pressed="false" aria-describedby="comboKindWhy">Two species</button>
+            <button type="button" data-k="self" aria-pressed="false" aria-describedby="comboKindWhy">Two of the same</button>
           </div></div>
-        <p class="sub ctlwide" id="comboKindWhy" aria-live="polite"></p>
+        <!-- NOT aria-live. It changed on the same press as #comboCount, and §4
+             settles that two polite regions changing together are read as two
+             disconnected utterances. The pressed state already announces the
+             choice; aria-describedby carries the consequence, like #carryHint. -->
+        <p class="sub ctlwide" id="comboKindWhy"></p>
         <span class="rstats" id="comboCount" aria-live="polite"></span>
+        <button type="button" class="alink" id="comboClear" hidden>✕ Clear filters</button>
       </div>
-      <div class="combos" id="comboList"></div>
+      <!-- A grid board is one tab stop (§4) — which is only half the contract:
+           #dexGrid pairs its roving tabindex with a name and an .sr-only line
+           telling you the arrows exist. This is the other board in the same
+           view and shipped without either. -->
+      <ul class="combos" id="comboList" aria-label="Unique combos" aria-describedby="comboListHelp"></ul>
+      <p id="comboListHelp" class="sr-only">Arrow keys move between combos. Press Enter to load one in the Breed tab.</p>
     </div>
   </section>
 
