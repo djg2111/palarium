@@ -107,13 +107,100 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     else { console.log('  ✗ the status sentence lost its step prefix: ' + JSON.stringify(said)); fail(); }
   }
 
-  console.log('\nPAL MODAL');
+  console.log('\nPAL MODAL — stepping, the Tab trap, the star');
   await nav(page, '#/pal/Anubis', 500);
   if (await reach(page, () => page.waitForSelector('#overlay.open', {timeout: 3000}), 'the pal modal')) {
     await audit(page, 'pal modal open');
     await overflow(page, 'pal modal');
+
+    // ‹ › rebuild the card without the dialog opening or closing. The button
+    // that was pressed is destroyed in the rebuild, so it has to be handed the
+    // focus back, and something has to say which pal you are now looking at.
+    await page.evaluate(() => document.querySelector('#modal .mnav.next').focus());
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => document.querySelector('#modal .mnav.next').click());
+      await page.waitForTimeout(220);
+    }
+    await audit(page, 'pal modal after stepping');
+    const step = await page.evaluate(() => ({
+      onNext: document.activeElement === document.querySelector('#modal .mnav.next'),
+      said: (document.querySelector('#modal [aria-live]') || {}).textContent || '',
+      name: document.querySelector('#modal h2').firstChild.textContent.trim(),
+    }));
+    if (step.onNext) console.log('  ✓ stepping hands focus back to ›');
+    else { console.log('  ✗ stepping dropped focus off ›'); fail(); }
+    if (step.said.startsWith(step.name)) console.log(`  ✓ the step is announced: ${JSON.stringify(step.said)}`);
+    else { console.log(`  ✗ nothing announced the new pal: ${JSON.stringify(step.said)}`); fail(); }
+
+    // aria-modal="true" hides the page behind from screen readers, so Tab must
+    // not reach it — including from <body>, where a rebuild can strand focus.
+    let escaped = 0;
+    for (let i = 0; i < 24; i++) {
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(30);
+      if (!await page.evaluate(() => document.getElementById('overlay').contains(document.activeElement))) escaped++;
+    }
+    await page.evaluate(() => document.body.focus());
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(120);
+    const backIn = await page.evaluate(() => document.getElementById('overlay').contains(document.activeElement));
+    if (!escaped && backIn) console.log('  ✓ Tab stays in the dialog, and comes back to it from <body>');
+    else { console.log(`  ✗ Tab left the dialog ${escaped}/24 times; recovered from <body> = ${backIn}`); fail(); }
+
+    // One paintStar for the tile, the row and the card. ROSTER[0] is both
+    // starred and held in the roster, so un-starring it must land on "still
+    // owned, through the roster" — not on the hollow ☆ that a card drawing its
+    // own star from owned.has() alone produced.
     await page.keyboard.press('Escape');
     await page.waitForTimeout(250);
+    await nav(page, '#/pal/' + ROSTER[0].k, 500);
+    const rd = () => page.evaluate(() => {
+      const s = document.querySelector('#modal .star');
+      return {glyph: s.textContent, label: s.getAttribute('aria-label'), pressed: s.getAttribute('aria-pressed'),
+        kept: document.activeElement === s};
+    });
+    const s1 = await rd();
+    if (/^Unmark /.test(s1.label)) console.log(`  ✓ a starred species names the way out: ${JSON.stringify(s1.label)}`);
+    else { console.log(`  ✗ the card's star does not flip its name: ${JSON.stringify(s1)}`); fail(); }
+    await page.evaluate(() => { const s = document.querySelector('#modal .star'); s.focus(); s.click(); });
+    await page.waitForTimeout(250);
+    const s2 = await rd();
+    if (s2.glyph === '★' && /in your roster/.test(s2.label) && s2.kept)
+      console.log(`  ✓ un-starring it still reads as owned: ${JSON.stringify(s2.label)}`);
+    else { console.log(`  ✗ un-starring a roster-held species: ${JSON.stringify(s2)}`); fail(); }
+    await page.evaluate(() => document.querySelector('#modal .star').click());
+    await page.waitForTimeout(250);
+    if (/^Unmark /.test((await rd()).label)) console.log('  ✓ and starring it again comes back');
+    else { console.log('  ✗ the star did not come back'); fail(); }
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(250);
+  }
+
+  // The card carries the roster row's own actions. They run with the card
+  // closing under them, so renderRoster's focus restore has nothing to read.
+  console.log('\nPAL CARD ACTIONS — the four roster actions land somewhere real');
+  for (const act of ['✎ Edit', '⧉ Duplicate', 'Use as planner start', '✕ Remove']) {
+    // ✎ leaves the editor open over the list
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    await nav(page, '#/roster', 400);
+    const ok = await reach(page, async () => {
+      // the open species stays open across a tab change, and clicking its tile
+      // again would close it
+      if (!await page.$('#rosterList .rosrow .nm')) await page.click('#rosterList .rostile');
+      await page.waitForSelector('#rosterList .rosrow .nm', {timeout: 3000});
+      await page.click('#rosterList .rosrow .nm');
+      await page.waitForSelector('#modal .rentacts button', {timeout: 3000});
+    }, 'a roster entry’s card');
+    if (!ok) break;
+    await page.evaluate(a => {
+      [...document.querySelectorAll('#modal .rentacts button')].find(x => x.textContent.trim() === a).click();
+    }, act);
+    await page.waitForTimeout(700);
+    await focusVisible(page, `“${act}” from the card`);
+    // put the entry back before the next one runs
+    await page.evaluate(() => { const u = document.querySelector('.toast .undo'); if (u) u.click(); });
+    await page.waitForTimeout(400);
   }
 
   console.log('\nFIND PARENTS — target set, owned-only toggle');

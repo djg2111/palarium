@@ -120,29 +120,8 @@ function dexMetric(p, wk) {
   const s = document.createElement('span'); s.textContent = zk(p); return s;
 }
 
-// A species can be owned two ways: starred here, or held in the roster. The
-// table never showed ownership on the row, so the split was invisible; on a
-// tile the ring and the star sit 6px apart and must not disagree.
-// Every visual and spoken property of a star, in one place. The in-place
-// branch below used to repaint only the glyph and aria-pressed from
-// owned.has(), never re-reading viaRoster — so two presses on a species owned
-// through the roster left a hollow ☆ inside a gold owned tile whose own class
-// came from ownedSpeciesSet(). Two sources of truth 6px apart, and §4 names
-// that exact state as reading like a broken control.
-function paintStar(star, p) {
-  const starred = owned.has(p.k);
-  const viaRoster = !starred && roster.some(r => r.k === p.k);
-  star.className = 'star' + (starred ? ' on' : '') + (viaRoster ? ' viaroster' : '');
-  star.textContent = starred || viaRoster ? '★' : '☆';
-  // title was a word-for-word duplicate of the accessible name, which AT reads
-  // as a description on top of it — the name carries the whole message
-  star.title = viaRoster ? 'In your roster — already counts as owned'
-    : starred ? 'Starred as owned' : 'Mark as owned';
-  star.setAttribute('aria-label', viaRoster
-    ? p.n + ' is in your roster and already counts as owned'
-    : (starred ? 'Unmark ' : 'Mark ') + p.n + ' as owned');
-  star.setAttribute('aria-pressed', String(starred));
-}
+// paintStar lives in core.js: the pal card draws a star too, and drew it from
+// its own third copy of these rules.
 function dexStar(p, onToggle) {
   const star = document.createElement('button');
   star.type = 'button';

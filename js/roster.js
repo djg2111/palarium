@@ -208,8 +208,25 @@ function trapTab(e, container) {
     .filter(el => el.offsetParent !== null);
   if (!f.length) return;
   const first = f[0], last = f[f.length - 1];
+  // Focus can sit outside an open dialog — a rebuild removed the node under it,
+  // or a stray click landed on the scrim. The trap only ever watched its own two
+  // ends, so from <body> Tab walked straight into the page behind, which
+  // aria-modal="true" has hidden from screen readers. Wrap it back in.
+  if (!container.contains(document.activeElement)) {
+    e.preventDefault(); (e.shiftKey ? last : first).focus(); return;
+  }
   if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
   else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+// Where a roster action leaves you: its own button on the row it acted on, then
+// the row's name, then the species tile, then Add. The undo paths below and the
+// pal card's copies of these actions all land by this same rule.
+function focusRosterAct(id, act) {
+  const row = id && rosterList.querySelector(`.rosrow[data-id="${CSS.escape(id)}"]`);
+  const el = (row && (row.querySelector(`[data-act="${act}"]`) || row.querySelector('.nm')))
+    || rosterList.querySelector('.rostile')
+    || document.getElementById('rosterOpenAdd');
+  if (el) focusOnScreen(el);
 }
 document.addEventListener('keydown', e => {
   if (roverlay.classList.contains('open')) trapTab(e, roverlay);
@@ -571,12 +588,9 @@ function duplicateEntry(r) {
     if (i >= 0) roster.splice(i, 1);
     saveRoster(); renderRoster(); renderDex(); renderReverse();
     // the copy is gone, so land on the original it was made from
-    const row = rosterList.querySelector(`.rosrow[data-id="${CSS.escape(r.id)}"]`);
-    const el = (row && (row.querySelector('[data-act="dup"]') || row.querySelector('.nm')))
-      || rosterList.querySelector('.rostile')
-      || document.getElementById('rosterOpenAdd');
-    if (el) el.focus();
+    focusRosterAct(r.id, 'dup');
   }, {label: 'Edit it', fn: () => { const e2 = roster.find(x => x.id === copy.id); if (e2) openRosterEditor(e2); }});
+  return copy;   // the pal card lands on the copy's own row
 }
 // One Undo for the whole batch. Capture in ascending original index, splice
 // descending so earlier indices stay valid, and restore ascending so positions
@@ -641,11 +655,7 @@ function removeEntry(r) {
     saveRoster(); renderRoster(); renderDex(); renderReverse();
     // land on the row that just came back, rather than leaving it to toast()'s
     // last resort — the batch undo already does this (see removeEntries)
-    const row = rosterList.querySelector(`.rosrow[data-id="${CSS.escape(removed.id)}"]`);
-    const el = (row && (row.querySelector('[data-act="remove"]') || row.querySelector('.nm')))
-      || rosterList.querySelector('.rostile')
-      || document.getElementById('rosterOpenAdd');
-    if (el) el.focus();
+    focusRosterAct(removed.id, 'remove');
   };
   const name = entryName(removed);
   // last roster entry of a species: offer to also drop the owned ★

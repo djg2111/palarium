@@ -337,6 +337,29 @@ function toggleOwned(k) {
   scheduleAuto(); // owned pool feeds the planner's partner list
   updateChecklist();
 }
+// A species can be owned two ways: starred in the Paldex, or held in the
+// roster. Every visual and spoken property of a star, in one place — the
+// Paldex tile, the Paldex row and the pal card all draw from here.
+// The tile's in-place branch used to repaint only the glyph and aria-pressed
+// from owned.has(), never re-reading viaRoster, so two presses on a species
+// owned through the roster left a hollow ☆ inside a gold owned tile whose own
+// class came from ownedSpeciesSet(). §4 names that exact state as reading like
+// a broken control — and the card's copy had the same split, plus a name that
+// still said "Mark" after it was marked.
+function paintStar(star, p) {
+  const starred = owned.has(p.k);
+  const viaRoster = !starred && roster.some(r => r.k === p.k);
+  star.className = 'star' + (starred ? ' on' : '') + (viaRoster ? ' viaroster' : '');
+  star.textContent = starred || viaRoster ? '★' : '☆';
+  // title was a word-for-word duplicate of the accessible name, which AT reads
+  // as a description on top of it — the name carries the whole message
+  star.title = viaRoster ? 'In your roster — already counts as owned'
+    : starred ? 'Starred as owned' : 'Mark as owned';
+  star.setAttribute('aria-label', viaRoster
+    ? p.n + ' is in your roster and already counts as owned'
+    : (starred ? 'Unmark ' : 'Mark ') + p.n + ' as owned');
+  star.setAttribute('aria-pressed', String(starred));
+}
 
 // ---------- recently picked pals (shared across all pickers) ----------
 let recentPicks = readStore('palbreed_recents', []).filter(k => byKey.has(k));
@@ -466,19 +489,30 @@ function genderBar(p) {
 // ---------- modal ----------
 const overlay = document.getElementById('overlay');
 const modalEl = document.getElementById('modal');
+// ‹ › swap one pal's card for another's without the dialog opening or closing,
+// so nothing announces the change. This says the new name — and it has to live
+// INSIDE #modal, because aria-modal="true" hides everything outside it. It is
+// therefore the one child a rebuild must not destroy.
+const modalSay = document.createElement('div');
+modalSay.className = 'sr-only'; modalSay.setAttribute('aria-live', 'polite');
+modalEl.appendChild(modalSay);
+function clearModal() { for (const n of [...modalEl.childNodes]) if (n !== modalSay) n.remove(); }
 overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal(); });
 let currentModalPal = null, lastFocusModal = null, modalPushed = false;
 // keepHistory: the caller is navigating anyway (hash change / navTab), so leave
 // the history stack alone; otherwise pop the entry the modal pushed so Back
 // behaves as if the modal was never opened.
-function closeModal(keepHistory) {
+// placed: the caller is about to put focus somewhere itself. Without this the
+// restore below fires from a setTimeout AFTER the caller's own focus call and
+// takes it back — to an element that by then is inside a closed overlay.
+function closeModal(keepHistory, placed) {
   if (!overlay.classList.contains('open')) { modalPushed = false; return; }
   overlay.classList.remove('open'); document.body.style.overflow = '';
   currentModalPal = null;
-  const restore = lastFocusModal;
+  const restore = placed ? null : lastFocusModal;
   lastFocusModal = null;
-  if (keepHistory) { modalPushed = false; refocusAfterModal(restore, false); return; }
+  if (keepHistory) { modalPushed = false; if (!placed) refocusAfterModal(restore, false); return; }
   const popping = modalPushed;
   if (modalPushed) { modalPushed = false; history.back(); }
   else if (location.hash.startsWith('#/pal/')) history.replaceState(null, '', '#/' + currentTab);
@@ -515,8 +549,8 @@ function refocusAfterModal(el, popping) {
 }
 // close without touching history, then point the hash back at the current tab
 // (used when another overlay opens on top, e.g. the roster editor)
-function leaveModal() {
-  closeModal(true);
+function leaveModal(placed) {
+  closeModal(true, placed);
   if (location.hash.startsWith('#/pal/')) history.replaceState(null, '', '#/' + currentTab);
 }
 document.addEventListener('keydown', e => {
@@ -535,16 +569,29 @@ function sec(title) { const s = document.createElement('div'); s.className = 'ms
 function openModal(p, rentry) {
   const wasOpen = overlay.classList.contains('open');
   if (!wasOpen) lastFocusModal = document.activeElement;
+  // ‹ › and the arrow keys rebuild the card from scratch, destroying the button
+  // that was pressed — and the dialog never closed, so nothing put the focus
+  // back: every step through the Paldex dropped it on <body>, outside the Tab
+  // trap. Remember the control by a stable key and hand it back afterwards.
+  const held = wasOpen && modalEl.contains(document.activeElement)
+    ? document.activeElement.dataset.mfk : null;
   currentModalPal = p;
   modalEl.setAttribute('aria-label', p.n + ' details');
-  modalEl.innerHTML = '';
+  clearModal();
   const close = document.createElement('button'); close.className = 'close'; close.textContent = '✕';
-  close.setAttribute('aria-label', 'Close dialog'); close.addEventListener('click', closeModal);
+  close.dataset.mfk = 'close';
+  close.setAttribute('aria-label', 'Close dialog');
+  // an arrow function, not closeModal itself: the handler was passed the click
+  // event, and a MouseEvent is a truthy `keepHistory` — so ✕ took the "the
+  // caller is navigating anyway" branch and left the pushed #/pal/ entry on the
+  // stack. Closing with ✕ and pressing Back reopened the card you just closed.
+  close.addEventListener('click', () => closeModal());
   modalEl.appendChild(close);
   const idx = PALS.indexOf(p);
   const mkNav = (label, delta, cls, sym) => {
     const b = document.createElement('button'); b.className = 'mnav ' + cls; b.type = 'button';
     b.textContent = sym; b.title = label + ' (arrow keys)'; b.setAttribute('aria-label', label);
+    b.dataset.mfk = cls;
     b.addEventListener('click', () => openModal(PALS[(idx + delta + PALS.length) % PALS.length]));
     return b;
   };
@@ -556,12 +603,11 @@ function openModal(p, rentry) {
   const h2 = document.createElement('h2');
   h2.textContent = p.n;
   const z = document.createElement('span'); z.className = 'zk'; z.textContent = zk(p); h2.appendChild(z);
-  const star = document.createElement('button'); star.className = 'star' + (owned.has(p.k) ? ' on' : '');
-  star.textContent = owned.has(p.k) ? '★' : '☆'; star.title = 'Mark as owned';
-  star.setAttribute('aria-label', 'Mark ' + p.n + ' as owned'); star.setAttribute('aria-pressed', String(owned.has(p.k)));
+  const star = document.createElement('button'); star.type = 'button';
+  paintStar(star, p);
+  star.dataset.mfk = 'star';
   star.addEventListener('click', () => {
-    toggleOwned(p.k); star.classList.toggle('on'); star.textContent = owned.has(p.k) ? '★' : '☆';
-    star.setAttribute('aria-pressed', String(owned.has(p.k)));
+    toggleOwned(p.k); paintStar(star, p);
     renderDex(); renderReverse();
   });
   h2.appendChild(star);
@@ -599,18 +645,21 @@ function openModal(p, rentry) {
     const acts = document.createElement('div'); acts.className = 'rentacts';
     const mk = (label, title, fn) => {
       const b = document.createElement('button'); b.className = 'alink';
-      b.textContent = label; b.title = title;
+      b.textContent = label; b.title = title; b.dataset.mfk = label;
       b.addEventListener('click', fn); acts.appendChild(b);
     };
-    mk('✎ Edit', 'Edit this roster entry', () => { leaveModal(); openRosterEditor(rentry); });
-    // leaveModal() first, both times: closing restores focus to the row that
-    // opened the card, and that row has to still exist when it does.
+    mk('✎ Edit', 'Edit this roster entry', () => { leaveModal(true); openRosterEditor(rentry); });
+    // leaveModal(true) — "I'll place focus myself" — on all four. These are the
+    // row's own actions run from a card that is closing under them, so
+    // renderRoster's focus restore (which reads document.activeElement) sees
+    // <body> and restores nothing, and the card's restore aims at a button
+    // inside the overlay it just hid. Three of the four ended on <body>.
     mk('⧉ Duplicate', 'Another with the same passives, gender and note',
-      () => { leaveModal(); duplicateEntry(rentry); });
+      () => { leaveModal(true); const copy = duplicateEntry(rentry); focusRosterAct(copy ? copy.id : rentry.id, 'dup'); });
     mk('Use as planner start', 'Add to the next free Planner start slot',
-      () => { leaveModal(); setSlotAuto(rentry); });
+      () => { leaveModal(true); setSlotAuto(rentry); });   // lands on the slot it filled
     mk('✕ Remove', 'Remove this pal from your roster',
-      () => { leaveModal(); removeEntry(rentry); });
+      () => { leaveModal(true); removeEntry(rentry); focusRosterAct(rentry.id, 'remove'); });
     r1.appendChild(acts);
     box.appendChild(r1);
     if (rentry.ps.length) box.appendChild(passiveChips(rentry.ps));
@@ -631,7 +680,7 @@ function openModal(p, rentry) {
   }
   bs.appendChild(bm);
   const btns = document.createElement('div'); btns.className = 'mbtns';
-  const mkBtn = (label, primary, fn) => { const b = document.createElement('button'); b.className = 'alink' + (primary ? ' primary' : ''); b.textContent = label; b.addEventListener('click', fn); return b; };
+  const mkBtn = (label, primary, fn) => { const b = document.createElement('button'); b.className = 'alink' + (primary ? ' primary' : ''); b.textContent = label; b.dataset.mfk = label; b.addEventListener('click', fn); return b; };
   btns.appendChild(mkBtn('Find parents', true, () => { closeModal(true); pickT.set(p, true); reverseShown = {}; renderReverse(); navTab('reverse'); landAfterNav('#pickT .picker-btn'); }));
   btns.appendChild(mkBtn('Set as Parent 1', false, () => { closeModal(true); pickA.set(p, true); renderBreed(); navTab('breed'); landAfterNav('#pickA .picker-btn'); }));
   btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(true); pickB.set(p, true); renderBreed(); navTab('breed'); landAfterNav('#pickB .picker-btn'); }));
@@ -732,6 +781,12 @@ function openModal(p, rentry) {
   overlay.scrollTop = 0;
   document.body.style.overflow = 'hidden';
   if (!wasOpen) close.focus();
+  else {
+    // stepping: back to the control that was pressed, so ›››  walks three pals
+    const back = held && modalEl.querySelector(`[data-mfk="${CSS.escape(held)}"]`);
+    (back || close).focus({preventScroll: true});
+    liveText(modalSay, p.n + ', ' + zk(p));
+  }
   // reflect the open pal in the URL so browser Back closes the modal
   const ph = '#/pal/' + p.k;
   if (location.hash !== ph) {

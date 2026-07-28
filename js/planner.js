@@ -201,7 +201,10 @@ function setSlotAuto(rosterEntry) {
   setPlanMode('new');
   navTab('plan');
   scheduleAuto();
-  document.getElementById('pickS1').scrollIntoView({block:'center', behavior: SMOOTH});
+  // the slot that was actually filled, not always slot 1 — and focus it rather
+  // than scroll to it: this is a navTab away from the button that was pressed,
+  // so leaving focus behind drops it on <body> (§8, land on what you set)
+  landAfterNav('#pickS' + n + ' .picker-btn');
 }
 function renderSlotChips() {
   // read back after set(): set() clamps to four, and without the write-back a
