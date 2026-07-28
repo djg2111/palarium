@@ -45,6 +45,25 @@ Never add a token without a role and a contrast entry here.**
 bg → surface → raised → overlay; popovers/toasts sit on raised/overlay with a border
 plus shadow. Don't invent intermediate grays.
 
+**A card nested in a card takes the next rung.** A `--surface` card on a
+`--surface` `.pcard` has no fill delta at all, which leaves a sub-3:1 border as
+the sole boundary of a control — forbidden by the `--border-strong` row below.
+The steps are small by design and that is fine: **`--surface` on `--bg` is
+1.09:1** (`.pair` inside `.hatchpanel`, `#smPick`'s choice rows) and **`--raised`
+on `--surface` is 1.10:1** (`.hcard` inside its `.pcard`). A rung of the ladder
+is not the boundary on its own either — it is the *second* indicator that lets
+the hairline count, alongside the card's own art, bold name and hover
+(`--border-strong`). Note the trade, because it is not free: going up a rung
+costs the hairline some of its own contrast — `--border` on `.hcard` fell from
+**1.36:1** against `--surface` to **1.24:1** against `--raised`. That is the
+right way round (a fill delta the eye reads plus a fainter line beats no delta
+and a slightly stronger one), but it is why the rung is a *pairing* rule and not
+a licence to drop the border. Nesting three deep is the smell, not the rung:
+flatten instead. **A recessed well is the documented exception** — `.hatchpanel`
+and `.rospanel` take `--bg`, a rung *down* from the `.pcard` they sit in, because
+a disclosure panel is a hole in the board rather than something on top of it, and
+its own children (`.pair`, `.rosband`) then climb back to `--surface`.
+
 **Contrast matrix (WCAG ratios, computed 2026-07-26).** Approved pairings — anything
 not in this table needs a computed ratio before merge:
 
@@ -313,8 +332,8 @@ the reason in an `.sr-only` tail, while the header band and the open panel show
 `3♂ · can’t pair with each other` outright. Both keep the tally — a warning that eats
 the number it is warning about leaves nothing to act on.
 
-**Grid boards are one tab stop.** `.roster.tileview`, `.dexgrid` and `.combos`
-all use a roving `tabindex` over their items. **One stop is only half the
+**Grid boards are one tab stop.** `.roster.tileview`, `.dexgrid`, `.combos` and
+`.hatchgrid` all use a roving `tabindex` over their items. **One stop is only half the
 contract**: the board also carries a name and an `.sr-only` line saying the
 arrows exist (`#dexGridHelp`, `#comboListHelp`), and it is a `<ul>` so AT can
 report its size. Removing 249 tab stops without those leaves 249 controls
@@ -353,8 +372,9 @@ Breedable now (a board of disclosures, so it inherits the roster's panel rules):
 
 | Class | Role |
 |---|---|
-| `.hcard` | One breedable species: a `<button aria-expanded>` carrying **decorative, inert** art, the name, an optional `.tier`, `New`, and the pair count or step count. `aria-controls` is set **only while expanded** — the panel does not exist before that, and an unresolvable IDREF is a no-op that "move to controlled element" walks into. Art inside a button is never clickable: a second action no keyboard can reach, whose `alt` announces the species twice. |
-| `.hatchpanel` | The expanding panel. Same contract as `.rospanel` — a `<section role="region" aria-labelledby>` spanning `1/-1`, placed after the **last card of the open card's visual row**, re-placed on resize behind a `previousElementSibling` guard so the `ResizeObserver` can't loop. Appended straight after its own card it left up to `cols-1` empty cells beside it. |
+| `.hatchgrid` | The board: a `<ul>` that is **one tab stop**, with the full grid-board contract above (name, `#hatchGridHelp`, geometric `gridStep`). The grid item is an `li.hcell`, not the card, because the panel is an `li.hpanelcell` in the same list. This is the hardest board in the app to rove: its items are disclosures and a full-width row can appear **between** them, which is precisely why vertical movement is geometric — `i ± cols` cannot see that row. The panel is **not** in the ring; Tab reaches it, because every other card sits at `-1` and the panel follows the open card in DOM order. 239 stops at "Any chain" became 6. |
+| `.hcard` | One breedable species: a `<button aria-expanded>` carrying **decorative, inert** art, the name, an optional `.tier`, `New`, and the pair count or step count. **A fixed two-row grid** — art spanning both rows, name on row 1, `.hmeta` (rarity, `New`, count) on row 2 — so every card is 68px whatever badges it carries. Sharing one line they wrapped, and the board came out at 62px and 94px, 216 of 253 cards tall at 1366. `.ways` is on every card, so the meta row never collapses, and it keeps `margin-left:auto` — the count is the card's one varying quantity, and packed behind two optional badges its x wandered over 103px of the board. `--raised`, one rung above its `.pcard` (§1). `aria-controls` is set **only while expanded** — the panel does not exist before that, and an unresolvable IDREF is a no-op that "move to controlled element" walks into. Art inside a button is never clickable: a second action no keyboard can reach, whose `alt` announces the species twice. The roving stop **follows the press**: open, close and Escape all re-seed it onto the card acted on, or a close would hand Tab back to the first card on the board. |
+| `.hatchpanel` | The expanding panel. Same contract as `.rospanel` — a `<section role="region" aria-labelledby>` spanning `1/-1`, placed after the **last card of the open card's visual row**, re-placed on resize behind a `previousElementSibling` guard so the `ResizeObserver` can't loop. Appended straight after its own card it left up to `cols-1` empty cells beside it. Escape from anywhere inside it closes and returns focus to the card — arrows never open or close, like the roster's board. |
 | `.pair .x` | The `×` between the two sides, `aria-hidden` with an `.sr-only` "and". **Hidden at ≤640** for the same reason as `.pgroup .x`: once the sides wrap it parks in the top-right of a row that is itself a press target and reads as a close button. |
 | `#hatchStats` | The view's `aria-live` count. States the population it actually counted — `N species from M owned` unfiltered, `N of M species match “q”` with a search. A search-filtered numerator under an ownership denominator produced `0 species from 11 owned`, which says the roster breeds nothing. Same denominator rule as Find parents' `.resline`. |
 
@@ -624,28 +644,6 @@ is still a 2.4.11 failure — which is how it shipped twice.
 
 ## 11 · Known-clunky backlog (ux-designer: start here)
 
-- **Breedable now is 239 tab stops at "Any chain"** — 234 result cards plus the five
-  controls, one stop per card, measured on the §10 seed (4 owned; a 34-species
-  roster gives 263). §4 settles that a grid board is **one** stop with a
-  roving `tabindex`, which `.dexgrid` and `.roster.tileview` both do through
-  `gridStep`. `.hatchgrid` is the last grid in the app that doesn't, and it is the
-  hardest one: its cards are disclosures whose panel is appended **into** the grid
-  between them, so the roving model has to survive a full-width row appearing
-  mid-board — the same problem `.rospanel` solved, and the reason geometric
-  movement exists.
-- **`.hcard` renders at two heights, 62px and 94px**, because a card carrying both
-  a rarity badge and its `.ways` count wraps to a second line. At "Any chain" that
-  is most of the board, so rows come out ragged (216 of 253 cards tall at 1366;
-  three columns at 900 is the worst case). Either let the count sit under the name
-  always, or drop the rarity badge from a card whose job is "can I breed it".
-- **`.hcard` is the one canon card with no fill delta from its container.** It is
-  `--surface` on a `--surface` `.pcard`, so `--border` at **1.36:1** (and
-  `--border-strong` at 1.82:1 on hover) is the only thing delimiting the control —
-  §1 forbids a sub-3:1 border as the *sole* boundary indicator. Every other card
-  has the delta (`.pair` is `--surface` on the panel's `--bg`). The art and bold
-  name still read as a discrete item, so this wants a §1 decision on card-on-card
-  nesting rather than a one-off patch.
-
 - **The Planner's start slots reflow every time one is revealed.** `.slotgrid` is
   `auto-fit`, and `[hidden]` slots collapse their tracks — so slot 1 alone is a
   1076px species picker at 1366, and filling it halves the width of the control
@@ -668,8 +666,11 @@ is still a 2.4.11 failure — which is how it shipped twice.
 - **`.accb.mid` / `.accb.alpha` and `.tier.common/rare/epic` carry six raw
   `rgba()`s** between them, outside §1's two-alpha tint recipe, and use
   `--neutral`/`--water`/`--dark` (*element* colours) for catch difficulty and
-  rarity. Computed 6.33 / 6.15 / 5.98 / 5.31:1, so this is token discipline, not
-  contrast — wants `--neutral-tint/line` and `--dark-tint/line` and matrix rows.
+  rarity. Computed 6.33 / 6.15 / 5.98 / 5.31:1 over `--surface`, so this is token
+  discipline, not contrast — wants `--neutral-tint/line` and `--dark-tint/line`
+  and matrix rows. Note the ratios move with the fill underneath: on `.hcard`'s
+  `--raised` they are 5.39 (rare) and 4.80 (epic), still AA but with epic down to
+  0.30 of headroom, which is the argument for matrix rows rather than one number.
 
 - **The Paldex table is 598 tab stops** — 299 `tr[tabindex="0"]` rows plus 299
   stars — in the same view whose gallery is **one**, over the same 299 species.

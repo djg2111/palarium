@@ -26,7 +26,7 @@ function renderHatch() {
   const own = [...ownedSpeciesSet()].filter(k => byKey.has(k));
   if (own.length < 1) {
     stats.textContent = '';
-    const h = document.createElement('div'); h.className = 'hint'; h.style.gridColumn = '1/-1';
+    const h = document.createElement('li'); h.className = 'hint';
     h.append('Mark what you own first — then this page shows everything you can hatch from it. ');
     const bd = document.createElement('button'); bd.className = 'alink'; bd.textContent = '★ Star pals in the Paldex';
     bd.addEventListener('click', () => { navTab('dex'); landAfterNav('#dexSearch'); });
@@ -70,6 +70,11 @@ function renderHatch() {
   let rows = [...kids.entries()].map(([k, e]) => ({p: byKey.get(k), gen: e.gen, ways: e.ways, pairs: e.pairs, isNew: !ownSet.has(k)}))
     .filter(r => (!hatchNewOnly || r.isNew) && (!q || r.p.n.toLowerCase().includes(q)));
   rows.sort((a, b) => (b.isNew - a.isNew) || (a.gen - b.gen) || a.p.z - b.p.z);
+  // A search, "New species only" or a narrower depth can drop the open card off
+  // the board. Left set, hatchOpen records a panel that no card and no node
+  // backs — and Escape then re-rendered the whole list out from under whatever
+  // card the user was on, dropping focus to <body> (2.4.3).
+  if (hatchOpen && !rows.some(r => r.p.k === hatchOpen)) hatchOpen = null;
   const newCount = rows.filter(r => r.isNew).length;
   const depthLbl = hatchDepth === 1 ? 'one step' : hatchDepth === 2 ? '≤2 steps' : 'any chain';
   // "4 species from 11 owned" attributed a search-filtered count to ownership —
@@ -82,12 +87,16 @@ function renderHatch() {
   stats.textContent = head + ` · ${depthLbl}`
     + (hatchNewOnly ? ' · new only' : ` · ${newCount} new`);
   if (!rows.length) {
-    const h = document.createElement('div'); h.className = 'hint'; h.style.gridColumn = '1/-1';
+    const h = document.createElement('li'); h.className = 'hint';
     h.append('Nothing matches these filters. ');
     const b = document.createElement('button'); b.className = 'alink'; b.textContent = '✕ Clear filters';
     b.addEventListener('click', () => {
       hatchSearch.value = ''; hatchNewOnly = false; setSwitch(hatchNewBtn, false);
       save(); renderHatch();
+      // renderHatch destroys the button that was pressed, so focus fell to
+      // <body> — land on the board this press just restored (DESIGN.md §9)
+      const first = hatchList.querySelector('.hcard');
+      if (first) { seedHatchCards(first); first.focus(); } else hatchSearch.focus();
     });
     h.appendChild(b);
     list.appendChild(h);
@@ -110,13 +119,19 @@ function renderHatch() {
     // card announce its species twice (DESIGN.md §4)
     card.appendChild(icon(r.p, 40, false, true));
     const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.p.n; card.appendChild(nm);
-    if (r.p.rar >= 5) card.appendChild(tierBadge(r.p));
+    // The badges live on their own row, always — sharing the name's line, a card
+    // that happened to carry both a rarity badge and its count wrapped, and the
+    // board came out at two heights (62px and 94px, 216 of 253 cards tall at
+    // 1366). `.ways` is on every card, so the row never collapses.
+    const meta = document.createElement('span'); meta.className = 'hmeta';
+    if (r.p.rar >= 5) meta.appendChild(tierBadge(r.p));
     // authored sentence-case and uppercased by CSS, like .tier beside it — so a
     // screen reader reads "new", not the shouted literal (DESIGN.md §3)
-    if (r.isNew) { const nb = document.createElement('span'); nb.className = 'newb'; nb.textContent = 'New'; card.appendChild(nb); }
+    if (r.isNew) { const nb = document.createElement('span'); nb.className = 'newb'; nb.textContent = 'New'; meta.appendChild(nb); }
     const ways = document.createElement('span'); ways.className = 'ways';
     ways.textContent = r.gen === 1 ? r.ways + (r.ways === 1 ? ' pair' : ' pairs') : r.gen + ' steps';
-    card.appendChild(ways);
+    meta.appendChild(ways);
+    card.appendChild(meta);
     card.title = (expanded ? 'Hide' : 'Show') + (r.gen === 1 ? ` the pairs that produce ${r.p.n}` : ` a breeding chain to ${r.p.n}`);
     card.addEventListener('click', () => {
       hatchOpen = expanded ? null : r.p.k;
@@ -125,7 +140,9 @@ function renderHatch() {
       // focus fell to <body> on every open AND every close — on the view's one
       // interaction (DESIGN.md §9)
       const again = list.querySelector(`.hcard[data-k="${CSS.escape(r.p.k)}"]`);
-      if (again) again.focus();
+      // the roving stop follows the press, or a close would hand Tab back to
+      // the first card on the board instead of the one under the cursor
+      if (again) { seedHatchCards(again); again.focus(); }
       // focus() alone scrolls nothing — the card was already in view — so a card
       // pressed near the bottom opened its panel almost entirely below the fold
       // (24px of 217px readable at 360, behind the tab bar). Anchor on the card,
@@ -137,30 +154,94 @@ function renderHatch() {
           behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
       }
     });
-    list.appendChild(card);
+    // the board is a <ul> so AT can report its size (DESIGN.md §4), so the grid
+    // item is the cell and the card fills it
+    const cell = document.createElement('li'); cell.className = 'hcell';
+    cell.dataset.k = r.p.k; cell.appendChild(card);
+    list.appendChild(cell);
     if (expanded) {
       const panel = r.gen === 1 ? hatchPanel(r) : hatchChainPanel(r, kids, ownSet);
       panel.id = panelId;
-      list.appendChild(panel);
+      const pcell = document.createElement('li'); pcell.className = 'hpanelcell';
+      pcell.appendChild(panel);
+      list.appendChild(pcell);
     }
   }
   placeHatchPanel();
+  seedHatchCards();
 }
+// The board is one tab stop (DESIGN.md §4), like .dexgrid and .roster.tileview.
+// This is the hard one: the cards are disclosures and the panel is appended
+// INTO the grid between them, so a full-width row can appear mid-board. Index
+// math (i ± cols) cannot see that row and clamps ArrowUp into a column the user
+// was never in — which is why gridStep moves by geometry. The panel itself is
+// not in the ring: Tab reaches it, because every other card is at -1 and the
+// panel follows the open card in DOM order.
+function seedHatchCards(active) {
+  const cards = [...hatchList.querySelectorAll('.hcard')];
+  for (const c of cards) c.tabIndex = -1;
+  const pick = active && cards.includes(active) ? active
+    : cards.find(c => c.dataset.k === hatchOpen) || cards[0];
+  if (pick) pick.tabIndex = 0;
+}
+function closeHatchPanel() {
+  const k = hatchOpen;
+  hatchOpen = null;
+  renderHatch();
+  const again = k && hatchList.querySelector(`.hcard[data-k="${CSS.escape(k)}"]`);
+  if (again) { seedHatchCards(again); again.focus(); }
+}
+// Arrowing across the board never opens or closes anything — this is a set of
+// disclosures, not a menu. Only Enter, Space, click and Escape do that.
+hatchList.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && hatchOpen && hatchList.contains(e.target)) {
+    e.stopPropagation(); closeHatchPanel(); return;
+  }
+  const cur = e.target.closest('.hcard');
+  if (!cur) return;
+  const cards = [...hatchList.querySelectorAll('.hcard')];
+  const i = cards.indexOf(cur);
+  let j = null;
+  if (e.key === 'ArrowRight') j = Math.min(i + 1, cards.length - 1);
+  else if (e.key === 'ArrowLeft') j = Math.max(i - 1, 0);
+  else if (e.key === 'ArrowDown') j = gridStep(cards, cur, 1);
+  else if (e.key === 'ArrowUp') j = gridStep(cards, cur, -1);
+  else if (e.key === 'Home') j = 0;
+  else if (e.key === 'End') j = cards.length - 1;
+  else if (e.key === 'PageDown' || e.key === 'PageUp') {
+    // four rows, geometrically, like .combos — i ± cols*4 travels a different
+    // distance depending on whether the panel's full-width row is in the way,
+    // which is the whole reason movement here is geometric
+    const dir = e.key === 'PageDown' ? 1 : -1;
+    let k = i;
+    for (let n = 0; n < 4; n++) {
+      const step = gridStep(cards, cards[k], dir);
+      if (step === null) break;
+      k = step;
+    }
+    j = k;
+  }
+  // an arrow with no row that way still belongs to the grid, not to the page
+  if (j === null) { if (e.key.startsWith('Arrow')) e.preventDefault(); return; }
+  e.preventDefault();
+  seedHatchCards(cards[j]); cards[j].focus();
+  cards[j].scrollIntoView({block: 'nearest', behavior: SMOOTH});
+});
 // Same rule as the roster's .rospanel (js/roster.js): the panel goes after the
 // last card of the open card's visual row, so grid auto-placement gives it a
 // fresh row and the board resumes underneath. Appended straight after the card
 // it belonged to, it left up to cols-1 empty cells beside it (DESIGN.md §4).
 function placeHatchPanel() {
-  const panel = hatchList.querySelector('.hatchpanel');
+  const panel = hatchList.querySelector('.hpanelcell');
   if (!panel) return;
   // gridTemplateColumns resolves to the repeat() source, not a track list, while
   // any ancestor is display:none — which .view is on every inactive tab
   if (!document.getElementById('view-hatch').classList.contains('active')) return;
   const cols = getComputedStyle(hatchList).gridTemplateColumns.split(' ').length;
-  const cards = [...hatchList.querySelectorAll('.hcard')];
-  const i = cards.findIndex(c => c.dataset.k === hatchOpen);
+  const cells = [...hatchList.querySelectorAll('.hcell')];
+  const i = cells.findIndex(c => c.dataset.k === hatchOpen);
   if (i < 0) return;
-  const anchor = cards[Math.min(cards.length - 1, Math.floor(i / cols) * cols + cols - 1)];
+  const anchor = cells[Math.min(cells.length - 1, Math.floor(i / cols) * cols + cols - 1)];
   // re-placing unconditionally mutates the DOM, which changes the list height,
   // which fires the ResizeObserver again — a loop
   if (panel.previousElementSibling !== anchor) anchor.after(panel);

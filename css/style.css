@@ -953,16 +953,32 @@ select#genderSel{padding:10px 12px}
 .hatchpanel .rstep{background:var(--surface)}
 #hatchDepth,#comboKind{flex-shrink:0}
 #hatchDepth button,#comboKind button{white-space:nowrap;flex:0 0 auto;padding:9px 12px}
-.hatchgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr));gap:10px}
-/* the NEW and "n pairs" chips don't shrink, so let them wrap and let a long
-   species name give ground rather than push the card past the screen edge */
-.hcard{display:flex;align-items:center;gap:11px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 14px;text-align:left}
+.hatchgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr));gap:10px;list-style:none;margin:0;padding:0}
+/* the grid item is the cell; the card and the panel fill it */
+.hatchgrid>li{display:flex;min-width:0}
+.hatchgrid>li.hpanelcell,.hatchgrid>li.hint{grid-column:1/-1}
+.hatchgrid>li.hint{display:block}
+.hcell>.hcard,.hpanelcell>.hatchpanel{flex:1 1 auto;min-width:0}
+/* Name on one row, badges on the next — a fixed two-row grid, so a card with a
+   rarity badge is the same height as one without (DESIGN.md §4). --raised, not
+   --surface: this card sits on a --surface .pcard, and a card nested in a card
+   goes one rung up the ladder (§1). */
+.hcard{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:var(--sp-3);row-gap:var(--sp-1);background:var(--raised);border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 14px;text-align:left}
+.hcard>.pico{grid-row:1/3}
 .hcard:hover{border-color:var(--border-strong)}
-.hcard .nm{font-weight:600;font-size:var(--fs-md);min-width:0;overflow:hidden;text-overflow:ellipsis}
+.hcard .nm{font-weight:600;font-size:var(--fs-md);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* --sp-1, not --sp-2: the widest real row is `legendary · New · 1 pair` at
+   169.7px in a 180px track, and 8px gaps put it 1.7px over — one card wrapping
+   takes its whole grid row with it, which is the raggedness this layout exists
+   to remove. .ways's auto margin supplies the visual separation anyway, so the
+   gap only has to hold the badge run apart. flex-wrap stays as a safety valve. */
+.hcard .hmeta{display:flex;align-items:center;gap:var(--sp-1);min-width:0;flex-wrap:wrap}
+/* the count keeps its own column: it is the card's one varying quantity, and
+   packed behind two optional badges its x wandered over 103px of the board */
 .hcard .ways{margin-left:auto;font-size:var(--fs-xs);color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:var(--r-full);padding:1px 8px;flex-shrink:0}
 .hcard .newb{font-size:var(--fs-xs);font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--success);border:1px solid var(--success-line);border-radius:var(--r-sm);padding:1px 6px}
 .hcard.expanded{border-color:var(--accent)}
-.hatchpanel{grid-column:1/-1;background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--r-lg);padding:13px 15px;display:flex;flex-direction:column;gap:10px}
+.hatchpanel{background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--r-lg);padding:13px 15px;display:flex;flex-direction:column;gap:10px}
 .hatchpanel .hpttl{font-size:var(--fs-sm);font-weight:700;color:var(--muted)}
 .hatchpanel .pair{background:var(--surface)}
 .warnchip{font-size:var(--fs-xs);color:var(--danger);border:1px solid var(--danger-line);border-radius:var(--r-sm);padding:1px 7px;flex-shrink:0;

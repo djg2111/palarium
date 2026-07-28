@@ -96,7 +96,8 @@
         </div>
         <button type="button" class="toggle" id="hatchNewOnly" role="switch" aria-checked="false" title="Hide species you already own"><span class="kn"></span>New species only</button>
       </div>
-      <div class="hatchgrid" id="hatchList"></div>
+      <ul class="hatchgrid" id="hatchList" aria-label="Breedable species" aria-describedby="hatchGridHelp"></ul>
+      <p id="hatchGridHelp" class="sr-only">Arrow keys move between species. Press Enter to show how to breed it. Press Escape to hide it again.</p>
     </div>
   </section>
 

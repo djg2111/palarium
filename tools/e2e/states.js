@@ -609,6 +609,27 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
   console.log('\nBREEDABLE NOW — results, expanded pairs');
   await nav(page, '#/hatch', 600);
   await audit(page, 'breedable now with results');
+  // §4: a grid board is ONE tab stop with a roving tabindex. The full contract
+  // is one stop AND a named <ul> AND a keyboard-help line — without those, the
+  // removed stops leave controls depending on a convention nothing states.
+  const hboard = await page.evaluate(() => {
+    const l = document.getElementById('hatchList');
+    const items = [...l.querySelectorAll('.hcard')];
+    const d = l.getAttribute('aria-describedby');
+    return {n: items.length, stops: items.filter(c => c.tabIndex >= 0).length,
+      tag: l.tagName, named: !!l.getAttribute('aria-label'),
+      help: !!(d && document.getElementById(d))};
+  });
+  if (hboard.n > 1 && hboard.stops === 1) console.log(`  ✓ the breedable board is one tab stop for ${hboard.n} cards`);
+  else { console.log(`  ✗ the breedable board costs ${hboard.stops} tab stops for ${hboard.n} cards`); fail(); }
+  if (hboard.tag === 'UL' && hboard.named && hboard.help) console.log('  ✓ the breedable board is a named list with keyboard help');
+  else { console.log(`  ✗ the breedable board is undocumented: ${JSON.stringify(hboard)}`); fail(); }
+  // the cards are one height whatever badges they carry — two heights made the
+  // rows ragged across most of the board at "Any chain"
+  const heights = await page.evaluate(() =>
+    [...new Set([...document.querySelectorAll('.hcard')].map(c => Math.round(c.getBoundingClientRect().height)))]);
+  if (heights.length === 1) console.log(`  ✓ every breedable card is ${heights[0]}px`);
+  else { console.log(`  ✗ the breedable board renders at ${heights.length} heights: ${heights.join(', ')}`); fail(); }
   if (await reach(page, () => page.click('#hatchList .hcard'), 'a breedable result card')) {
     await page.waitForTimeout(400);
     await audit(page, 'breedable now with pairs expanded');
@@ -630,6 +651,31 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     });
     if (gap) { console.log(`  ✗ the open panel left a hole in the board: rows ${gap}`); fail(); }
     else console.log('  ✓ the open panel sits on its own row, board resumes underneath');
+    // Escape from inside the panel closes it and hands focus back to the card
+    // that opened it — including after a filter drops that card off the board
+    await page.evaluate(() => document.querySelector('.hatchpanel button').focus());
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    const back = await page.evaluate(() => ({
+      cls: document.activeElement.className, panels: document.querySelectorAll('.hatchpanel').length,
+    }));
+    if (back.cls.includes('hcard') && !back.panels) console.log('  ✓ Escape in the panel closes it and lands on its card');
+    else { console.log(`  ✗ Escape in the panel left ${JSON.stringify(back)}`); fail(); }
+    await focusVisible(page, 'Escape from the panel lands on screen');
+    // a search that drops the open card must not leave a phantom open panel
+    // behind for Escape to re-render the board out from under the user
+    await page.click('#hatchList .hcard');
+    await page.waitForTimeout(300);
+    await page.fill('#hatchSearch', 'zzzzz');
+    await page.waitForTimeout(300);
+    await page.fill('#hatchSearch', '');
+    await page.waitForTimeout(400);
+    await page.evaluate(() => document.querySelector('#hatchList .hcard[tabindex="0"]').focus());
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    const survived = await page.evaluate(() => document.activeElement.tagName);
+    if (survived !== 'BODY') console.log('  ✓ Escape after a filter drops the open card keeps focus');
+    else { console.log('  ✗ Escape after a filter dropped focus to <body>'); fail(); }
   }
   // "Plan this route" crosses tabs, then the route it renders 600ms later scrolls
   // itself into view — the hand-off has to survive that scroll (WCAG 2.4.11)
