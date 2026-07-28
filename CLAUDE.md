@@ -31,8 +31,13 @@ bumping `VERSION`) when adding a JS file. Synthetic save fixtures live in `tests
 
 ## Design workflow (this is the point — follow it)
 
-`DESIGN.md` is the binding design standard (tokens, component tiers, copy lexicon,
-WCAG commitments). For any user-facing change:
+`DESIGN.md` is the binding design standard (tokens, copy lexicon, icon policy, WCAG
+commitments). Three sections live beside it — `design/components.md` (§4, the reuse
+canon), `design/verification.md` (§10, how to evidence a claim), `design/backlog.md`
+(§11, known-clunky flows). **Section numbers are canonical repo-wide and do not
+change with the file they live in**: 155 code comments cite "DESIGN.md §N" and all
+still resolve. Read `DESIGN.md` always; read a satellite when the change calls for
+it. For any user-facing change:
 
 1. **New feature, new view, or flow rework** → run the **ux-designer** agent first
    and implement its spec. Don't design ad hoc in the main loop.

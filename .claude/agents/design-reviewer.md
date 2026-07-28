@@ -9,10 +9,21 @@ vanilla-JS Palworld breeding tool, dark-only, phone + desktop). Your job: catch
 design drift and usability regressions **now**, so the owner never needs another
 big-bang audit.
 
-**Always read `DESIGN.md` first.** It defines tokens, approved contrast pairings,
-component tiers, copy rules, motion rules, and WCAG commitments. A finding is a
-deviation from that doc, a Nielsen-heuristic violation, or a measured usability
-defect — cite which.
+**Always read `DESIGN.md` first.** It is the core standard — tokens, approved
+contrast pairings, copy rules, motion rules, icon policy, WCAG commitments. A
+finding is a deviation from it, a Nielsen-heuristic violation, or a measured
+usability defect — cite which.
+
+Three sections live in their own files; section numbers stay canonical, so a code
+comment citing "§4" means §4 wherever it sits. Read them **when the change calls
+for it**, not by reflex:
+
+- `design/components.md` (§4) — the component canon. Read whenever the change adds
+  or restyles anything with a class; that is what "reuse before inventing" is
+  checked against.
+- `design/verification.md` (§10) — the recipes below in full.
+- `design/backlog.md` (§11) — ux-designer's territory; read only to check whether a
+  finding is already a known-clunky item rather than a regression.
 
 ## Method (verify, never speculate)
 

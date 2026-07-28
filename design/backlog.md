@@ -1,0 +1,179 @@
+# 11 · Known-clunky backlog
+
+The live backlog of flows known to need rework — ux-designer starts here. Split
+out of DESIGN.md because only ux-designer reads it. Section numbers are
+canonical repo-wide: "DESIGN.md §11" means this file.
+
+---
+
+## 11 · Known-clunky backlog (ux-designer: start here)
+
+- **`.accb.mid` / `.accb.alpha` and `.tier.common/rare/epic` carry six raw
+  `rgba()`s** between them, outside §1's two-alpha tint recipe, and use
+  `--neutral`/`--water`/`--dark` (*element* colours) for catch difficulty and
+  rarity. Computed 6.33 / 6.15 / 5.98 / 5.31:1 over `--surface`, so this is token
+  discipline, not contrast — wants `--neutral-tint/line` and `--dark-tint/line`
+  and matrix rows. Note the ratios move with the fill underneath: on `.hcard`'s
+  `--raised` they are 5.39 (rare) and 4.80 (epic), still AA but with epic down to
+  0.30 of headroom, which is the argument for matrix rows rather than one number.
+
+- **The Paldex table is 598 tab stops** — 299 `tr[tabindex="0"]` rows plus 299
+  stars — in the same view whose gallery is **one**, over the same 299 species.
+  §4 settles that a grid board is one stop, but a data table is a different
+  component and the rule does not simply transfer: rows also carry AT's own
+  table-navigation mode. It cannot be halved either — a `.star` inside a `<td>`
+  becomes keyboard-unreachable the moment it goes to `-1` unless a roving model
+  owns the row too. Note the rows are `role="row"` carrying `tabindex="0"`, an
+  `aria-label` and their own Enter/Space handler: a custom widget on a
+  non-interactive role. axe is clean, so it is not a gate — but "make only the
+  name cell a button, as `.dextile-open` already is" is the option that removes
+  that as well as the stops.
+
+- **The Guide's Deep dive hides 82% of itself behind five presses** — 6,399
+  characters across six `<details>`, of which 1,143 are visible at rest, and
+  nothing persists across a reload. It also has no per-section address: the app
+  navigates to `#g-mutations` itself (Breed's footnote does), but a reader
+  cannot link to one. Wants an `Expand all` and a `#/guide/<id>` route, at which
+  point Breed's footnote becomes a plain hash navigation.
+- **Should a `<summary>` carry an `<h3>`?** The Guide is 1,440 words behind two
+  headings, so heading navigation gets "Breeding, start here" and "Deep dive"
+  and nothing about which of six sections is which. Wrapping the summary text in
+  an `<h3>` was measured in Chrome to keep `role=DisclosureTriangle`, `expanded`,
+  the accessible name and Enter/Space — while adding six level-3 landmarks. It
+  collides with §4's reasoning for `.cardopen` ("buried an `h3` in a button"),
+  so this needs a §4 ruling, not a patch.
+- **`.recipe` is a `<div>` of `<span>`s** — five ingredient lists AT cannot count
+  or navigate, with no "Recipe" noun anywhere. `<ul aria-label="Cake recipe">` +
+  `<li class="mchip">` costs nothing; `.recipe{display:flex}` already handles it.
+  The Ancient Breeding Facility's ingredients are inline prose while the five
+  cakes are chips — same content, two presentations (§4 reuse-first).
+
+- **The partner-skill list is 999 tab stops fully paged** — 299 pal links, 421
+  tag chips, 249 rank disclosures and 30 controls. This is **not** the Paldex
+  table's question (§11 above): that is a data table with AT's own navigation
+  mode and two stops per uniform row. Nor is `.skillgrid` a §4 grid board —
+  `.dextile`, `.combo` and `.rostile` are each one press target, while a
+  `.skillcard` holds a pal link, up to four independent tag-filter chips and a
+  disclosure, so a roving `tabindex` over cards cannot reach three kinds of
+  control without a second axis. The cheap 40% is a roving `role="toolbar"` on
+  each card's tag row, which `rovingRow` already does elsewhere: −421 stops for
+  +53.
+- **The two sections page by item count, at a threshold no user can see.**
+  Measured at 360: one page of partner skills (60 cards) is **15,064px** —
+  *longer* than the entire unpaginated Passives section at 12,975px. Meanwhile
+  the Paldex renders 299 items in 9,553px with no pager at all. Card height, not
+  list length, is what decides whether a list needs paging, so a page size
+  counted in cards will always drift. Paging by scroll distance (~6–8 viewports)
+  would give both sections the same rule and put the mobile pager before the
+  19th screen instead of after it.
+
+- **`#mapCount` and `#mapResults` answer the same query differently.**
+  `mapSyncMarkers` counts only the current layer; `mapRenderResults` searches
+  across layers by design. Measured: "Celesdir" announces *1 species · 1 place*
+  in the live region while three marker buttons sit 8px above it, two of them
+  tagged *World Tree*. The empty case is worse — the only actionable sentence
+  ("Nothing matches ... — try a pal or waypoint name") is in the results row,
+  not the live region, so AT hears "0 places" and nothing to do about it.
+- **The map's 123 region names have no textual route.** `#mapRegions` is
+  `aria-hidden` and `mapMatch` tests only marker label, boss and pal name, so
+  searching a real region ("Bamboo Groves") returns nothing. The input's label
+  says "pal or waypoint", so nothing is over-promised — but a whole layer of
+  named places is sighted-only.
+- **Five words for one concept on the Map**: the fast-travel statue is
+  *Waypoints* (filter chip), *Fast travel point* (every marker's accessible
+  name), *fast travel statues* (title), *Closest/Best fast travel* (panel), and
+  *statue* (footnote). Pick one — *waypoint* matches the chip the user sets —
+  and add it to §6's lexicon.
+
+- **Duplicate uses `⧉` (U+29C9), which is not on §7's plain-symbol allowlist**
+  (`★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×`), and §7 says not to add one where a Lucide icon
+  exists — it has `copy`. It does render (13×16px in Segoe UI), so this is a
+  policy deviation rather than a broken glyph; `.tchev` in the same component
+  family is already inline SVG, so the swap is consistent as well as compliant.
+- **"Save" is a verb in three roster controls while §6 reserves it for the
+  Palworld game file** — `✓ Save changes`, `+ Save & add another` and `Read my
+  save` sit in one flow. "Save changes" is unambiguous and universal, so the
+  likely resolution is amending §6 to reserve the *noun* only. Logged so the
+  decision is made rather than drifting.
+
+- **Find parents is dominated by Terraria collab species, with no way to filter
+  them.** Measured over the full pair lists: **22 of Lamball's 30 pairs (73%)**
+  and **44 of Chikipi's 46 (96%)** need a collab pal, and they crowd the tiers a
+  player is most likely to read — one group under *Both parents missing* was
+  eleven collab partners in a row. The Planner already owns this problem and
+  solves it with the `No Terraria collab partners` switch (`avoidCollab`), because
+  those species can't be caught in every game version. Find parents needs the
+  same escape, and the design questions are real: filter or de-prioritise, share
+  `avoidCollab` with the Planner or keep a separate control, and what the status
+  sentence says once a filter can empty a tier. Needs a spec before code.
+
+- **`#smPick`'s two choice rows are the quietest "forward" on any view**: fill 1.10:1
+  and border 1.36:1 against the dialog surface, since a route-choice view carries no
+  primary button (§4). Legal — the rows are identified by their text, and hover
+  (7.66:1) and focus (14.64:1) both clear 3:1 — but if any route-choice view ever
+  grows past two options, the resting affordance needs revisiting first.
+
+- **The pal card's CSS carries a dozen off-scale values.** §2's scale is 4·8·12·16·20·24·32
+  and the card predates it: `.msec{margin-top:18px}`, `.msec h3{margin-bottom:9px}`,
+  `.stat{padding:7px 12px}`, `.pskill{padding:14px 16px}`, `.mbtns{gap:10px}`,
+  `.mbtns .alink{padding:9px 18px}`, `.crow{gap:7px;margin-top:7px}`. The dialog
+  chrome was moved onto tokens in 302765a (`.overlay`, `.modal`, `.mbar`, `.mnav`,
+  `.mtitle`, and `.zk`'s off-scale 16px → `--fs-lg`); the section interiors were
+  left alone deliberately, because each is a 1–2px change across seven rules and
+  the visual diff is worth reviewing on its own rather than buried in a focus fix.
+
+- **`pretty()` leaves the index glued to internal item ids.** The card's drop chips
+  read `Pal Upgrade Stone3`, `Exp Boost 04`, `World Tree Relic 01`, `Technology
+  Book G2`. `pretty()` (`js/core.js`) splits camelCase and underscores but has no
+  rule for a trailing number, and it can't get one blindly — `Exp Boost 04` wants
+  the digits dropped, `Technology Book G2` does not, and some are genuine tiers the
+  player sees in-game. Wants a small display-name map in `tools/`, generated
+  against the item table, not a regex.
+
+- **"In your roster" names a species-scoped fact and shows one individual.** Open a
+  card from a roster row when you hold two of that species and you get the entry
+  you clicked, under a heading that reads as though it covers your roster. §6 keeps
+  species and pal apart everywhere else. `Your "Woolly"` or `This pal` says what it
+  is, but the honest fix may be listing the siblings — which is a layout question
+  inside an already long card, so it needs a spec.
+
+- **§6's 15-word microcopy cap versus the save reader's explainer prose.** Seven
+  strings in that dialog run 16–27 words: the privacy promise (23), *"Browsers
+  can't open that folder for you…"* (27), the truncated-save error (26),
+  `#smConflictNote` (22), the ambiguous-match sentence (22), *"Close the game
+  first…"* (22). Four are genuinely two sentences and should be split whatever
+  else is decided. But the cap is written for labels, and a privacy promise and
+  a where-is-my-file guide are not labels — this dialog is a second longform
+  surface whether or not §6 admits it. Either §6 names the save reader's
+  explainer prose at the Guide's 25-word cap, or the prose moves into the Guide
+  and the dialog links to it. The doc should say which rather than let the code
+  drift against it silently.
+
+- **The save reader's component family is undocumented in §4.** `.privacy`,
+  `.smsum`, `.smh3`, `.smlist`/`.smitem`, `.smacts`, `.smchoose`, `.confrow`,
+  `.pbar` and `.smerr` were all one-offs; `.smerr` is gone (it was `.warnbox`
+  one type step smaller and without its triangle) and `.confrow` changed in
+  0954b69, but the rest still have no entry, against §4's own "a new class gets
+  documented here". One table pass, ideally alongside whatever next touches
+  those recipes.
+
+- **A 400 MB save reads silently for anyone not watching the bar.** `.pbar` has
+  no `role="progressbar"` or `aria-valuenow`, and `#smBusyMsg` is written once
+  ("Reading …sav (400.0 MB)…") and never again — only `bar.style.width` moves.
+  Sighted users get continuous feedback; everyone else gets one utterance and
+  then nothing until it finishes. Either put the role and values on `.pbar`, or
+  update the polite message at coarse milestones (25/50/75%). Coarse, because a
+  live region driven by a progress bar is a stream of interruptions.
+
+- **The toast dwell is not a conformant 2.2.1 "extend" mechanism, deliberately.**
+  Hover and focus pause it and re-arm the full duration, and Alt+Z reaches it,
+  but 3.5s/8s with no warning is not the 20-second-plus-ten-extensions the SC
+  describes. §4's "feedback ≤8s" is the standing position and Undo is never the
+  only route to the action — recorded here so it stays a decision rather than an
+  oversight.
+
+- **`.bottomnav`'s top border is invisible.** `--border` against the composited
+  bar surface measures 1.30–1.49:1 depending on what is scrolled underneath. It
+  is decorative — the bar's own fill separates it — so 1.4.11 doesn't bite, but
+  the hairline is doing nothing at the darker backdrops and either wants
+  `--border-strong` or wants dropping.

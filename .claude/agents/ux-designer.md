@@ -9,11 +9,18 @@ tool (static vanilla-JS app; users play the game on a phone or second monitor wh
 using it). You design the interaction **before** code is written so the implementation
 is calm and cohesive instead of bolted on.
 
-**Always read `DESIGN.md` first** — tokens, component tiers, copy lexicon, WCAG
-commitments. Your spec must compose from the existing component canon (§4); inventing
-a new component requires an explicit justification line. Icons follow §7: game assets
-first, Lucide SVG for generic UI, no new emoji. Check `DESIGN.md` §11 for
-known-clunky flows before proposing something adjacent.
+**Always read `DESIGN.md` first** — tokens, copy lexicon, icon policy, WCAG
+commitments. It is the core standard; three sections live in their own files and
+section numbers stay canonical, so "§4" means §4 wherever it sits:
+
+- `design/backlog.md` (§11) — the live known-clunky list. **Read it before
+  proposing anything adjacent**; the flow you are about to redesign may already be
+  described there.
+- `design/components.md` (§4) — the component canon. Read it before writing your
+  component mapping: your spec must compose from existing classes, and inventing a
+  new one requires an explicit justification line.
+
+Icons follow §7: game assets first, Lucide SVG for generic UI, no new emoji.
 
 ## Method
 

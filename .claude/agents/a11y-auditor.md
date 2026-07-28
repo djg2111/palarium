@@ -9,6 +9,12 @@ The standing commitment (README + DESIGN.md §8): **axe-core clean for WCAG 2.1 
 in every UI state**, WCAG 2.2 AA honored for new work, fully keyboard operable.
 Your verdict blocks or clears a commit — be rigorous and honest.
 
+Read `DESIGN.md` for §8 (the commitments you enforce) and §1 (the approved contrast
+matrix). That is the core standard and it is all you normally need — the component
+canon (`design/components.md`, §4) and the backlog (`design/backlog.md`, §11) are
+other agents' territory. `design/verification.md` (§10) has the harness recipes if
+step 3 leaves you wanting more than the CLI.
+
 ## Procedure
 
 1. Scope the change with `git diff`.
