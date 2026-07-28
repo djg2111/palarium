@@ -628,16 +628,32 @@ select#genderSel{padding:10px 12px}
 .pset{background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--r-full);
   padding:3px 12px;font-size:var(--fs-sm);font-weight:600;color:var(--muted);max-width:100%;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pset:hover:not(:disabled):not([aria-disabled="true"]){color:var(--text);border-color:var(--accent);border-style:solid}
+/* :not([aria-pressed="true"]) or this outranks the pressed rule below on
+   specificity and a hovered pressed chip loses BOTH its state cues — the
+   --success text and the solid --success-line — leaving only a ~1.05:1 tint,
+   which §1 calls atmosphere and never a signal */
+.pset:hover:not(:disabled):not([aria-disabled="true"]):not([aria-pressed="true"]){color:var(--text);border-color:var(--accent);border-style:solid}
 /* the planner's carry row toggles rather than consuming its chips — a chip that
    vanishes under a finger reflows the row mid-tap. Solid border + tint, so the
-   pressed state is shape and fill, not hue alone (§1). 8.20:1 on --surface. */
+   pressed state is shape and fill, not hue alone (§1). 8.31:1 on --surface. */
 .pset[aria-pressed="true"]{color:var(--success);border:1px solid var(--success-line);background:var(--success-tint)}
+.pset[aria-pressed="true"]:hover{border-color:var(--accent)}
 .pset:disabled,.pset[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
 /* 24px target floor without moving anything, the .rosrow .thbtn recipe */
 #carryFrom .pset{padding-top:6px;padding-bottom:6px;margin-top:-3px;margin-bottom:-3px}
-#carryRow{margin-bottom:14px}
-#carryRow[hidden]{display:none}
+/* The toolbar is the single chip display. The picker's own .pchips render the
+   identical pill — same fill, border, radius and weight — so every carried
+   passive appeared twice, 40px apart, one toggling and one removing. */
+#carryPass .pchips{display:none}
+#carryRow{margin-bottom:var(--sp-4)}
+/* The remedy on a legacy plan's warn chip. §4's rule for .mchip.warn: state it
+   in words wherever the width allows, and in an sr-only tail where it does not —
+   never display:none, which would take it from AT as well. */
+.mchip.warn .whytail{color:inherit}
+@media (max-width:640px){
+  .mchip.warn .whytail{position:absolute;width:1px;height:1px;margin:-1px;padding:0;
+    overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+}
 .emptywhy{max-width:52ch;margin:14px auto 0;font-size:var(--fs-sm);line-height:1.6}
 .emptywhy>span{display:block;margin-bottom:9px}
 .vform{display:flex;flex-direction:column;gap:15px}

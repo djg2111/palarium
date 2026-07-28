@@ -8,7 +8,9 @@ function save() {
     rdense: typeof denseRows !== 'undefined' && denseRows,
     rv: typeof rosterView !== 'undefined' ? rosterView : 'tiles',
     pt: pickPT.get()?.k, po: partnerMode, ml: myLevel, ac: avoidCollab, sp: slotPassives, sg: slotGenders,
-    dp: desiredPick.get(),
+    // dpc, because an empty dp is ambiguous on its own: before a choice it means
+    // "carry everything that fits", after one it means "carry nothing"
+    dp: desiredPick.get(), dpc: typeof carryChosen !== 'undefined' && carryChosen,
     ro: !!currentRoute, chain: breedChain,
     hn: typeof hatchNewOnly !== 'undefined' && hatchNewOnly,
     hd: typeof hatchDepth !== 'undefined' ? hatchDepth : 1,
@@ -83,7 +85,11 @@ function rovingRow(container) {
     else if (e.key === 'End') j = btns.length - 1;
     if (j === null) return;
     e.preventDefault();
-    btns[i].tabIndex = -1; btns[j].tabIndex = 0; btns[j].focus();
+    // clear every button, not just btns[i]: a re-render between presses moves the
+    // stop to the first chip, so clearing only the focused one left two at 0 and
+    // the row cost two tab stops with no visible reason
+    all().forEach(b => { b.tabIndex = b === btns[j] ? 0 : -1; });
+    btns[j].focus();
   });
   return container;
 }

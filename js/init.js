@@ -22,6 +22,9 @@ for (const n of SLOTS) {
 if (state.pt && byKey.has(state.pt)) pickPT.set(byKey.get(state.pt), true);
 // sliced: a hand-edited or pre-cap palbreed.dp must not reintroduce a five-passive pal
 if (Array.isArray(state.dp) && state.dp.length) desiredPick.set(state.dp.slice(0, 4));
+// A save written before dpc existed had no "carry nothing" state — a non-empty dp
+// was the only way to say "these specific ones", so that is what it migrates to.
+carryChosen = state.dpc !== undefined ? !!state.dpc : !!(Array.isArray(state.dp) && state.dp.length);
 // `po` used to be a boolean, where true meant "only use my pals". Read both
 // shapes: an old true lands on 'mine', an old false (or anything unrecognised)
 // on 'any' — the two states that existed before, unchanged either way.

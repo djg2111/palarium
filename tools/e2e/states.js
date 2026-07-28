@@ -223,10 +223,19 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
   // A pal has four passive slots, so a route carries at most four. The >4 state
   // is unreachable by deep link (applyHash clears slotPassives), so type them in.
   await nav(page, '#/plan/SheepBall+ElecCat/Anubis', 900);
-  // the block above saved a plan and left the view on the saved sub-tab, which
-  // hides #planNewBlock and every control this block drives
-  await page.evaluate(() => { if (planMode !== 'new') setPlanMode('new'); });
-  await page.waitForTimeout(300);
+  // the block above saved a plan, left the view on the saved sub-tab (which
+  // hides #planNewBlock and every control this block drives) and left a passive
+  // in slot 1 — this block counts passives, so it starts from a known set
+  const resetCarry = async () => {
+    await page.evaluate(() => {
+      if (planMode !== 'new') setPlanMode('new');
+      for (const n of SLOTS) { slotPassives[n] = []; slotGenders[n] = null; }
+      carryChosen = false; desiredPick.clear();
+      renderSlotChips(); computeRoute();
+    });
+    await page.waitForTimeout(600);
+  };
+  await resetCarry();
   const typePass = async (sel, names) => {
     for (const n of names) {
       await page.click(sel + ' .taginp');
@@ -236,6 +245,44 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
       await page.waitForTimeout(120);
     }
   };
+  // The default state, and the one that shipped a lie: with the union inside the
+  // cap the chips must say they are pressed, because that IS what the route
+  // carries — and pressing one must remove only that one.
+  if (await reach(page, async () => {
+    await typePass('#passS1', ['Swift', 'Runner', 'Nimble']);
+    await page.waitForTimeout(1200);
+    await page.waitForSelector('#carryFrom .pset', {timeout: 3000});
+  }, 'three starter passives inside the cap')) {
+    const def = await page.evaluate(() => ({
+      pressed: document.querySelectorAll('#carryFrom .pset[aria-pressed="true"]').length,
+      chips: document.querySelectorAll('#carryFrom .pset').length,
+      status: document.getElementById('planStatus').textContent,
+      dupChips: [...document.querySelectorAll('#carryPass .pchip')].filter(c => c.getBoundingClientRect().height > 0).length,
+    }));
+    if (def.pressed === def.chips && def.chips === 3 && /carrying Swift, Runner, Nimble/.test(def.status))
+      console.log('  ✓ inside the cap every chip states it is carried, and the status agrees');
+    else { console.log(`  ✗ the chips disagree with the route: ${JSON.stringify(def)}`); fail(); }
+    if (!def.dupChips) console.log('  ✓ each carried passive renders once, in the toolbar only');
+    else { console.log(`  ✗ ${def.dupChips} duplicate passive chips below the toolbar`); fail(); }
+    await page.click('#carryFrom .pset[data-p="Swift"]');
+    await page.waitForTimeout(1400);
+    const one = await page.evaluate(() => document.getElementById('planStatus').textContent);
+    if (/carrying Runner, Nimble\.$/.test(one) && !/Swift/.test(one)) console.log('  ✓ un-pressing a chip removes only that one');
+    else { console.log(`  ✗ un-pressing Swift changed more than Swift: ${JSON.stringify(one)}`); fail(); }
+    // un-pressing the rest must mean "carry nothing", not "re-carry everything"
+    await page.click('#carryFrom .pset[data-p="Runner"]');
+    await page.waitForTimeout(400);
+    await page.click('#carryFrom .pset[data-p="Nimble"]');
+    await page.waitForTimeout(1400);
+    const none = await page.evaluate(() => ({
+      status: document.getElementById('planStatus').textContent,
+      pressed: document.querySelectorAll('#carryFrom .pset[aria-pressed="true"]').length,
+    }));
+    if (!/carrying/.test(none.status) && none.pressed === 0) console.log('  ✓ un-pressing the last chip carries nothing, not everything');
+    else { console.log(`  ✗ carrying nothing did not stick: ${JSON.stringify(none)}`); fail(); }
+    await audit(page, 'planner carrying nothing');
+  }
+  await resetCarry();
   if (await reach(page, async () => {
     await typePass('#passS1', ['Swift', 'Runner', 'Nimble', 'Lucky']);
     await typePass('#passS2', ['Artisan', 'Serious', 'Brave', 'Legend']);
