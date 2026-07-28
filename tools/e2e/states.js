@@ -542,7 +542,6 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     const over = await page.evaluate(() => ({
       status: document.getElementById('planStatus').textContent,
       chips: document.querySelectorAll('#routeOut .rsummary .pchip').length,
-      carrier: document.querySelectorAll('#routeOut .carrier').length,
       odds: document.querySelectorAll('#routeOut button.odds:not(.wild)').length,
       steps: document.querySelectorAll('#routeOut .rstep').length,
       psets: document.querySelectorAll('#carryFrom .pset').length,
@@ -552,8 +551,8 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     if (/carrying/.test(over.status)) { console.log('  ✗ over the cap the status still claims a carry set: ' + JSON.stringify(over.status)); fail(); }
     else if (!/pick up to 4 to carry/.test(over.status)) { console.log('  ✗ over the cap the status does not state the choice: ' + JSON.stringify(over.status)); fail(); }
     else console.log('  ✓ over the cap the status states the choice, claims no carry set');
-    if (over.chips || over.carrier || over.odds) { console.log(`  ✗ over the cap the route still prices a set: ${over.chips} chips, ${over.carrier} carrier tags, ${over.odds} odds`); fail(); }
-    else console.log('  ✓ over the cap: no chips, no carrier tags, no odds');
+    if (over.chips || over.odds) { console.log(`  ✗ over the cap the route still prices a set: ${over.chips} chips, ${over.odds} odds`); fail(); }
+    else console.log('  ✓ over the cap: no chips, no odds');
     // ...but the route itself is correct and must still render in full
     if (over.steps > 0 && over.psets === 8 && over.jump) console.log(`  ✓ the route still renders in full (${over.steps} steps) with 8 carry chips and a jump link`);
     else { console.log(`  ✗ the route was withheld: ${JSON.stringify(over)}`); fail(); }

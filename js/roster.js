@@ -1235,11 +1235,16 @@ function renderRosterStrip() {
     b.addEventListener('click', () => { navTab('roster'); landAfterNav('#rosterOpenAdd'); });
     h.appendChild(b);
     strip.appendChild(h);
+    // a toolbar with no buttons is a landmark-shaped dead end — the hint's own
+    // link is a grandchild, so rovingRow never owned it anyway
+    strip.removeAttribute('role');
+    strip.removeAttribute('aria-orientation');
+    strip.removeAttribute('aria-label');
     return;
   }
   for (const r of [...roster].sort((a, b) => byKey.get(a.k).z - byKey.get(b.k).z)) {
     const p = byKey.get(r.k);
-    const chip = document.createElement('button'); chip.className = 'spal'; chip.type = 'button';
+    const chip = document.createElement('button'); chip.className = 'tchip'; chip.type = 'button';
     // decorative: the name sits right beside it, and a non-decorative alt made a
     // pal with no nickname announce its species twice (DESIGN.md §4)
     chip.appendChild(icon(p, 30, false, true));

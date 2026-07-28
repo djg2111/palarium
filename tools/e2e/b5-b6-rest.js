@@ -32,7 +32,7 @@ function check(label, got, want) {
   const hatchBefore = (await page.textContent('#hatchStats')).trim();
   await page.evaluate(() => location.hash = '#/roster');
   await page.waitForTimeout(300);
-  const stripBefore = await page.$$eval('#rosterStrip .spal, #rosterStrip button', e => e.length).catch(() => 0);
+  const stripBefore = await page.$$eval('#rosterStrip button', e => e.length).catch(() => 0);
 
   await page.click('#importBtn');
   await page.setInputFiles('#saveFile', SAVE);

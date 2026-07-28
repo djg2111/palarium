@@ -359,7 +359,7 @@ main{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
 .pgroup .x{color:var(--muted);flex:0 0 auto}
 .pgroup .chiprow{flex:1 1 auto}
 /* the chip sits ON the card, so it is a step lighter than it */
-.pgroup .tchip{cursor:pointer;background:var(--raised)}
+.pgroup .tchip{background:var(--raised)}
 @media (hover:hover){.pgroup .tchip:hover{border-color:var(--accent);color:var(--text)}}
 /* Colour is never the only signal: the triangle glyph and the visible .why text
    both carry it. The reason is ALSO in the chip's aria-label, because an
@@ -651,10 +651,6 @@ tbody tr:hover{background:var(--surface)}
 .roster.rowview{grid-template-columns:minmax(0,1fr)}
 @media (max-width:640px){.roster.tileview{grid-template-columns:repeat(auto-fill,minmax(min(96px,100%),1fr));gap:8px}}
 .rospanel,.roster>.hint{grid-column:1/-1}
-.strip{display:flex;flex-wrap:wrap;gap:8px}
-.spal{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-full);padding:4px 13px 4px 5px;cursor:pointer;font-size:var(--fs-md);font-weight:600}
-.spal:hover{border-color:var(--border-strong)}
-.spal .g{font-size:var(--fs-md)}
 .gm,.gf{font-weight:700}
 .gm{color:var(--male)}.gf{color:var(--female)}
 .g svg{width:.95em;height:.95em;display:inline-block;vertical-align:-.08em}
@@ -1011,8 +1007,6 @@ select#genderSel{padding:10px 12px}
 .wildinfo .wlink{color:var(--accent);font-weight:600;text-decoration:none;border-bottom:1px solid var(--accent-line)}
 .wildinfo .wlink:hover{border-bottom-color:var(--accent)}
 .needrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;font-size:var(--fs-sm);color:var(--muted)}
-.needrow .tchip{cursor:pointer}
-.needrow .tchip:hover{border-color:var(--border-strong)}
 /* how gettable a species is — a named tier plus the facts it came from.
    Four ordered steps on one severity ramp (green -> neutral -> gold -> pink)
    so the order is readable without the labels, and two categorical ones off
@@ -1049,7 +1043,13 @@ select#genderSel{padding:10px 12px}
 .plannerhow>div{padding:2px 16px 14px;color:var(--text-2);font-size:var(--fs-md)}
 .plannerhow b{color:var(--accent)}
 .tree{display:flex;justify-content:center;padding:6px 0 14px}
-.tvp{position:relative;overflow:hidden;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg);cursor:grab;touch-action:none;margin-bottom:10px;width:100%;user-select:none}
+/* pan-y, not none. The viewport is 23% of the height at 360 and sits in the page's
+   scroll path, so touch-action:none meant a vertical swipe that started anywhere
+   on the tree scrolled nothing at all. pan-y hands vertical swipes back to the
+   page and keeps the horizontal pan these trees actually need — they are wide,
+   not tall — and pinch still reaches the app, since pan-y does not imply
+   pinch-zoom. Reset view puts a nudged tree back. */
+.tvp{position:relative;overflow:hidden;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg);cursor:grab;touch-action:pan-y;margin-bottom:10px;width:100%;user-select:none}
 .tvp *{user-select:none}
 .tvp img{-webkit-user-drag:none}
 .tvp.grabbing{cursor:grabbing}
@@ -1085,6 +1085,10 @@ select#genderSel{padding:10px 12px}
 .tn-join{width:20px;height:2px;background:var(--border-strong);flex-shrink:0;position:relative}
 .tn-join::after{content:'▸';position:absolute;right:-6px;top:-9px;color:var(--accent);font-size:var(--fs-sm)}
 .tchip{display:inline-flex;align-items:center;gap:7px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-full);padding:4px 12px 4px 5px;font-size:var(--fs-sm);font-weight:600;white-space:nowrap}
+/* one rule for every pressable .tchip — the roster strip, Find parents' need row
+   and the passive groups all had their own cursor/hover (§4 reuse-first) */
+button.tchip{cursor:pointer}
+button.tchip:hover{border-color:var(--border-strong)}
 .tchip.final{border-color:var(--gold)}
 .tchip .own{color:var(--gold);font-size:var(--fs-xs)}
 .tchip .g{font-size:var(--fs-sm)}
@@ -1109,8 +1113,17 @@ select#genderSel{padding:10px 12px}
 .plansec::after{content:'';flex:1;height:1px;background:var(--border);order:1}
 .plansec .alink{order:2;text-transform:none;letter-spacing:0}
 .quicklb{font-size:var(--fs-sm);color:var(--muted);margin-bottom:8px}
-.strip{margin-bottom:16px}
-.slotgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px}
+/* .chiprow, not a .strip of its own: since the strip became a roving toolbar it
+   has been doing .chiprow's documented job under a second name (§4) */
+#rosterStrip{margin-bottom:16px}
+/* auto-FILL, not auto-fit. The slots reveal progressively, and auto-fit collapses
+   the tracks the hidden ones would have taken — so slot 1 alone was a 1106px
+   picker at 1366, and filling it halved the width of the control under the
+   user's cursor (-559px at 1366, -409px at 900, -343px at 768). auto-fill keeps
+   the tracks sized, so the row never moves. Fixed repeat(4,…) would hold it
+   still too, but at 900 it gives four 192.5px tracks — under this rule's own
+   220px minimum — so the column count still has to be responsive. */
+.slotgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:14px}
 .slot{background:var(--bg);border:1px dashed var(--border-strong);border-radius:var(--r-lg);padding:12px 14px}
 .slotlb{font-size:var(--fs-xs);font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
 .slot .picker{max-width:none;min-width:0}
@@ -1135,12 +1148,10 @@ select#genderSel{padding:10px 12px}
 .rstep .arr2{color:var(--accent);font-size:var(--fs-lg);font-weight:700}
 .rstep .own{color:var(--gold);font-size:var(--fs-sm)}
 .rstep .badge{flex-shrink:0}
-.rstep .carrier{font-size:var(--fs-xs);color:var(--success);border:1px solid var(--success-line);border-radius:var(--r-sm);padding:1px 7px}
 .routemeta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
 .saverow{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center}
 .planhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .planhead .nm{font-weight:700;font-size:16px}
-.planhead .prog{font-size:var(--fs-sm);color:var(--muted);background:var(--raised);border-radius:var(--r-sm);padding:2px 9px}
 .planhead .pushr{margin-left:auto}
 .plan{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:12px}
 .plan .rstep{background:var(--surface);cursor:default}
@@ -1149,7 +1160,7 @@ select#genderSel{padding:10px 12px}
    checklist exists to show, on a row whose controls are still operable. */
 .plan .rstep.done{transition:opacity var(--t-base)}
 .plan .rstep.done .unit .nm{color:var(--muted);text-decoration:line-through}
-.plan .rstep.done .badge,.plan .rstep.done .carrier,.plan .rstep.done .pico{opacity:.55}
+.plan .rstep.done .badge,.plan .rstep.done .pico{opacity:.55}
 /* one checkbox recipe, used by the plan's step ticks and the roster's selection
    mode. Promoted from .plan .rstep .chk rather than forked (DESIGN.md §4). */
 /* --muted, not --border-strong: the resting box has no fill delta from its row
@@ -1715,7 +1726,10 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   /* a catch-list chip carries a tier and a reason now, so at 320px it is a
      paragraph, not a pill — let it wrap inside its own border instead of
      pushing the row sideways */
-  .needrow .tchip{white-space:normal;text-align:left}
+  /* same reason, and the one .tchip property the quick-add strip cannot inherit:
+     a nickname is free text with no length cap, and nowrap floored the chip at
+     its min-content width, so a 38-character name pushed the page past 320 */
+  .needrow .tchip,#rosterStrip .tchip{white-space:normal;text-align:left}
   .needrow .accr{white-space:normal}
   /* margin-left:auto on a wrapping row gave the ↗ button a whole empty line */
   .rstep{position:relative;--gutter:50px;padding-right:var(--gutter)}

@@ -168,21 +168,32 @@ function renderCarryRow() {
 }
 document.getElementById('clearSlots').addEventListener('click', () => {
   clearTimeout(autoTimer);
-  const had = SLOTS.some(n => pickS[n].get()) || pickPT.get() || desiredPick.get().length;
+  // Section 1 only. This used to clear the target as well — a control in one
+  // section band reaching into the next, which is the one thing §4 says a
+  // sectioned form must not do. The target has its own .pclear 40px from where
+  // it lives, so nothing became unreachable (DESIGN.md §11).
+  // a refusal with no words is indistinguishable from a broken control (§4) —
+  // and now that the target is out of scope, "nothing here to clear" is a state
+  // the user can reach with a target already picked
+  if (!SLOTS.some(n => pickS[n].get()) && !desiredPick.get().length) {
+    toast('No start pals to clear.'); return;
+  }
   const snap = {
     slots: SLOTS.map(n => pickS[n].get()),
     sp: SLOTS.map(n => [...slotPassives[n]]),
     sg: SLOTS.map(n => slotGenders[n]),
-    pt: pickPT.get(), dp: desiredPick.get(), dpc: carryChosen,
+    dp: desiredPick.get(), dpc: carryChosen,
   };
   for (const n of SLOTS) { pickS[n].set(null, true); slotPassives[n] = []; slotGenders[n] = null; }
-  pickPT.set(null, true); desiredPick.clear(); carryChosen = false;
+  desiredPick.clear(); carryChosen = false;
   currentRoute = null; renderSlotChips();
   document.getElementById('routeOut').innerHTML = ROUTE_HINT; setPlanStatus(ROUTE_HINT_TEXT);
   save();
-  if (had) toast('Planner inputs cleared', () => {
+  // names both halves: the button says "start pals", but the press also drops
+  // the carry choice, and a title is not a warning on touch (§8)
+  toast('Start pals and carry passives cleared', () => {
     for (const n of SLOTS) { pickS[n].set(snap.slots[n - 1], true); slotPassives[n] = snap.sp[n - 1]; slotGenders[n] = snap.sg[n - 1]; }
-    pickPT.set(snap.pt, true); desiredPick.set(snap.dp); carryChosen = snap.dpc;
+    desiredPick.set(snap.dp); carryChosen = snap.dpc;
     renderSlotChips(); save(); scheduleAuto();
   });
 });
@@ -772,7 +783,11 @@ function stepEl(s, opts = {}) {
     bd.textContent = s.kind === 'same' ? 'Same species' : s.kind === 'gender' ? 'Gender combo' : 'Unique combo';
     row.appendChild(bd);
   }
-  if (opts.carrier) { const c = document.createElement('span'); c.className = 'carrier'; c.textContent = 'passive carrier line'; row.appendChild(c); }
+  // No "passive carrier line" tag here. It is a property of the ROUTE, not the
+  // step — it read identically on every row of a carrying route, which §4
+  // already settles against for Find parents' badge column. .rsummary says it
+  // once ("carrying: …"), and the per-step signal that actually varies is the
+  // odds badge below (DESIGN.md §4, §11).
   if (opts.odds) {
     // a button, not a tooltip-only span: touch users have no hover
     const o = document.createElement('button'); o.type = 'button'; o.className = 'odds';
@@ -1013,7 +1028,7 @@ function treeViewport(treeEl) {
   }, { passive: false });
   // one pointer pans, two pinch-zoom around their midpoint
   const pts = new Map(); // pointerId -> viewport-relative position
-  let drag = null, pinch = null;
+  let drag = null, pinch = null, gestureStart = null;
   const rel = e => { const r = vp.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; };
   const startGesture = () => {
     const ps = [...pts.values()];
@@ -1032,6 +1047,7 @@ function treeViewport(treeEl) {
     pts.set(e.pointerId, rel(e));
     vp.setPointerCapture(e.pointerId);
     vp.classList.add('grabbing');
+    if (!gestureStart) gestureStart = {tx, ty};
     startGesture();
   });
   vp.addEventListener('pointermove', e => {
@@ -1047,8 +1063,16 @@ function treeViewport(treeEl) {
     } else if (drag) { tx = ps[0].x - drag.x; ty = ps[0].y - drag.y; apply(); }
   });
   const endDrag = e => {
+    // touch-action:pan-y means the browser can claim a vertical swipe as a page
+    // scroll — but it delivers one or two pointermoves BEFORE deciding, and
+    // those have already been written into ty. Untouched, every swipe over the
+    // tree nudged it ~24px and six ordinary swipes emptied the viewport. A
+    // pointercancel is the browser saying "this was never mine": give it back.
+    if (e.type === 'pointercancel' && gestureStart && pts.size === 1) {
+      tx = gestureStart.tx; ty = gestureStart.ty; apply();
+    }
     pts.delete(e.pointerId);
-    if (!pts.size) vp.classList.remove('grabbing');
+    if (!pts.size) { vp.classList.remove('grabbing'); gestureStart = null; }
     startGesture(); // a remaining pointer seamlessly resumes as a pan
   };
   vp.addEventListener('pointerup', endDrag);
@@ -1198,8 +1222,7 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
   const need = neededSpecies(steps, ropts.starterKs || []);
   if (need.length) out.appendChild(neededRow(need));
   if (steps.length > 1) out.appendChild(treeViewport(routeTree(steps)));
-  // the "passive carrier line" tag only means something when passives are tracked
-  steps.forEach((s, i) => out.appendChild(stepEl(s, {stepNo: i + 1, chain: steps, carrier: carried.length > 0, odds: stepOdds[i], onOpen: () => openChainStep(steps, i)})));
+  steps.forEach((s, i) => out.appendChild(stepEl(s, {stepNo: i + 1, chain: steps, odds: stepOdds[i], onOpen: () => openChainStep(steps, i)})));
   if (carried.length) {
     const n = document.createElement('div'); n.className = 'mathline';
     n.textContent = 'At each step, hatch until a child inherits your passives (and the right gender for the next pairing), then continue with that child.';
@@ -1291,7 +1314,7 @@ function renderPlans() {
     head.appendChild(icon(byKey.get(plan.tK), 38, true));
     const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = plan.name; head.appendChild(nm);
     const doneCnt = plan.done.filter(Boolean).length;
-    const prog = document.createElement('span'); prog.className = 'prog';
+    const prog = document.createElement('span'); prog.className = 'mchip';
     prog.textContent = doneCnt === plan.steps.length ? '✓ complete' : `${doneCnt}/${plan.steps.length} steps`;
     head.appendChild(prog);
     // Plans saved before the four-passive cap can list more. The data is left
