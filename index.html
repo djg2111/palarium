@@ -374,6 +374,9 @@
   </section>
 
   <section class="view" id="view-map">
+    <!-- Every other view names itself in an h2; Map had no heading at all, so
+         heading navigation skipped straight past it. -->
+    <div class="collhead"><h2>Map</h2></div>
     <div class="dex-controls mapbar">
       <div class="segrow" id="mapLayer" role="group" aria-label="Map layer">
         <button type="button" data-l="MainMap" class="on" aria-pressed="true">Palpagos Islands</button>
@@ -394,9 +397,13 @@
       </div>
       <span class="rstats" id="mapCount" aria-live="polite"></span>
     </div>
-    <div class="mapresults" id="mapResults" hidden></div>
+    <!-- named, like #dexGrid and #comboList: a bare <div> of buttons gave AT
+         nothing to identify it by. group, not list: the row mixes result
+         buttons with a trailing "+N more" span, and role=listitem on a
+         <button> would replace the role that makes it operable. -->
+    <div class="mapresults" id="mapResults" role="group" aria-label="Search results" hidden></div>
     <div class="spawnbar" id="spawnBar" hidden></div>
-    <div class="mapview" id="mapView" tabindex="0" role="region" aria-label="Interactive map — drag to pan, arrow keys to move, plus and minus to zoom">
+    <div class="mapview" id="mapView" tabindex="0" role="region" aria-label="Interactive map — drag or arrow keys to pan, plus and minus to zoom, 0 to fit, Escape to clear a selection">
       <div class="mapstage" id="mapStage">
         <div class="maptiles" id="mapTiles"></div>
         <canvas class="mapzones" id="mapZones" width="1" height="1" hidden></canvas>
@@ -409,7 +416,10 @@
         <button type="button" id="mapOut" aria-label="Zoom out" title="Zoom out"><svg class="lui" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
         <button type="button" id="mapReset" aria-label="Fit the whole map" title="Fit the whole map"><svg class="lui" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
       </div>
-      <div class="maphelp" id="mapHelp">Drag to pan · scroll to zoom · tap a marker</div>
+      <!-- keyboard included: this line used to name only pointer gestures while
+           the arrow/zoom keys existed solely in the region's aria-label, so a
+           sighted keyboard user had no way to learn them (DESIGN.md §8) -->
+      <div class="maphelp" id="mapHelp">Drag or arrow keys to pan · scroll or + − to zoom · 0 fits the map</div>
       <aside class="mapinfo" id="mapInfo" hidden aria-live="polite"></aside>
     </div>
     <div class="viewsub mapfoot">Marker positions, names and alpha levels come straight from the game files (v1.0.1) — the same extraction that builds the Paldex. Distances are straight-line, so treat them as a guide to the closest statue rather than a walking route.</div>

@@ -664,6 +664,47 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await audit(page, 'map with a spawn overlay');
   }
 
+  // Every view names itself in an h2 — Map had no heading at all, so heading
+  // navigation skipped straight past the app's largest surface.
+  {
+    const hd = await page.evaluate(() => {
+      const v = document.getElementById('view-map');
+      const h = [...v.querySelectorAll('h1,h2,h3')].filter(e => e.getBoundingClientRect().height > 0)[0];
+      return h ? h.tagName + ':' + h.textContent.trim() : 'NONE';
+    });
+    if (hd === 'H2:Map') console.log('  ✓ the Map names itself in an h2');
+    else { console.log(`  ✗ the Map's first heading is ${hd}`); fail(); }
+  }
+  // the visible help named only pointer gestures while the keyboard route
+  // existed solely in the region's aria-label
+  {
+    const kb = await page.evaluate(() => ({
+      help: document.getElementById('mapHelp').textContent,
+      label: document.getElementById('mapView').getAttribute('aria-label'),
+    }));
+    if (/arrow keys/i.test(kb.help)) console.log('  ✓ the map help names the keyboard route, not just dragging');
+    else { console.log(`  ✗ the map help is pointer-only: ${JSON.stringify(kb.help)}`); fail(); }
+  }
+  // arrows pan once there is somewhere to pan to
+  {
+    const moved = await page.evaluate(async () => {
+      document.getElementById('mapView').focus();
+      const press = k => document.getElementById('mapView').dispatchEvent(
+        new KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true}));
+      press('+'); press('+');
+      await new Promise(r => setTimeout(r, 400));
+      const before = Math.round(mapTX);
+      press('ArrowRight');
+      await new Promise(r => setTimeout(r, 300));
+      return Math.round(mapTX) - before;
+    });
+    if (moved !== 0) console.log(`  ✓ arrow keys pan the map (${moved}px)`);
+    else { console.log('  ✗ ArrowRight did not pan the map'); fail(); }
+    await page.evaluate(() => document.getElementById('mapView').dispatchEvent(
+      new KeyboardEvent('keydown', {key: '0', bubbles: true, cancelable: true})));
+    await page.waitForTimeout(300);
+  }
+
   console.log('\nTOAST — a bad deep link says so');
   await nav(page, '#/pal/Xyzzy', 400);
   if (await reach(page, () => page.waitForSelector('#toasts .toast', {timeout: 3000}), 'the bad-link toast')) {
