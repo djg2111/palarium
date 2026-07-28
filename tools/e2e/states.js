@@ -60,6 +60,27 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await overflow(page, `cold ${t}`);
   }
 
+  // Every width, not one: scrollIntoView sets the sequential focus navigation
+  // starting point, so showTab scrolling the active tab at boot meant the first
+  // Tab of the session started AFTER the tab strip — at ≥641px only, which is
+  // why a 360-only check called this fixed when it was not.
+  for (const w of [320, 360, 641, 900, 1280]) {
+    await page.setViewportSize({width: w, height: 800});
+    await page.evaluate(() => localStorage.clear());
+    await page.reload({waitUntil: 'load'});
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(120);
+    const first = await page.evaluate(() => document.activeElement.className);
+    if (first === 'skip') console.log(`  ✓ the skip link is the first tab stop at ${w}`);
+    else { console.log(`  ✗ at ${w} the first Tab lands on ${JSON.stringify(first)}`); fail(); }
+  }
+  await page.setViewportSize({width: 1280, height: 900});
+  await page.evaluate(() => { localStorage.clear(); });
+  await page.reload({waitUntil: 'load'});
+  await page.waitForTimeout(400);
+  await nav(page, '#/guide', 400);
+
   // The hash IS the router, so the skip link's own href was a route: it used to
   // answer the app's accessibility affordance with "Link not recognized".
   {
@@ -1021,6 +1042,31 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     if (bar.current === 'page' && /^More/.test(bar.name) && / Map$/.test(bar.name))
       console.log(`  ✓ the bar names the view behind More: ${JSON.stringify(bar.name)}`);
     else { console.log(`  ✗ on a sheet view the bar says: ${JSON.stringify(bar)}`); fail(); }
+
+    // A toast is 331px wide and centred, the sheet 190px hard right: they
+    // overlapped, and #toasts is z-index 300 to the sheet's 95, so the toast
+    // took the hit test over the sheet's bottom three entries — 5.4px of
+    // tappable width for "Map" at 360, and a tap there closed the sheet and
+    // went nowhere.
+    await page.evaluate(() => { document.getElementById('moreBtn').click();
+      toast('Removed Woolly from roster — species still ★ owned', () => {}, {label: 'Un-star Lamball', fn: () => {}}); });
+    await page.waitForTimeout(500);
+    const covered = await page.evaluate(() => ['skills', 'map', 'guide'].filter(v => {
+      const b = document.querySelector(`#moresheet button[data-v="${v}"]`);
+      const r = b.getBoundingClientRect();
+      const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return !(at && at.closest('#moresheet'));
+    }));
+    if (!covered.length) console.log('  ✓ a toast does not sit on the open More sheet');
+    else { console.log(`  ✗ a toast covers the sheet's ${JSON.stringify(covered)}`); fail(); }
+    await audit(page, 'a toast over the open More sheet');
+    // one "current page" per navigation context, not two
+    const cur = await page.evaluate(() => document.querySelectorAll('#bottomnav [aria-current], #moresheet [aria-current]').length);
+    if (cur === 1) console.log('  ✓ exactly one control claims the current page');
+    else { console.log(`  ✗ ${cur} controls claim aria-current at once`); fail(); }
+    await page.evaluate(() => document.querySelectorAll('.toast .tx').forEach(x => x.click()));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
     if (bar.ring && bar.ring !== 'none') console.log('  ✓ the current tab is marked by more than its colour');
     else { console.log('  ✗ the current tab is marked by colour alone (1.4.1)'); fail(); }
     await nav(page, '#/breed/SheepBall/ElecCat', 400);

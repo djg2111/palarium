@@ -39,7 +39,19 @@ function showTab(v) {
     b.classList.toggle('active', on);
     b.setAttribute('aria-selected', String(on));
     b.tabIndex = on ? 0 : -1;
-    if (on) b.scrollIntoView({block: 'nearest', inline: 'nearest'});
+    // Scroll the strip, never ask the button to scroll itself: in Chrome
+    // scrollIntoView SETS THE SEQUENTIAL FOCUS NAVIGATION STARTING POINT, so
+    // running it at boot meant the first Tab of the session started after the
+    // tab strip — the skip link was never offered at any width where .tabs is
+    // rendered, and the strip itself could only be reached backwards. At 900
+    // and 1280 the call was a pure no-op scroll (scrollWidth == clientWidth)
+    // that cost the affordance for nothing; the strip only overflows at
+    // roughly 641-830px.
+    if (on && tabsEl.scrollWidth > tabsEl.clientWidth) {
+      const r = b.getBoundingClientRect(), c = tabsEl.getBoundingClientRect();
+      if (r.left < c.left) tabsEl.scrollLeft += r.left - c.left;
+      else if (r.right > c.right) tabsEl.scrollLeft += r.right - c.right;
+    }
   });
   syncBottomNav(v);
   closeMoreSheet();
@@ -123,7 +135,20 @@ function closeMoreSheet() {
   const held = moreSheetEl.contains(document.activeElement);
   moreSheetEl.classList.remove('open');
   moreBtnEl.setAttribute('aria-expanded', 'false');
+  syncSheetHeight();
+  // the sheet no longer claims the current page; its own entry still does
+  if (MORE_TABS.includes(currentTab)) moreBtnEl.setAttribute('aria-current', 'page');
   if (held) moreBtnEl.focus();
+}
+// A toast is 331px wide and centred; the sheet is 190px hard against the right
+// edge. They overlapped, and .toasts is z-index 300 to the sheet's 95 — so the
+// toast won the hit test over the bottom three entries and left 5.4px of
+// tappable width for "Map" at 360 (2.5.8 wants 24). Tapping its centre closed
+// the sheet and navigated nowhere. The sheet is a layer the user opened;
+// passive feedback gets out of its way.
+function syncSheetHeight() {
+  const h = moreSheetEl.classList.contains('open') ? Math.round(moreSheetEl.getBoundingClientRect().height) : 0;
+  document.documentElement.style.setProperty('--sheet-h', h + 'px');
 }
 function syncBottomNav(v) {
   bottomNavEl.querySelectorAll('button[data-v]').forEach(b => {
@@ -159,6 +184,11 @@ moreBtnEl.addEventListener('click', e => {
   const open = !moreSheetEl.classList.contains('open');
   moreSheetEl.classList.toggle('open', open);
   moreBtnEl.setAttribute('aria-expanded', String(open));
+  // Two controls claiming "current page" in one navigation context reads as a
+  // stutter; while the sheet is open the real button is on screen and says it.
+  if (open) moreBtnEl.removeAttribute('aria-current');
+  else if (MORE_TABS.includes(currentTab)) moreBtnEl.setAttribute('aria-current', 'page');
+  syncSheetHeight();
 });
 bottomNavEl.addEventListener('click', e => {
   const b = e.target.closest('button[data-v]');
@@ -178,7 +208,13 @@ moreSheetEl.addEventListener('click', e => {
 document.querySelector('.skip').addEventListener('click', e => {
   if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   e.preventDefault();
+  // tabindex on demand, removed on blur. Left on the element it made <main> the
+  // nearest focusable ancestor of every paragraph in the app, so an ordinary
+  // click on body text focused it — and the next Tab jumped to the first
+  // control of the view, scrolling 1800px back to the top of the Guide.
   const m = document.getElementById('main');
+  m.setAttribute('tabindex', '-1');
+  m.addEventListener('blur', () => m.removeAttribute('tabindex'), {once: true});
   m.focus();
   scrollTo({top: 0, behavior: SMOOTH});
 });

@@ -266,6 +266,17 @@ function toast(msg, undoFn, action, opts = {}) {
   t.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
   arm();
   toastsEl.appendChild(t); syncToastRegion();
+  // A two-row toast is 109px, and the stack grows upward from the tab bar: at
+  // 320x568 the fifth one's message row is off the top of the screen with
+  // nothing to scroll. Drop the oldest rather than let the stack run past the
+  // fold — the oldest is also the one closest to expiring on its own.
+  while (toastsEl.children.length > 4) {
+    const old = toastsEl.firstElementChild;
+    const held = old.contains(document.activeElement);
+    old.remove();
+    if (held) restoreFromToast();
+  }
+  syncToastRegion();
 }
 // Alt+Z moves focus to the newest toast's first action; pressed again inside the
 // stack it walks to the next one, newest first. It focuses rather than fires:

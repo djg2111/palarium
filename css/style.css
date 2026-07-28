@@ -1563,6 +1563,10 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
          every toast underneath the nav. --- */
   footer{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
   .toasts{bottom:calc(76px + env(safe-area-inset-bottom))}
+  /* clear of the More sheet while it is open — see syncSheetHeight in
+     js/router.js. The sheet precedes #toasts in the markup, so this needs
+     no JS beyond publishing the height. */
+  .moresheet.open ~ .toasts{bottom:calc(76px + var(--sheet-h, 0px) + 12px + env(safe-area-inset-bottom))}
   /* sequential focus navigation honours scroll-padding, so tabbing to a control
      near the fold scrolls it clear of the fixed nav instead of parking it
      underneath (WCAG 2.4.11 Focus Not Obscured) */
