@@ -113,9 +113,17 @@ const bottomNavEl = document.getElementById('bottomnav');
 const moreSheetEl = document.getElementById('moresheet');
 const moreBtnEl = document.getElementById('moreBtn');
 const MORE_TABS = ['hatch', 'roster', 'dex', 'skills', 'map', 'guide'];
+// Closing hides the button that was pressed, so the sheet has to hand focus
+// back — every route out of it (Escape, picking a view, clicking away with the
+// keyboard inside) left the phone layout's primary navigation on <body>.
+// Only when it actually held the focus: a pointer user who taps elsewhere has
+// put focus where they want it.
 function closeMoreSheet() {
+  if (!moreSheetEl.classList.contains('open')) return;
+  const held = moreSheetEl.contains(document.activeElement);
   moreSheetEl.classList.remove('open');
   moreBtnEl.setAttribute('aria-expanded', 'false');
+  if (held) moreBtnEl.focus();
 }
 function syncBottomNav(v) {
   bottomNavEl.querySelectorAll('button[data-v]').forEach(b => {
@@ -123,8 +131,28 @@ function syncBottomNav(v) {
     b.classList.toggle('active', on);
     if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
-  moreBtnEl.classList.toggle('active', MORE_TABS.includes(v));
-  moreSheetEl.querySelectorAll('button[data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+  // Six of the nine views live behind More, and on those the bar said nothing:
+  // the accent colour marked the button and no control carried aria-current, so
+  // the only "where am I" in the phone layout was a hue. More stands in for the
+  // view it is hiding, and names it — the sheet that holds the real button is
+  // display:none, so it cannot.
+  const inSheet = MORE_TABS.includes(v);
+  moreBtnEl.classList.toggle('active', inSheet);
+  let here = null;
+  moreSheetEl.querySelectorAll('button[data-v]').forEach(b => {
+    const on = b.dataset.v === v;
+    b.classList.toggle('active', on);
+    if (on) { b.setAttribute('aria-current', 'page'); here = b.textContent.trim(); }
+    else b.removeAttribute('aria-current');
+  });
+  if (inSheet) {
+    moreBtnEl.setAttribute('aria-current', 'page');
+    // starts with the visible word, so the visible label is still in the name (2.5.3)
+    if (here) moreBtnEl.setAttribute('aria-label', 'More — ' + here);
+  } else {
+    moreBtnEl.removeAttribute('aria-current');
+    moreBtnEl.removeAttribute('aria-label');
+  }
 }
 moreBtnEl.addEventListener('click', e => {
   e.stopPropagation(); // keep the document-level close handler from undoing the toggle
@@ -152,6 +180,8 @@ document.querySelector('.logo a').addEventListener('click', e => {
 document.addEventListener('click', e => {
   if (moreSheetEl.classList.contains('open') && !moreSheetEl.contains(e.target)) closeMoreSheet();
 });
+// closeMoreSheet is a no-op when the sheet is shut, so this stays out of the
+// way of the other layers' Escape handlers (§8 — topmost layer only)
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMoreSheet(); });
 // ---------- shareable URLs ----------
 let booting = true;                    // suppress hash writes until init has applied the incoming hash

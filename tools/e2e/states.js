@@ -851,12 +851,32 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
   await nav(page, '#/breed/SheepBall/ElecCat', 500);
   await audit(page, 'breed at 360');
   if (await reach(page, async () => {
-    await page.click('#moreBtn');
+    await page.evaluate(() => { const b = document.getElementById('moreBtn'); b.focus(); b.click(); });
     await page.waitForSelector('#moresheet.open', {timeout: 3000});
   }, 'the more sheet')) {
     await audit(page, 'more sheet open at 360');
+    // closing hides the button that was pressed — all three routes out
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(200);
+    await focusSane(page, 'Escape hands the sheet’s focus back to More');
+    await page.evaluate(() => { const b = document.getElementById('moreBtn'); b.focus(); b.click(); });
+    await page.waitForTimeout(250);
+    await page.evaluate(() => { const b = document.querySelector('#moresheet button[data-v="map"]'); b.focus(); b.click(); });
+    await page.waitForTimeout(900);
+    await focusVisible(page, 'picking a view from the sheet');
+    // six of the nine views live behind More; the bar has to say so in words,
+    // not in the accent hue alone
+    const bar = await page.evaluate(() => {
+      const m = document.getElementById('moreBtn');
+      return {current: m.getAttribute('aria-current'), name: m.getAttribute('aria-label') || m.textContent.trim(),
+        ring: getComputedStyle(m).boxShadow};
+    });
+    if (bar.current === 'page' && /^More/.test(bar.name) && / Map$/.test(bar.name))
+      console.log(`  ✓ the bar names the view behind More: ${JSON.stringify(bar.name)}`);
+    else { console.log(`  ✗ on a sheet view the bar says: ${JSON.stringify(bar)}`); fail(); }
+    if (bar.ring && bar.ring !== 'none') console.log('  ✓ the current tab is marked by more than its colour');
+    else { console.log('  ✗ the current tab is marked by colour alone (1.4.1)'); fail(); }
+    await nav(page, '#/breed/SheepBall/ElecCat', 400);
   }
   if (await reach(page, async () => {
     await page.click('#pickA .picker-btn');

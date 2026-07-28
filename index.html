@@ -542,9 +542,9 @@
   <button data-v="breed" type="button"><svg class="bi" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c6.23-.05 7.87-5.57 7.5-10-.36-4.34-3.95-9.96-7.5-10-3.55.04-7.14 5.66-7.5 10-.37 4.43 1.27 9.95 7.5 10z"/></svg>Breed</button>
   <button data-v="reverse" type="button"><svg class="bi" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>Find</button>
   <button data-v="plan" type="button"><svg class="bi" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>Plan</button>
-  <button id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false"><svg class="bi" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</button>
+  <button id="moreBtn" type="button" aria-expanded="false" aria-controls="moresheet"><svg class="bi" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</button>
 </nav>
-<div class="moresheet" id="moresheet">
+<div class="moresheet" id="moresheet" role="group" aria-label="More views">
   <button data-v="hatch" type="button">Breedable now</button>
   <button data-v="roster" type="button">Roster</button>
   <button data-v="dex" type="button">Paldex</button>
