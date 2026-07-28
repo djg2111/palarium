@@ -100,7 +100,26 @@ const {audit, overflow, focusSane, fail, failed} = makeChecks();
   console.log('\nSTATE 3 — the preview, nothing to decide');
   await page.setInputFiles('#saveFile', path.join(TESTS, 'fixture-before.sav'));
   await page.waitForSelector('#smResult:not([hidden])');
-  await focusSane(page, 'preview moves focus to the action');
+  await focusSane(page, 'preview moves focus into the result');
+  // ...and to the ANSWER, not to the button that commits it. Focusing #smApply
+  // scrolled the dialog 161px (1366) / 524px (360) past its own summary, the
+  // scope filter and the first conflict row.
+  {
+    const land = await page.evaluate(() => {
+      const m = document.querySelector('#soverlay .modal');
+      const sum = document.getElementById('smSummary').getBoundingClientRect();
+      return {onResult: document.activeElement.id === 'smResult',
+        summaryVisible: sum.top >= m.getBoundingClientRect().top - 1 && sum.bottom <= m.getBoundingClientRect().bottom,
+        scrolled: Math.round(m.scrollTop)};
+    });
+    if (land.onResult && land.summaryVisible) console.log(`  ✓ the preview opens on its own summary (${land.scrolled}px in)`);
+    else { console.log(`  ✗ the preview opens past its answer: ${JSON.stringify(land)}`); fail(); }
+    // everything the Import button writes has to be previewed, stars included
+    const said = await page.evaluate(() => [...document.querySelectorAll('#smPreview .sub')].map(p => p.textContent).join(' '));
+    const stars = await page.evaluate(() => new Set(smPlan.allPals.map(sp => sp.palKey).filter(k => !owned.has(k))).size);
+    if (!stars || /will be starred as owned/.test(said)) console.log(`  ✓ the preview names the ${stars} species it will star`);
+    else { console.log(`  ✗ ${stars} species get starred and the preview does not say so`); fail(); }
+  }
   await audit(page, 'preview without collisions');
   await overflow(page, 'preview without collisions');
   await page.screenshot({path: path.join(__dirname, 'shot-preview-desktop.png')});

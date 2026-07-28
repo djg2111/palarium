@@ -569,14 +569,14 @@
     <div class="worldlist" id="smPickList" role="list">
       <div class="worldrow" role="listitem">
         <button type="button" class="worldbtn" id="smChooseDir" aria-labelledby="smDirName" aria-describedby="smDirWhy smDirUp">
-          <span class="wname" id="smDirName"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Choose my save folder…</span>
+          <span class="wname" id="smDirName"><svg class="lui" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Choose my save folder…</span>
           <span class="wsub" id="smDirWhy">Palarium lists the worlds inside by world and character name, so you don’t guess.</span>
           <span class="wsub" id="smDirUp">Your browser will ask to confirm and will say “upload”. Nothing is uploaded.</span>
         </button>
       </div>
       <div class="worldrow" role="listitem">
         <button type="button" class="worldbtn" id="smChoose" aria-labelledby="smFileName" aria-describedby="smFileWhy">
-          <span class="wname" id="smFileName"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>Choose one Level.sav…</span>
+          <span class="wname" id="smFileName"><svg class="lui" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>Choose one Level.sav…</span>
           <span class="wsub" id="smFileWhy">For when you already know which file you want — it skips the world list.</span>
         </button>
       </div>
@@ -647,7 +647,10 @@
     <button type="button" class="alink" id="smCancel">Cancel</button>
   </section>
 
-  <section id="smResult" hidden>
+  <!-- focusable and named by its own summary: arriving here used to focus the
+       commit button, which scrolled the dialog past the answer it is asking
+       you to approve (the .chaincard / .mapinfo pattern, DESIGN.md §4) -->
+  <section id="smResult" tabindex="-1" role="group" aria-labelledby="smSummary" hidden>
     <p id="smSummary" class="smsum" aria-live="polite"></p>
     <div class="dex-controls smfilter">
       <div class="segrow" id="smScope" role="group" aria-label="Which pals to import">
@@ -668,7 +671,7 @@
   </section>
 
   <section id="smError" hidden>
-    <p class="smerr" id="smErrMsg" role="alert"></p>
+    <p class="warnbox" id="smErrMsg" role="alert"></p>
     <div class="smacts">
       <button type="button" class="alink" id="smRetry">Choose a different file</button>
       <button type="button" class="alink" id="smErrAlt" hidden></button>

@@ -188,7 +188,13 @@ function restoreFromToast() {
   const next = toastsEl.lastElementChild;
   const btn = next && next.querySelector('.undo, .tx');
   if (btn) { btn.focus(); return; }
-  if (toastReturn && toastReturn !== document.body && document.contains(toastReturn)) { toastReturn.focus(); return; }
+  // offsetParent too, or the return below skips the tab-bar fallback for an
+  // element that is still in the DOM but inside a hidden view — the fourth
+  // instance of this in the app, after closeModal, closeRosterEditor and
+  // closeSaveReader. Alt+Z from the Roster, an undo that navigates, then
+  // dismiss: focus.() is a no-op and nothing catches it.
+  if (toastReturn && toastReturn !== document.body
+      && document.contains(toastReturn) && toastReturn.offsetParent !== null) { toastReturn.focus(); return; }
   const bar = activeTabButton();
   if (bar) bar.focus();
 }

@@ -69,7 +69,7 @@ function openBackupHub() {
   renderHub();
   if (!sov.classList.contains('open')) {
     smLastFocus = document.activeElement;
-    sov.classList.add('open'); sov.scrollTop = 0;
+    sov.classList.add('open'); smodalEl.scrollTop = 0;   // the dialog is the scrollport, not the overlay (302765a)
     document.body.style.overflow = 'hidden';
   }
   document.getElementById('smTitle').textContent = 'Backup & restore';
@@ -238,6 +238,11 @@ function renderBackupPreview() {
   else if (stars) label = `Star ${stars} species`;
   else label = 'Nothing to restore';
   apply.textContent = label;
+  // §4: destructive is never .alink.primary — "Replace my data" sits directly
+  // under a warnbox naming what it removes, and a solid accent fill on a
+  // destructive default invites the mis-press the warning exists to prevent.
+  // Merge and the cold-start restore are additive and stay primary.
+  apply.className = 'alink ' + (merge || coldStart ? 'primary' : 'danger');
   apply.disabled = merge && !pals.length && !plns.length && !stars;
 }
 
@@ -324,6 +329,7 @@ function palFromCharacterId(cid) {
 const passiveDisplay = key => PASSIVE_NAME_BY_KEY.get(String(key).toLowerCase()) || String(key);
 
 const sov = document.getElementById('soverlay');
+const smodalEl = sov.querySelector('.modal');
 let smWorker = null, smParsed = null, smPlan = null, smScope = 'all', smLastFocus = null;
 // Reading the file into an ArrayBuffer is itself async and not cancellable, so
 // Cancel can't stop one already in flight. Every read carries a token; a read
@@ -470,7 +476,7 @@ function openSaveReader() {
   smShow('smPick');
   if (!sov.classList.contains('open')) {
     smLastFocus = document.activeElement;
-    sov.classList.add('open'); sov.scrollTop = 0;
+    sov.classList.add('open'); smodalEl.scrollTop = 0;   // the dialog is the scrollport, not the overlay (302765a)
     document.body.style.overflow = 'hidden';
   }
   document.getElementById('smChooseDir').focus();
@@ -611,7 +617,8 @@ document.getElementById('saveFile').addEventListener('change', e => {
 // itself tells us which door was meant, so it never guesses.
 function smFail(msg, alt) {
   smShow('smError');
-  document.getElementById('smErrMsg').textContent = msg;
+  // a .warnbox now, and every other .warnbox in the app leads with the triangle
+  document.getElementById('smErrMsg').replaceChildren(lucide('triangleAlert', 16), ' ' + msg);
   const b = document.getElementById('smErrAlt');
   b.hidden = !alt;
   if (alt) { b.textContent = alt.label; b.onclick = alt.fn; } else { b.onclick = null; }
@@ -699,7 +706,14 @@ function showSavePreview() {
   smPlan = buildPlan();
   smShow('smResult');
   renderSavePreview();
-  document.getElementById('smApply').focus();
+  // The result, not the button that commits it. Focusing #smApply scrolled the
+  // dialog 161px (1366) / 524px (360) past its own answer — the summary
+  // sentence, the scope filter and the whole first conflict row were above the
+  // viewport on arrival, and .mbar carries only ✕, so nothing on screen named
+  // the dialog either. It is also the only focusable that can be DISABLED
+  // (a save with nothing importable), where focus() is a no-op and the state
+  // change handed focus nowhere at all.
+  document.getElementById('smResult').focus();
 }
 
 function recomputePlan() {
@@ -729,7 +743,7 @@ function recomputePlan() {
 
 function describeSavePal(sp) {
   const bits = [sp.palName];
-  if (sp.boss) bits.push('α');
+  if (sp.boss) bits.push('Alpha');   // α is off §7's allowlist and nothing on screen decoded it
   if (sp.gender) bits.push(sp.gender === 'M' ? '♂' : '♀');
   bits.push('Lv ' + sp.lv);
   bits.push('IV ' + sp.iv.join('·'));
@@ -748,7 +762,7 @@ function renderSavePreview() {
   sum.textContent = `Found ${smParsed.pals.length} pals in your save. ` + parts.join(' · ') + '.';
 
   const note = [];
-  if (P.unrecognised) note.push(`${P.unrecognised} entr${P.unrecognised === 1 ? 'y' : 'ies'} skipped — raid, tower or unreleased pals the Paldex doesn’t list.`);
+  if (P.unrecognised) note.push(`${P.unrecognised} entr${P.unrecognised === 1 ? 'y' : 'ies'} skipped — raid, tower or unreleased species the Paldex doesn’t list.`);
   if (smParsed.players) note.push(`${smParsed.players} player character${smParsed.players === 1 ? '' : 's'} skipped.`);
 
   const wrap = document.getElementById('smConflictWrap');
@@ -817,9 +831,16 @@ function renderSavePreview() {
       const o0 = document.createElement('option'); o0.value = '-1';
       o0.textContent = 'Keep them separate — leave my entry alone, import all ' + c.cands.length;
       sel.appendChild(o0);
+      // Two pals can differ only by an id the user never sees, so the question
+      // "Which one is this?" could arrive with two byte-identical answers.
+      // Number the ones that collide — it does not say which is which, but it
+      // makes the choice answerable and the result predictable.
+      const labels = c.cands.map(describeSavePal);
+      const dupes = new Set(labels.filter((t, i) => labels.indexOf(t) !== i));
       c.cands.forEach((sp2, i) => {
         const o = document.createElement('option'); o.value = String(i);
-        o.textContent = 'Combine with: ' + describeSavePal(sp2);
+        o.textContent = 'Combine with: ' + labels[i]
+          + (dupes.has(labels[i]) ? ` (${i + 1} of ${c.cands.length})` : '');
         sel.appendChild(o);
       });
       sel.value = String(c.choice === 'combine' ? c.pick : -1);
@@ -843,7 +864,7 @@ function renderSavePreview() {
     const ul = mkSmList('Pals that will be added from your save');
     for (const sp of P.added.slice(0, 60)) {
       const d = document.createElement('div'); d.className = 'smitem';
-      d.appendChild(icon(byKey.get(sp.palKey), 22));
+      d.appendChild(icon(byKey.get(sp.palKey), 20, false, true));   // named by the line beside it (§7)
       const t = document.createElement('span'); t.textContent = describeSavePal(sp);
       d.appendChild(t);
       ul.appendChild(d);
@@ -855,8 +876,36 @@ function renderSavePreview() {
       prev.appendChild(m);
     }
   }
+  // Starring happens for every species in the save, filter or no filter, and
+  // the preview never said so — the toast afterwards was the first mention of
+  // it. A preview that omits half of what the button writes is not a preview.
+  const newStars = new Set(P.allPals.map(sp => sp.palKey).filter(k => !owned.has(k))).size;
+  if (newStars) {
+    const st = document.createElement('p'); st.className = 'sub';
+    st.textContent = `${newStars} more species will be starred as owned — every species in the save counts as owned, whichever pals you import.`;
+    prev.appendChild(st);
+  }
   const apply = document.getElementById('smApply');
   const willWrite = P.added.length + P.linked.length + P.conflicts.filter(c => c.choice !== 'mine' && c.choice !== 'separate').length;
+  // Nothing to import is an empty state, not a disabled button. A live filter
+  // over an empty result, a greyed primary that cannot explain itself on touch
+  // and one operable control reading "Cancel" — a verb for undoing something,
+  // when nothing has happened. Same swap renderHub already makes for Export.
+  const nothing = !willWrite && !P.added.length;
+  document.querySelector('#smResult .smfilter').hidden = nothing;
+  apply.hidden = nothing;
+  document.getElementById('smAbort').textContent = nothing ? 'Close' : 'Cancel';
+  if (nothing) {
+    const why = document.createElement('p'); why.className = 'sub';
+    why.textContent = P.unrecognised
+      ? 'None of these species are in the Paldex — this may be a modded or unreleased pal list.'
+      : 'Everything in this save is already in your roster.';
+    prev.appendChild(why);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'alink';
+    b.textContent = 'Choose a different save';
+    b.addEventListener('click', openSaveReader);
+    prev.appendChild(b);
+  }
   apply.disabled = !willWrite;
   apply.textContent = P.added.length ? `Import ${P.added.length} pal${P.added.length === 1 ? '' : 's'}` : (willWrite ? 'Update my roster' : 'Nothing to import');
 }

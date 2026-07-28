@@ -513,8 +513,10 @@ tbody tr:hover{background:var(--surface)}
   /* .child-card used to stack and centre here; it stays a row at every width
      now and only the art shrinks at <=640 — stacking cost ~100px of height and
      centred the running text the redesign moved to the start edge. */
-  .modal{padding:0 var(--sp-4) var(--sp-5)}
-  .mbar{margin:0 calc(var(--sp-4) * -1) var(--sp-3);padding:var(--sp-2) var(--sp-3)}
+  /* .modal / .mbar are re-sized in the ≤640 block near the end of the file —
+     declared here they sit BEFORE the base rules at equal specificity and lose
+     the tie, which is how .mbar kept a -24px margin against 16px of padding and
+     hung 7px past the dialog on both sides. */
   .mhead{flex-direction:column;text-align:center}
   .mhead h2{justify-content:center}
   .mhead .crow{justify-content:center}
@@ -1496,6 +1498,14 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 .confsave.amb{color:var(--muted);font-style:italic}
 .conflab{display:block;font-size:var(--fs-xs);color:var(--muted);margin:8px 0 4px}
 .confseg,#smMode{margin-top:8px}
+/* The row is already --raised, so its buttons had a 1.00:1 fill delta against
+   it and only --border at 1.24:1 to say where they were — the two unchosen
+   options read as empty space with a hairline (§1: a boundary below 3:1 must
+   never be the sole indicator). One more rung up the ladder. */
+.confrow .segrow button{background:var(--overlay)}
+/* the select carried the row's answer truncated to "Keep them separate — lea⌄"
+   beside three full-width segmented buttons */
+#smConflicts select{width:100%}
 /* the consequence of the selected option, in visible text — touch has no hover */
 .confeff{font-size:var(--fs-sm);color:var(--muted);margin:6px 0 0;line-height:1.45}
 /* the way out to the other import path — quiet, but always in the same place
@@ -1508,8 +1518,8 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 .smitem{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--text-2);
   overflow-wrap:anywhere;line-height:1.4}
 .smacts{display:flex;gap:10px;margin-top:20px}
-.smerr{background:var(--danger-tint);border-left:3px solid var(--danger);border-radius:0 10px 10px 0;
-  padding:12px 15px;font-size:var(--fs-sm);line-height:1.55;color:var(--text-2);margin:0 0 16px}
+/* .smerr was .warnbox one type step smaller and without its triangle — the
+   error is now a .warnbox like every other warning in the app (§4 reuse). */
 /* the level and the in-game name, both from the save. The in-game name is
    muted and separate because it is not the nickname you typed. */
 .lvchip{font-size:var(--fs-xs);color:var(--muted);background:var(--surface);border:1px solid var(--border);
@@ -1524,7 +1534,9 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 .worldlist{display:flex;flex-direction:column;gap:8px;margin:4px 0 4px}
 .worldbtn{display:block;width:100%;text-align:left;background:var(--raised);border:1px solid var(--border);
   border-radius:var(--r-lg);padding:12px 15px;cursor:pointer;color:var(--text);transition:border-color var(--t-fast),background var(--t-fast)}
-.worldbtn:hover{border-color:var(--accent);background:var(--surface)}
+/* --overlay, not --surface: the row rests on --raised, so hovering to --surface
+   stepped the fill DOWN the ladder and the row's own fill delta was 1.00 (§1) */
+.worldbtn:hover{border-color:var(--accent);background:var(--overlay)}
 /* flex, not block, so a leading icon sits beside the title */
 .worldbtn .wname{display:flex;align-items:center;gap:8px;font-weight:600;font-size:var(--fs-md);margin-bottom:2px}
 .worldbtn .wname svg{flex:none;width:18px;height:18px;color:var(--muted)}
@@ -1561,6 +1573,11 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .gcard{padding:18px 16px}
   .gcard ol,.gcard ul{margin:10px 0 10px 18px}
   .modal{padding:0 var(--sp-4) var(--sp-5)}
+  /* the bar bleeds out to the padding box, so it moves with the padding — or it
+     overhangs the dialog's rounded border and gives the dialog its own 8px of
+     horizontal scroll, which the suite's overflow() cannot see (it measures the
+     document, and the modal is what scrolls) */
+  .mbar{margin:0 calc(var(--sp-4) * -1) var(--sp-3);padding:var(--sp-2) var(--sp-3)}
   .setup{position:relative;padding:10px 42px 10px 14px}
   .setup .dismiss{position:absolute;top:5px;right:4px;margin:0}
 
@@ -1746,7 +1763,7 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .smacts{flex-direction:column}
   .smacts .alink{width:100%;justify-content:center}
   .smlist{max-height:200px}
-  .mono{font-size:10px}
+  .mono{font-size:var(--fs-xs)}   /* was 10px — below the scale, on the one string you have to read character by character */
 
   /* --- the two entry buttons and each world row want a full column --- */
   .smchoose{flex-direction:column}
