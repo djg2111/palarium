@@ -644,6 +644,8 @@ function openModal(p, rentry) {
       closeModal(true); navTab('map');
       mapLoadSpawns().then(() => {
         mapSelect(null);
+        // true = "take me there", which now also lands focus on the map — the
+        // sweep in c7a54e0 fixed the Map's outgoing jump and missed this one
         mapSetSpawn(p.k, true);
         if (!spawnEntries(p.k).length) {
           const alpha = MAP_ALPHAS.get(p.k);

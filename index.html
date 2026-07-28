@@ -403,7 +403,7 @@
          <button> would replace the role that makes it operable. -->
     <div class="mapresults" id="mapResults" role="group" aria-label="Search results" hidden></div>
     <div class="spawnbar" id="spawnBar" hidden></div>
-    <div class="mapview" id="mapView" tabindex="0" role="region" aria-label="Interactive map — drag or arrow keys to pan, plus and minus to zoom, 0 to fit, Escape to clear a selection">
+    <div class="mapview" id="mapView" tabindex="0" role="region" aria-label="Interactive map" aria-describedby="mapHelp">
       <div class="mapstage" id="mapStage">
         <div class="maptiles" id="mapTiles"></div>
         <canvas class="mapzones" id="mapZones" width="1" height="1" hidden></canvas>
@@ -419,8 +419,13 @@
       <!-- keyboard included: this line used to name only pointer gestures while
            the arrow/zoom keys existed solely in the region's aria-label, so a
            sighted keyboard user had no way to learn them (DESIGN.md §8) -->
-      <div class="maphelp" id="mapHelp">Drag or arrow keys to pan · scroll or + − to zoom · 0 fits the map</div>
-      <aside class="mapinfo" id="mapInfo" hidden aria-live="polite"></aside>
+      <div class="maphelp" id="mapHelp">Tap a marker for details · drag or arrows to pan · scroll or + − to zoom · 0 fits · Esc clears</div>
+      <!-- The .chaincard shape: every route into and out of this panel destroys the
+           control that was pressed, so the panel itself is the thing focus lands
+           on. It is NOT a live region — it holds seven focusable controls and
+           ~330 characters, and re-announced all of it on every nearest-marker
+           press. #mapCount carries the short utterance instead. -->
+      <aside class="mapinfo" id="mapInfo" hidden role="group" tabindex="-1" aria-labelledby="mapInfoTtl"></aside>
     </div>
     <div class="viewsub mapfoot">Marker positions, names and alpha levels come straight from the game files (v1.0.1) — the same extraction that builds the Paldex. Distances are straight-line, so treat them as a guide to the closest statue rather than a walking route.</div>
   </section>

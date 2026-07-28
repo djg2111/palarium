@@ -1206,7 +1206,10 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
 .spawnbar .sb-clear{flex-shrink:0;padding:6px 12px;font-size:var(--fs-sm)}
 .mapinfo .inote{margin-top:9px;line-height:1.45}
 
-.mapview{position:relative;overflow:hidden;height:min(72vh,760px);min-height:420px;
+/* 66vh, not 72: the view's h2 costs 43px above 640 (below it the height is
+   computed and the heading is free), and that pushed .mapinfo's action row —
+   Pal card and Copy link, its only two — entirely below the fold at 1366. */
+.mapview{position:relative;overflow:hidden;height:min(66vh,720px);min-height:420px;
   background:#0a1b2a;border:1px solid var(--border);border-radius:var(--r-xl);
   touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;contain:layout paint}
 .mapview.drag{cursor:grabbing}
@@ -1314,9 +1317,13 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
 .mapzoom button{width:36px;height:36px;display:grid;place-items:center;font-size:19px;font-weight:700;
   background:rgba(22,27,34,.92);border:1px solid var(--border-strong);border-radius:var(--r-md);color:var(--text-2);backdrop-filter:blur(6px)}
 .mapzoom button:hover{color:var(--text);border-color:var(--accent)}
+/* The .mapzoom recipe beside it, not --muted on a .78 tint: composited over
+   bright terrain that measured 3.76-4.07:1 at 11px, under AA. This pairing
+   measures 8.5-10.7 across the same tiles. axe cannot see either number —
+   it returns incomplete when the backdrop is an image. */
 .maphelp{position:absolute;left:12px;top:12px;z-index:5;pointer-events:none;
-  background:rgba(13,17,23,.78);border:1px solid var(--border);border-radius:var(--r-full);
-  padding:5px 13px;font-size:var(--fs-xs);color:var(--muted);backdrop-filter:blur(6px);
+  background:rgba(22,27,34,.92);border:1px solid var(--border);border-radius:var(--r-full);
+  padding:5px 13px;font-size:var(--fs-xs);color:var(--text-2);backdrop-filter:blur(6px);
   transition:opacity var(--t-base)}
 .maphelp.gone{opacity:0}
 
@@ -1667,7 +1674,10 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .mapbar .mfilters{display:flex}
   .mapbar .mfilters button{flex:1 1 0;padding:9px 6px;justify-content:center}
   .mapinfo{left:8px;right:8px;bottom:8px;width:auto;max-width:none;max-height:56%}
-  .maphelp{font-size:10px;padding:4px 10px}
+  /* right, so the pill stops short of the zoom column instead of running under
+     it — the keyboard half of this line was the part being clipped. And
+     --fs-xs (11) rather than 10px, which is below §3's floor. */
+  .maphelp{font-size:var(--fs-xs);padding:4px 10px;right:56px}
   .mapzoom button{width:32px;height:32px}
   .spawnbar{gap:9px;padding:7px 10px 7px 7px}
   .spawnbar .sb-clear{padding:6px 9px}
@@ -1676,7 +1686,11 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   /* 83 alphas over a 364px-wide island is dense; give the icons back a little
      of the gap rather than making the user zoom before anything is readable */
   .mk-alpha .g{width:22px;height:22px}
-  .mk-fastTravel .g{width:10px;height:10px}
+  /* 14, not 10: the same pin is 19px for a mouse and was 28% of that area for a
+     finger. Map pins take §8's Essential exception on size — position IS the
+     information — but nothing about that requires them to shrink on the device
+     with the coarser pointer. */
+  .mk-fastTravel .g{width:14px;height:14px}
   .mk-tower .g,.mk-middleBoss .g{width:18px;height:18px;font-size:11px}
 
   /* --- read-a-save dialog: the segmented choice per collision and the

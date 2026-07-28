@@ -283,7 +283,8 @@ siblings, so grouping is the shape of the data, not a preference):
 | `.rostile` | One species in **Tiles** view: a `<button aria-expanded aria-controls="rosPanel">` carrying art, a count badge on the art, the name and the gender tally. The whole tile is the press target. |
 | `.rospanel` | The expanding panel. A `<section role="region" aria-labelledby>` spanning `1/-1`, placed as a real sibling **after the last tile of the open tile's visual row** — so grid auto-placement puts it on its own row, the board resumes underneath, and DOM order stays visual order. `grid-auto-flow:dense` remains **forbidden**, and is not needed. |
 | View headings | **Every view names itself in an `h2`**, so group headings inside it are `h3`. Skills had no view heading at all, which put its section titles ("Work suitability +1 for every other pal") at the level every other view uses for its name; Map had none at all, so heading navigation skipped the app's largest surface entirely. |
-| `#mapHelp` / `#mapView` | The map's one-line help and the region's `aria-label` must name the **same** routes. The help said "drag to pan · scroll to zoom" while arrow keys, `+`/`-`, `0` and Escape existed only in the `aria-label` — the mirror image of hiding a fact in a `title`, and it left a sighted keyboard user with no way to learn the controls. |
+| `#mapHelp` / `#mapView` | **One string, not two hand-synced ones.** `#mapView`'s `aria-label` is the region's *name* ("Interactive map") and `#mapHelp` is its `aria-describedby` — a name identifies, instructions describe, and a 21-word name is what a screen reader reads out of the landmark list every time focus enters. The help must name every route, keyboard included: it said "drag to pan · scroll to zoom" while the keys lived only in the label. It also has to be **on screen when the Map opens** — its timer ran from boot, and Map is the ninth tab, so it had already faded. |
+| `.mapinfo` | The marker/spawn panel: the `.chaincard` shape, because **every route into and out of it destroys the control that was pressed** — both close buttons, the nearest-marker buttons, Escape, and the spawn bar's Clear all dropped focus on `<body>`. `role="group"` + `tabindex="-1"` + `aria-labelledby` its own `h3`; a press that opens it lands on it, a press that closes it lands on `#mapView`. **Not** an `aria-live` region — it holds seven controls and ~330 characters and re-announced all of it on every press; `#mapCount` carries the short utterance. And it is anchored to the map's bottom edge, so "take me there" must scroll the **panel** into view: a map judged visible enough (312 of 647px at 360) still had its answer 745px down, below the tab bar. |
 | `.rankscroll` | The focusable box around a `.ranktbl` inside a `.rankdet`. A table wider than its card is a scrollport, and `.ranktbl` holds no focusable cell — so the box itself takes `tabindex="0"` + `role="group"` + a name, or the clipped columns are pointer-only (axe `scrollable-region-focusable`; 156 of 249 tables overflow at 360). `role="group"`, not `region`: 249 landmarks would be worse than the bug. The Paldex's `.tablewrap` escapes this only because its rows are focusable. |
 | `.rosband` | The species header band. One implementation, two homes: a Rows section and the panel header — **so its responsive rules are written unscoped**. The ≤640 wrap fix was scoped to `.rospanel .rosband`, and in a Rows section the one-gender warn chip ate the row the same way: at 360 the header read `La…` and nothing on screen named the species. The `✕` is a sibling **after** the `<h3>`, never inside it — a control is not part of a heading's name. |
 | `.roster` | The grid. `.tileview` auto-fills a **single 120px track** above 640px and 96px below; `.rowview` is a single `minmax(0,1fr)` column. One track, not a ladder — every extra breakpoint steps the tile up and the column count down, so a wider window produces a *taller* board. **`minmax(0,1fr)`, never a bare `1fr`**: `1fr` floors the track at the widest section's min-content, so one long passive chip row pushed the whole page to 356px and broke 1.4.10 Reflow at 320. |
@@ -701,6 +702,24 @@ is still a 2.4.11 failure — which is how it shipped twice.
   counted in cards will always drift. Paging by scroll distance (~6–8 viewports)
   would give both sections the same rule and put the mobile pager before the
   19th screen instead of after it.
+
+- **`#mapCount` and `#mapResults` answer the same query differently.**
+  `mapSyncMarkers` counts only the current layer; `mapRenderResults` searches
+  across layers by design. Measured: "Celesdir" announces *1 species · 1 place*
+  in the live region while three marker buttons sit 8px above it, two of them
+  tagged *World Tree*. The empty case is worse — the only actionable sentence
+  ("Nothing matches ... — try a pal or waypoint name") is in the results row,
+  not the live region, so AT hears "0 places" and nothing to do about it.
+- **The map's 123 region names have no textual route.** `#mapRegions` is
+  `aria-hidden` and `mapMatch` tests only marker label, boss and pal name, so
+  searching a real region ("Bamboo Groves") returns nothing. The input's label
+  says "pal or waypoint", so nothing is over-promised — but a whole layer of
+  named places is sighted-only.
+- **Five words for one concept on the Map**: the fast-travel statue is
+  *Waypoints* (filter chip), *Fast travel point* (every marker's accessible
+  name), *fast travel statues* (title), *Closest/Best fast travel* (panel), and
+  *statue* (footnote). Pick one — *waypoint* matches the chip the user sets —
+  and add it to §6's lexicon.
 
 - **Duplicate uses `⧉` (U+29C9), which is not on §7's plain-symbol allowlist**
   (`★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×`), and §7 says not to add one where a Lucide icon

@@ -678,12 +678,34 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
   // the visible help named only pointer gestures while the keyboard route
   // existed solely in the region's aria-label
   {
-    const kb = await page.evaluate(() => ({
-      help: document.getElementById('mapHelp').textContent,
-      label: document.getElementById('mapView').getAttribute('aria-label'),
-    }));
-    if (/arrow keys/i.test(kb.help)) console.log('  ✓ the map help names the keyboard route, not just dragging');
-    else { console.log(`  ✗ the map help is pointer-only: ${JSON.stringify(kb.help)}`); fail(); }
+    const kb = await page.evaluate(() => {
+      const v = document.getElementById('mapView');
+      const d = v.getAttribute('aria-describedby');
+      const help = document.getElementById('mapHelp');
+      return {help: help.textContent, label: v.getAttribute('aria-label'),
+        describedBy: d, resolves: !!(d && document.getElementById(d)),
+        faded: help.classList.contains('gone')};
+    });
+    // The keyboard route has to be in the VISIBLE line, not only in the region's
+    // name — and the name should identify, not instruct. One string, described.
+    const named = /arrow/i.test(kb.help) && /zoom/i.test(kb.help);
+    if (named && kb.resolves && kb.label.split(/\s+/).length <= 6)
+      console.log('  ✓ the map help names the keyboard route and describes the region');
+    else { console.log(`  ✗ map help/label: ${JSON.stringify(kb)}`); fail(); }
+  }
+  // The help is once per session by design, and the cold-start loop above has
+  // already opened the Map — so check the real first-visit path on a fresh load.
+  // It used to start its timer at BOOT, so it was gone before the Map appeared.
+  {
+    await page.reload({waitUntil: 'load'});
+    await page.waitForTimeout(400);
+    await nav(page, '#/map', 1200);
+    const shown = await page.evaluate(() => {
+      const h = document.getElementById('mapHelp');
+      return {gone: h.classList.contains('gone'), opacity: getComputedStyle(h).opacity};
+    });
+    if (!shown.gone && shown.opacity !== '0') console.log('  ✓ the help is on screen when the Map is first opened');
+    else { console.log(`  ✗ the help had already faded before the Map appeared: ${JSON.stringify(shown)}`); fail(); }
   }
   // arrows pan once there is somewhere to pan to
   {
@@ -700,6 +722,32 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     });
     if (moved !== 0) console.log(`  ✓ arrow keys pan the map (${moved}px)`);
     else { console.log('  ✗ ArrowRight did not pan the map'); fail(); }
+  }
+  // The MAP block had no focus assertion at all, and six routes out of the info
+  // panel dropped focus on <body>: both close buttons, the nearest-marker
+  // buttons, Escape from inside it, and the spawn bar's Clear.
+  if (await reach(page, async () => {
+    await page.evaluate(() => { const i = document.getElementById('mapSearch'); i.value = 'statue'; i.dispatchEvent(new Event('input')); });
+    await page.waitForTimeout(600);
+    await page.waitForSelector('#mapResults button', {timeout: 3000});
+    await page.evaluate(() => { const b = document.querySelector('#mapResults button'); b.focus(); b.click(); });
+    await page.waitForTimeout(1200);
+  }, 'a marker chosen from map search')) {
+    await focusVisible(page, 'choosing a marker lands on its panel, on screen');
+    const acts = await page.evaluate(() => {
+      const a = document.querySelector('#mapInfo .iacts');
+      if (!a) return {ok: false};
+      const r = a.getBoundingClientRect();
+      const nv = document.getElementById('bottomnav'); const nr = nv && nv.getBoundingClientRect();
+      const bot = nr && nr.height ? nr.top : innerHeight;
+      return {ok: r.bottom <= bot + 1 && r.top >= 0, bottom: Math.round(r.bottom), bot: Math.round(bot)};
+    });
+    if (acts.ok) console.log("  ✓ the panel's actions are on screen");
+    else { console.log(`  ✗ the panel's actions are off screen: ${JSON.stringify(acts)}`); fail(); }
+    await page.evaluate(() => { const b = document.querySelector('#mapInfo .iclose'); b.focus(); b.click(); });
+    await page.waitForTimeout(600);
+    await focusVisible(page, 'closing the panel hands focus to the map');
+    await audit(page, 'map after closing the info panel');
     await page.evaluate(() => document.getElementById('mapView').dispatchEvent(
       new KeyboardEvent('keydown', {key: '0', bubbles: true, cancelable: true})));
     await page.waitForTimeout(300);

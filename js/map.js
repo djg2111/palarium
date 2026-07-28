@@ -303,13 +303,16 @@ function mapSyncMarkers() {
     const bits = [];
     if (sp) bits.push(sp + (sp === 1 ? ' species' : ' species'));
     bits.push(matches + (matches === 1 ? ' place' : ' places'));
-    mapCountEl.textContent = bits.join(' · ');
+    // liveText, not textContent: an aria-live region re-announces even when the
+    // string is unchanged, and typing produced runs of identical utterances
+    // ("1 place" three times). Same guard the Paldex counts already use.
+    liveText(mapCountEl, bits.join(' · '));
   } else {
     const parts = [];
     if (mapTypes.has('alpha')) parts.push(counts.alpha + ' alphas');
     if (mapTypes.has('fastTravel')) parts.push(counts.fastTravel + ' waypoints');
     if (mapTypes.has('tower')) parts.push(counts.tower + counts.middleBoss + ' towers');
-    mapCountEl.textContent = parts.join(' · ') || 'No markers shown';
+    liveText(mapCountEl, parts.join(' · ') || 'No markers shown');
   }
 }
 
@@ -389,15 +392,23 @@ function mapSelect(m, focus) {
   mapSel = m || null;
   if (!mapSel) {
     mapLinkEl.classList.add('off');
+    const held = mapHeldFocus(mapInfoEl);
     const sp = mapSpawnKey && byKey.get(mapSpawnKey);
     if (sp) mapRenderSpawnInfo(sp);
     else { mapInfoEl.hidden = true; mapInfoEl.textContent = ''; }
+    // the panel that held focus is gone — land on the map, which is what the
+    // user is now looking at and is already a tab stop
+    if (held && !sp) mapViewEl.focus({preventScroll: true});
     updateHash();
     return;
   }
   mapEls.get(mapKey(mapSel))?.classList.add('sel');
   mapRenderInfo(mapSel);
-  if (focus) mapFocus(mapSel);
+  // focus means "take me there". Land on the PANEL, not the map: the panel is
+  // anchored to the map's bottom edge, so at 360 a map judged "visible enough"
+  // (312 of 647px) still had its answer 745px down, below the tab bar — focus
+  // in the search box and nothing on screen, so Enter looked inert.
+  if (focus) { mapFocus(mapSel); mapLandOnPanel(); }
   updateHash();
 }
 function mapLinkTo(a, b) {
@@ -406,7 +417,19 @@ function mapLinkTo(a, b) {
   mapLinkLine.setAttribute('x2', b.map.x); mapLinkLine.setAttribute('y2', b.map.y);
   mapLinkEl.classList.remove('off');
 }
+// Emptying a container that holds the focused control drops focus on <body>.
+// Six routes did it: the nearest-marker buttons, both close buttons, Escape from
+// inside the panel, the spawn bar's Clear, and returning from the pal modal.
+// The panel is the .chaincard shape now — focusable and self-labelling — so the
+// answer is always "land on the panel", which is also what the user is reading.
+function mapHeldFocus(el) { return el.contains(document.activeElement); }
+function mapLandOnPanel() {
+  // focusOnScreen, not focus: at 360 the control stack is taller than the map,
+  // so a selection made from the search box lands 161px below the fold
+  focusOnScreen(mapInfoEl);
+}
 function mapRenderInfo(m) {
+  const held = mapHeldFocus(mapInfoEl) || mapHeldFocus(spawnBarEl);
   mapInfoEl.hidden = false;
   mapInfoEl.textContent = '';
   const p = mapPal(m);
@@ -418,9 +441,9 @@ function mapRenderInfo(m) {
   mapInfoEl.appendChild(x);
 
   const head = document.createElement('div'); head.className = 'ihead';
-  if (p) head.appendChild(icon(p, 44, true));
+  if (p) head.appendChild(icon(p, 44, false, true));
   const hb = document.createElement('div');
-  const h3 = document.createElement('h3'); h3.textContent = mapTitle(m); hb.appendChild(h3);
+  const h3 = document.createElement('h3'); h3.id = 'mapInfoTtl'; h3.textContent = mapTitle(m); hb.appendChild(h3);
   const sub = document.createElement('div'); sub.className = 'isub';
   sub.textContent = MTYPE_NAME[m.type] + (m.level ? ' · Lv ' + m.level : '')
     + (m.boss ? ' · ' + m.boss : '');
@@ -479,6 +502,7 @@ function mapRenderInfo(m) {
   });
   acts.appendChild(cp);
   mapInfoEl.appendChild(acts);
+  if (held) mapLandOnPanel();
 }
 
 // ---- layer ----
@@ -516,9 +540,23 @@ function mapSyncHeight() {
   const navH = bottomNavEl.offsetHeight || 0;
   mapViewEl.style.height = Math.max(300, window.innerHeight - mapHeadH() - navH - 22) + 'px';
 }
+// The pill used to start its 7s timer at BOOT, so on any session that spent
+// seven seconds anywhere else — Map is the ninth tab, so nearly all of them — it
+// was already at opacity 0 when the map first appeared. The one place a sighted
+// keyboard user can learn these controls was never shown to them.
+let helpTimer = 0, helpShown = false;
+function hideHelp() { clearTimeout(helpTimer); mapHelpEl.classList.add('gone'); }
+function showHelpOnce() {
+  if (helpShown) return;
+  helpShown = true;
+  mapHelpEl.classList.remove('gone');
+  clearTimeout(helpTimer);
+  helpTimer = setTimeout(hideHelp, 10000);
+}
 function mapActivate() {
   if (!MAP) return;
   mapSyncHeight();
+  showHelpOnce();
   if (!mapBuilt) {
     mapBuilt = true;
     mapResetTiles();
@@ -857,9 +895,11 @@ function mapSetSpawn(palKey, focus) {
   const p = palKey ? byKey.get(palKey) : null;
   mapSpawnKey = p ? p.k : null;
   if (!mapSpawnKey) {
+    const held = mapHeldFocus(spawnBarEl) || mapHeldFocus(mapInfoEl);
     spawnBarEl.hidden = true; spawnBarEl.textContent = '';
     mapDrawZones();
     if (!mapSel) { mapInfoEl.hidden = true; mapInfoEl.textContent = ''; }
+    if (held) (mapSel ? mapInfoEl : mapViewEl).focus({preventScroll: true});
     updateHash();
     return;
   }
@@ -869,7 +909,9 @@ function mapSetSpawn(palKey, focus) {
   mapRenderSpawnBar(p);
   const n = mapDrawZones();
   if (!mapSel) mapRenderSpawnInfo(p);
-  if (focus && n) mapFocusSpawns(mapSpawnKey);
+  // focus means the user asked to be taken here, from the pal modal or a deep
+  // link — so land on the map, not on whatever the previous view left behind
+  if (focus && n) { mapFocusSpawns(mapSpawnKey); mapLandOnPanel(); }
   updateHash();
 }
 
@@ -916,7 +958,7 @@ function mapRenderSpawnBar(p) {
   const sum = mapSpawnSummary(p.k);
   spawnBarEl.hidden = false;
   spawnBarEl.textContent = '';
-  spawnBarEl.append(icon(p, 30, true));
+  spawnBarEl.append(icon(p, 30, false, true));
   const txt = document.createElement('div'); txt.className = 'sb-txt';
   const b = document.createElement('b'); b.textContent = p.n + ' spawn areas';
   const sub = document.createElement('span');
@@ -959,6 +1001,7 @@ function mapRenderSpawnBar(p) {
 }
 
 function mapRenderSpawnInfo(p) {
+  const held = mapHeldFocus(mapInfoEl) || mapHeldFocus(spawnBarEl);
   mapInfoEl.hidden = false;
   mapInfoEl.textContent = '';
   const sum = mapSpawnSummary(p.k);
@@ -970,9 +1013,9 @@ function mapRenderSpawnInfo(p) {
   mapInfoEl.appendChild(x);
 
   const head = document.createElement('div'); head.className = 'ihead';
-  head.appendChild(icon(p, 44, true));
+  head.appendChild(icon(p, 44, false, true));
   const hb = document.createElement('div');
-  const h3 = document.createElement('h3'); h3.textContent = p.n; hb.appendChild(h3);
+  const h3 = document.createElement('h3'); h3.id = 'mapInfoTtl'; h3.textContent = p.n; hb.appendChild(h3);
   const sub = document.createElement('div'); sub.className = 'isub';
   sub.textContent = sum
     ? `Wild spawns · Lv ${sum.lo === sum.hi ? sum.lo : sum.lo + '–' + sum.hi}` +
@@ -1064,6 +1107,7 @@ function mapRenderSpawnInfo(p) {
   });
   acts.append(pc, cp);
   mapInfoEl.appendChild(acts);
+  if (held) mapLandOnPanel();
 }
 
 // ---------- label placement ----------
@@ -1350,9 +1394,8 @@ if (MAP) {
   const ptrs = new Map();
   let pinchD = 0, pinchK = 0, dragged = 0;
   let helpTimer = 0;
-  const hideHelp = () => { clearTimeout(helpTimer); mapHelpEl.classList.add('gone'); };
   // it's a hint, not a caption — retire it whether or not anyone touches the map
-  helpTimer = setTimeout(hideHelp, 7000);
+
   mapViewEl.addEventListener('pointerdown', e => {
     if (e.target.closest('.mapzoom, .mapinfo')) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
