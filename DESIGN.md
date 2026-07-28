@@ -607,6 +607,17 @@ is still a 2.4.11 failure — which is how it shipped twice.
   rarity. Computed 6.33 / 6.15 / 5.98 / 5.31:1, so this is token discipline, not
   contrast — wants `--neutral-tint/line` and `--dark-tint/line` and matrix rows.
 
+- **Duplicate uses `⧉` (U+29C9), which is not on §7's plain-symbol allowlist**
+  (`★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×`), and §7 says not to add one where a Lucide icon
+  exists — it has `copy`. It does render (13×16px in Segoe UI), so this is a
+  policy deviation rather than a broken glyph; `.tchev` in the same component
+  family is already inline SVG, so the swap is consistent as well as compliant.
+- **"Save" is a verb in three roster controls while §6 reserves it for the
+  Palworld game file** — `✓ Save changes`, `+ Save & add another` and `Read my
+  save` sit in one flow. "Save changes" is unambiguous and universal, so the
+  likely resolution is amending §6 to reserve the *noun* only. Logged so the
+  decision is made rather than drifting.
+
 - **Find parents is dominated by Terraria collab species, with no way to filter
   them.** Measured over the full pair lists: **22 of Lamball's 30 pairs (73%)**
   and **44 of Chikipi's 46 (96%)** need a collab pal, and they crowd the tiers a
