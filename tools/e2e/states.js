@@ -176,6 +176,43 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await page.waitForTimeout(250);
   }
 
+  // Every one of the 299 cards is taller than the viewport at 360, so the way
+  // out has to survive scrolling — touch has no Escape, and the controls used
+  // to be absolutely positioned at the top of the card and left the screen 85px
+  // in. The card is the scrollport and its bar is sticky.
+  await page.setViewportSize({width: 360, height: 640});
+  await nav(page, '#/pal/Mimog', 600);
+  if (await reach(page, () => page.waitForSelector('#overlay.open', {timeout: 3000}), 'the tallest pal card')) {
+    await audit(page, 'tallest pal card at 360');
+    const deep = await page.evaluate(() => {
+      const m = document.getElementById('modal');
+      m.scrollTop = m.scrollHeight;
+      const c = document.querySelector('#modal .close').getBoundingClientRect();
+      const at = document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2);
+      return {scrolls: m.scrollHeight > m.clientHeight + 1, by: Math.round(m.scrollTop),
+        closeOnScreen: c.top >= 0 && c.bottom <= innerHeight, closeIsTopmost: !!(at && at.closest('.close'))};
+    });
+    if (deep.scrolls && deep.closeOnScreen && deep.closeIsTopmost)
+      console.log(`  ✓ ✕ is still on top after scrolling the card ${deep.by}px`);
+    else { console.log(`  ✗ the card's way out after scrolling: ${JSON.stringify(deep)}`); fail(); }
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(250);
+  }
+  await page.setViewportSize({width: 1280, height: 900});
+  await page.waitForTimeout(150);
+
+  // A shared #/pal/K link has no opener at all — applyHash opens the card with
+  // nothing focused, and every way out of one used to end on <body>.
+  for (const how of ['Escape', 'close', 'scrim']) {
+    await nav(page, '#/dex', 300);
+    await nav(page, '#/pal/Anubis', 500);
+    if (how === 'Escape') await page.keyboard.press('Escape');
+    else if (how === 'close') await page.evaluate(() => document.querySelector('#modal .close').click());
+    else await page.evaluate(() => document.getElementById('overlay').click());
+    await page.waitForTimeout(600);
+    await focusVisible(page, `a deep-linked card closed by ${how}`);
+  }
+
   // The card carries the roster row's own actions. They run with the card
   // closing under them, so renderRoster's focus restore has nothing to read.
   console.log('\nPAL CARD ACTIONS — the four roster actions land somewhere real');
@@ -676,6 +713,19 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
   for (const m of ['auras', 'partner', 'passives']) {
     await nav(page, '#/skills/' + m, 500);
     await audit(page, `skills · ${m}`);
+    // Opening a pal card from here re-renders the catalog on the way back, so
+    // the card has to find the rebuilt button — and Skills keeps all three
+    // sub-blocks in the DOM, so it must find one that is actually rendered.
+    const from = await page.evaluate(sel => {
+      const b = document.querySelector(sel + ' .palref');
+      if (!b) return null;
+      b.focus(); b.click(); return b.textContent.replace(/\s+/g, ' ').trim().slice(0, 20);
+    }, '#skill' + m[0].toUpperCase() + m.slice(1) + 'Block');
+    if (!from) continue;
+    await page.waitForTimeout(700);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(700);
+    await focusVisible(page, `a card opened from skills · ${m} comes back to ${JSON.stringify(from)}`);
   }
   await overflow(page, 'skills · passives');
 

@@ -175,13 +175,14 @@ function openRosterEditor(entry, presetPal) {
   // dead weight in the dialog of anyone already keeping a roster
   document.getElementById('rosterWhy').hidden = !!entry || roster.length >= 3;
   lastFocusEditor = document.activeElement;
-  roverlay.classList.add('open'); roverlay.scrollTop = 0;
+  roverlay.classList.add('open'); roverlay.querySelector('.modal').scrollTop = 0;
   document.body.style.overflow = 'hidden';
   renderRoster();
   pickR.root.querySelector('.picker-btn').focus();
 }
 let lastFocusEditor = null;
 function closeRosterEditor() {
+  const wasEditing = editingId;
   editingId = null; carried = null;
   roverlay.classList.remove('open');
   document.body.style.overflow = '';
@@ -189,16 +190,22 @@ function closeRosterEditor() {
   // always failed here and focus fell to <body>. Remember what it was, then
   // find its replacement in the freshly built list.
   const row = lastFocusEditor && lastFocusEditor.closest ? lastFocusEditor.closest('.rosrow') : null;
-  const want = row ? {id: row.dataset.id, act: lastFocusEditor.dataset.act || 'name'} : null;
-  const wasBody = !lastFocusEditor || lastFocusEditor === document.body;
+  // opened from the pal card's ✎ Edit, the opener is a card button and not a
+  // row at all — the entry being edited is what to come back to
+  const want = row ? {id: row.dataset.id, act: lastFocusEditor.dataset.act || 'name'}
+    : wasEditing ? {id: wasEditing, act: 'edit'} : null;
   renderRoster();
   let back = null;
-  if (lastFocusEditor && document.contains(lastFocusEditor)) back = lastFocusEditor;
+  // offsetParent, not just contains: the pal card closes by hiding its overlay
+  // and leaves its own buttons in the DOM, so contains() said yes to a button
+  // inside display:none and focus() was a silent no-op — every exit from an
+  // editor opened by ✎ Edit or + Add to roster ended on <body>.
+  if (lastFocusEditor && document.contains(lastFocusEditor) && lastFocusEditor.offsetParent !== null) back = lastFocusEditor;
   else if (want) {
     const r = document.querySelector(`#rosterList .rosrow[data-id="${CSS.escape(want.id)}"]`);
     back = r && (r.querySelector(`[data-act="${want.act}"]`) || r.querySelector('.nm'));
   }
-  (back || (wasBody ? null : document.getElementById('rosterOpenAdd')) || document.getElementById('rosterOpenAdd')).focus();
+  (back || document.getElementById('rosterOpenAdd')).focus();
   lastFocusEditor = null;
 }
 // keep Tab cycling inside whichever dialog is open

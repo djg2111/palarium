@@ -271,6 +271,9 @@ function rosterPassiveCount() {
 // ---------- shared card pieces ----------
 function palLink(p, size, num) {
   const b = document.createElement('button'); b.type = 'button'; b.className = 'palref';
+  // closing the card this opens re-renders the catalog and destroys the button,
+  // and the card's "find what I came from again" recovery looks for data-k
+  b.dataset.k = p.k;
   b.append(icon(p, size));
   const n = document.createElement('span'); n.textContent = p.n; b.appendChild(n);
   // the index is in paldex order, so say so rather than leaving it arbitrary

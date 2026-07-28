@@ -471,7 +471,10 @@ function neededRow(need) {
   for (const k of need) {
     const p = byKey.get(k);
     const c = document.createElement('button'); c.type = 'button'; c.className = 'tchip';
-    c.dataset.acc = k;
+    // data-k as well as data-acc (which accDecorate reads): closing the pal card
+    // this chip opens re-renders the route and destroys it, and the card's
+    // "find what I came from again" recovery looks for data-k
+    c.dataset.acc = k; c.dataset.k = k;
     c.appendChild(icon(p, 22));
     const nm = document.createElement('span'); nm.textContent = p.n; c.appendChild(nm);
     c.title = 'Not owned yet — view ' + p.n + '’s card';

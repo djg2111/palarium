@@ -157,6 +157,15 @@ function focusOnScreen(el) {
   if (!el) return;
   el.focus({preventScroll: true});
   const r = el.getBoundingClientRect();
+  // Inside an open dialog the header and the tab bar are irrelevant — the
+  // dialog is the scrollport and it is painted over both. Measure against it.
+  const dlg = el.closest('.overlay.open .modal');
+  if (dlg) {
+    const d = dlg.getBoundingClientRect();
+    if (Math.min(r.bottom, d.bottom) - Math.max(r.top, d.top) < Math.min(24, r.height / 2))
+      el.scrollIntoView({block: 'center', behavior: SMOOTH});
+    return;
+  }
   const top = document.querySelector('header').getBoundingClientRect().bottom;
   const nav = document.getElementById('bottomnav');
   // getBoundingClientRect, not offsetParent: offsetParent is null for a
@@ -177,14 +186,27 @@ function restoreFromToast() {
   const btn = next && next.querySelector('.undo, .tx');
   if (btn) { btn.focus(); return; }
   if (toastReturn && toastReturn !== document.body && document.contains(toastReturn)) { toastReturn.focus(); return; }
-  // Last resort. #tabs exists in the DOM at every width but is display:none at
-  // ≤640, so focus() there was a silent no-op and every undo that reached this
-  // line dropped the user on <body> on a phone (2.4.3). The bottom nav is the
-  // tab bar at those widths — fall through to whichever one is really showing.
-  const bar = document.querySelector('#tabs button.active')
-    || document.querySelector('#bottomnav button.active')
-    || document.querySelector('#bottomnav button');
-  if (bar && bar.offsetParent) bar.focus();
+  const bar = activeTabButton();
+  if (bar) bar.focus();
+}
+// #tabs exists in the DOM at every width but is display:none at ≤640, so
+// focus() there was a silent no-op and every hand-off that reached it dropped
+// the user on <body> on a phone (2.4.3). The bottom nav is the tab bar at those
+// widths — fall through to whichever one is really showing.
+// tabIndex is -1 both for "explicitly out of the tab order but focusable" and
+// for "an ordinary <li>", so it cannot be used to test focusability — the
+// attribute can.
+const FOCUSEL = 'button,a[href],input,select,summary,[tabindex]';
+function focusableIn(el) {
+  if (!el) return null;
+  return el.matches(FOCUSEL) ? el : el.querySelector(FOCUSEL);
+}
+function activeTabButton() {
+  for (const sel of ['#tabs button.active', '#bottomnav button.active', '#bottomnav button']) {
+    const b = document.querySelector(sel);
+    if (b && b.offsetParent) return b;
+  }
+  return null;
 }
 // opts.ms overrides the dwell — a bulk Undo covers more than one record and
 // needs longer to notice, read and reach (DESIGN.md §4)
@@ -504,7 +526,7 @@ modalEl.appendChild(modalSay);
 function clearModal() { for (const n of [...modalEl.childNodes]) if (n !== modalSay) n.remove(); }
 overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal(); });
-let currentModalPal = null, lastFocusModal = null, modalPushed = false;
+let currentModalPal = null, modalEntry = null, lastFocusModal = null, modalPushed = false;
 // keepHistory: the caller is navigating anyway (hash change / navTab), so leave
 // the history stack alone; otherwise pop the entry the modal pushed so Back
 // behaves as if the modal was never opened.
@@ -514,21 +536,26 @@ let currentModalPal = null, lastFocusModal = null, modalPushed = false;
 function closeModal(keepHistory, placed) {
   if (!overlay.classList.contains('open')) { modalPushed = false; return; }
   overlay.classList.remove('open'); document.body.style.overflow = '';
-  currentModalPal = null;
+  // the region is exempt from clearModal so it survives a rebuild; leaving the
+  // last pal's name in it made the NEXT visit that arrived at the same pal
+  // silent, because liveText only writes on a difference
+  modalSay.textContent = '';
+  const was = currentModalPal;
+  currentModalPal = null; modalEntry = null;
   const restore = placed ? null : lastFocusModal;
   lastFocusModal = null;
-  if (keepHistory) { modalPushed = false; if (!placed) refocusAfterModal(restore, false); return; }
+  if (keepHistory) { modalPushed = false; if (!placed) refocusAfterModal(restore, false, was); return; }
   const popping = modalPushed;
   if (modalPushed) { modalPushed = false; history.back(); }
   else if (location.hash.startsWith('#/pal/')) history.replaceState(null, '', '#/' + currentTab);
-  refocusAfterModal(restore, popping);
+  refocusAfterModal(restore, popping, was);
 }
 // history.back() re-renders the view through applyHash, and a re-render destroys
 // the node we came from — so restoring focus synchronously (as this used to)
 // left Escape and Back dropping focus onto <body>. A plain setTimeout is not
 // enough either: back() is asynchronous, so the timeout lands BEFORE the
 // popstate. Wait for the popstate, with a fallback so nothing is stranded.
-function refocusAfterModal(el, popping) {
+function refocusAfterModal(el, popping, pal) {
   let done = false;
   const land = () => {
     if (done) return;
@@ -540,11 +567,25 @@ function refocusAfterModal(el, popping) {
     if (el && document.contains(el) && el.offsetParent !== null) { el.focus(); return; }
     const view = document.querySelector('.view.active');
     if (!view) return;
-    // the opener is gone, but the row it belonged to was probably rebuilt —
-    // find it again rather than dumping you at the top of a 40-row list
-    const k = el && el.dataset && el.dataset.k;
-    const same = k && view.querySelector(`[data-k="${CSS.escape(k)}"]`);
-    const alt = same || view.querySelector('.cardopen, .pgroup .anchor');
+    // The opener is gone, but the row it belonged to was probably rebuilt —
+    // find it again rather than dumping you at the top of a 40-row list. Fall
+    // back to the pal the card was showing: a deep-linked #/pal/K has no opener
+    // at all (applyHash opens it with nothing focused), and every way out of
+    // one ended on <body> — the shared-link path, on a documented URL.
+    const k = (el && el.dataset && el.dataset.k) || (pal && pal.k);
+    // ...and the element carrying data-k is often not the focusable one. A
+    // Paldex tile is an <li data-k> wrapping a <button.dextile-open>, and
+    // focus() on the <li> is a silent no-op — which is why this whole recovery
+    // looked like it was never running.
+    // ...and querySelector's first match may not be a rendered one: Skills
+    // keeps all three sub-blocks in the DOM and hides two, so closing a card
+    // opened from the partner list handed focus to the same pal's button in
+    // the hidden auras block, where focus() is a silent no-op.
+    const same = k && [...view.querySelectorAll(`[data-k="${CSS.escape(k)}"]`)]
+      .map(focusableIn).find(n => n && n.getClientRects().length);
+    // last resort: the tab bar that is actually showing at this width — the
+    // same fall-through restoreFromToast uses, and never nothing
+    const alt = same || view.querySelector('.cardopen, .pgroup .anchor, .palref') || activeTabButton();
     if (alt) alt.focus();
   };
   const onPop = () => setTimeout(land, 0);
@@ -581,8 +622,36 @@ function openModal(p, rentry) {
   const held = wasOpen && modalEl.contains(document.activeElement)
     ? document.activeElement.dataset.mfk : null;
   currentModalPal = p;
+  // The roster individual the card was opened for. Held across steps rather
+  // than passed along: › then ‹ came back to the same species with "In your
+  // roster" and its four actions gone for good, a silent one-way door.
+  if (!wasOpen || rentry) modalEntry = rentry || null;
+  const ent = rentry || (modalEntry && modalEntry.k === p.k
+    && roster.some(r => r.id === modalEntry.id) ? modalEntry : null);
   modalEl.setAttribute('aria-label', p.n + ' details');
   clearModal();
+  // A sticky bar, not three buttons floating at the top of the card. Every one
+  // of the 299 cards is taller than the viewport at 360 (median 1581px), the
+  // controls scrolled away 85px in, and touch has no Escape — so at the bottom
+  // of a card nothing on screen closed it but a 16px strip of scrim down each
+  // edge. The bar also gives ‹ › the resting affordance they never had, and
+  // lets them be emitted before ✕, in the order they are read (1.3.2).
+  const bar = document.createElement('div'); bar.className = 'mbar';
+  const idx = PALS.indexOf(p);
+  const mkNav = (label, delta, cls) => {
+    const b = document.createElement('button'); b.className = 'mnav ' + cls; b.type = 'button';
+    // §7: chevrons are Lucide, not ‹ ›, which are off the glyph allowlist —
+    // the same migration breed.js and planner.js already made
+    b.append(lucide(delta < 0 ? 'chevronLeft' : 'chevronRight', 18));
+    b.title = label + ' (arrow keys)'; b.setAttribute('aria-label', label);
+    b.dataset.mfk = cls;
+    b.addEventListener('click', () => openModal(PALS[(idx + delta + PALS.length) % PALS.length]));
+    return b;
+  };
+  // §6: these walk PALS in Paldex order, which is species — and on a roster
+  // card the pal you are looking at is an individual, so "next pal" was wrong
+  // twice over
+  bar.append(mkNav('Previous species', -1, 'prev'), mkNav('Next species', 1, 'next'));
   const close = document.createElement('button'); close.className = 'close'; close.textContent = '✕';
   close.dataset.mfk = 'close';
   close.setAttribute('aria-label', 'Close dialog');
@@ -591,16 +660,8 @@ function openModal(p, rentry) {
   // caller is navigating anyway" branch and left the pushed #/pal/ entry on the
   // stack. Closing with ✕ and pressing Back reopened the card you just closed.
   close.addEventListener('click', () => closeModal());
-  modalEl.appendChild(close);
-  const idx = PALS.indexOf(p);
-  const mkNav = (label, delta, cls, sym) => {
-    const b = document.createElement('button'); b.className = 'mnav ' + cls; b.type = 'button';
-    b.textContent = sym; b.title = label + ' (arrow keys)'; b.setAttribute('aria-label', label);
-    b.dataset.mfk = cls;
-    b.addEventListener('click', () => openModal(PALS[(idx + delta + PALS.length) % PALS.length]));
-    return b;
-  };
-  modalEl.append(mkNav('Previous pal', -1, 'prev', '‹'), mkNav('Next pal', 1, 'next', '›'));
+  bar.appendChild(close);
+  modalEl.appendChild(bar);
 
   const head = document.createElement('div'); head.className = 'mhead';
   head.appendChild(icon(p, 96));
@@ -615,8 +676,13 @@ function openModal(p, rentry) {
     toggleOwned(p.k); paintStar(star, p);
     renderDex(); renderReverse();
   });
-  h2.appendChild(star);
-  hb.appendChild(h2);
+  // A sibling AFTER the h2, never inside it — §4 states this for .rosband in as
+  // many words. Inside, the dialog's only level-2 heading announced as
+  // "Anubis#139Unmark Anubis as owned", and changed its own name on a press
+  // that did not change the pal.
+  const trow = document.createElement('div'); trow.className = 'mtitle';
+  trow.append(h2, star);
+  hb.appendChild(trow);
   const crow = document.createElement('div'); crow.className = 'crow';
   crow.appendChild(typeChips(p));
   crow.appendChild(tierBadge(p));
@@ -634,41 +700,44 @@ function openModal(p, rentry) {
   modalEl.appendChild(head);
 
   // opened from a roster card: show that individual's recorded details
-  if (rentry) {
+  if (ent) {
     const rs = sec('In your roster');
     const box = document.createElement('div'); box.className = 'rosentry';
     const r1 = document.createElement('div'); r1.className = 'row1';
-    if (rentry.g) r1.appendChild(gEl(rentry.g === 'M' ? '♂' : '♀'));
-    if (rentry.nick) { const nk = document.createElement('b'); nk.textContent = '“' + rentry.nick + '”'; r1.appendChild(nk); }
-    if (rentry.iv) {
+    if (ent.g) r1.appendChild(gEl(ent.g === 'M' ? '♂' : '♀'));
+    if (ent.nick) { const nk = document.createElement('b'); nk.textContent = '“' + ent.nick + '”'; r1.appendChild(nk); }
+    if (ent.iv) {
       const ivc = document.createElement('span'); ivc.className = 'ivchip';
-      ivc.textContent = 'IV ' + rentry.iv.map(v => v === null ? '–' : v).join('·');
-      ivc.title = 'HP · Attack · Defense IVs'; r1.appendChild(ivc);
+      // the roster row stays terse for width; the card has room to say which
+      // number is which, and a title alone does not reach touch (§8)
+      const IVN = ['HP', 'Atk', 'Def'];
+      ivc.textContent = 'IV ' + ent.iv.map((v, i) => (v === null ? '–' : v) + ' ' + IVN[i]).join(' · ');
+      r1.appendChild(ivc);
     }
     // The row in the Roster carries only ✎ ⧉ ✕; the rest of an entry's
     // actions live here, at comfortable size, where there is room to name them.
     const acts = document.createElement('div'); acts.className = 'rentacts';
-    const mk = (label, title, fn) => {
-      const b = document.createElement('button'); b.className = 'alink';
+    const mk = (label, title, fn, danger) => {
+      const b = document.createElement('button'); b.className = 'alink' + (danger ? ' danger' : '');
       b.textContent = label; b.title = title; b.dataset.mfk = label;
       b.addEventListener('click', fn); acts.appendChild(b);
     };
-    mk('✎ Edit', 'Edit this roster entry', () => { leaveModal(true); openRosterEditor(rentry); });
+    mk('✎ Edit', 'Edit this roster entry', () => { leaveModal(true); openRosterEditor(ent); });
     // leaveModal(true) — "I'll place focus myself" — on all four. These are the
     // row's own actions run from a card that is closing under them, so
     // renderRoster's focus restore (which reads document.activeElement) sees
     // <body> and restores nothing, and the card's restore aims at a button
     // inside the overlay it just hid. Three of the four ended on <body>.
     mk('⧉ Duplicate', 'Another with the same passives, gender and note',
-      () => { leaveModal(true); const copy = duplicateEntry(rentry); focusRosterAct(copy ? copy.id : rentry.id, 'dup'); });
+      () => { leaveModal(true); const copy = duplicateEntry(ent); focusRosterAct(copy ? copy.id : ent.id, 'dup'); });
     mk('Use as planner start', 'Add to the next free Planner start slot',
-      () => { leaveModal(true); setSlotAuto(rentry); });   // lands on the slot it filled
+      () => { leaveModal(true); setSlotAuto(ent); });   // lands on the slot it filled
     mk('✕ Remove', 'Remove this pal from your roster',
-      () => { leaveModal(true); removeEntry(rentry); focusRosterAct(rentry.id, 'remove'); });
+      () => { leaveModal(true); removeEntry(ent); focusRosterAct(ent.id, 'remove'); }, true);
     r1.appendChild(acts);
     box.appendChild(r1);
-    if (rentry.ps.length) box.appendChild(passiveChips(rentry.ps));
-    if (rentry.note) { const nt = document.createElement('div'); nt.className = 'rnote'; nt.textContent = rentry.note; box.appendChild(nt); }
+    if (ent.ps.length) box.appendChild(passiveChips(ent.ps));
+    if (ent.note) { const nt = document.createElement('div'); nt.className = 'rnote'; nt.textContent = ent.note; box.appendChild(nt); }
     rs.appendChild(box);
     modalEl.appendChild(rs);
   }
@@ -757,8 +826,21 @@ function openModal(p, rentry) {
       f.textContent = 'Always on: ' + flags.join(' · ');
       card.appendChild(f);
     }
+    // The same 6-column table the Skills catalog shows, in a card 294px wide at
+    // 360 — it measured 317–339px on 11 of the 30 pals sampled, and the only
+    // thing that scrolled was #overlay, which no key can reach (ArrowRight is
+    // preventDefault()ed into "next pal"). Rk 4 and Rk 5 were pointer-only.
+    // js/skills.js already solved this for the identical table; the card had
+    // been left out of the fix.
     const tbl = psRankTable(p);
-    if (tbl) card.appendChild(tbl);
+    if (tbl) {
+      const scroll = document.createElement('div');
+      scroll.className = 'rankscroll'; scroll.tabIndex = 0;
+      scroll.setAttribute('role', 'group');
+      scroll.setAttribute('aria-label', p.ps.n + ' rank table — scrolls sideways');
+      scroll.appendChild(tbl);
+      card.appendChild(scroll);
+    }
     ps.appendChild(card);
     modalEl.appendChild(ps);
   }
@@ -767,7 +849,16 @@ function openModal(p, rentry) {
   if (p.dr && p.dr.length) {
     const ds = sec('Drops');
     const dl = document.createElement('div'); dl.className = 'droplist';
-    for (const [item, rate, mn, mx] of p.dr) {
+    // The table ships duplicate rows — Mimog lists "Exp Boost 04 ×1 (100%)"
+    // seven times identically, 90 of the 298 pals with drops carry at least one
+    // repeat. The data is the game's and stays as it is; printing it verbatim
+    // is what reads as a bug, so identical rows merge with a count.
+    const rows = new Map();
+    for (const d of p.dr) {
+      const key = d.join('|'); const seen = rows.get(key);
+      if (seen) seen.n++; else rows.set(key, {d, n: 1});
+    }
+    for (const {d: [item, rate, mn, mx], n: times} of rows.values()) {
       const c = document.createElement('span'); c.className = 'mchip drop';
       // not every drop id has an icon in DT_ItemIconDataTable; those fall back
       // to the plain text chip rather than leaving a broken image behind
@@ -775,7 +866,10 @@ function openModal(p, rentry) {
       im.src = 'assets/items/' + item.toLowerCase() + '.webp';   // see tools/gen-ui-icons.js
       im.alt = ''; im.loading = 'lazy'; im.decoding = 'async';
       im.onerror = () => { im.remove(); c.classList.remove('drop'); };
-      c.append(im, `${pretty(item)} ×${mn === mx ? mn : mn + '–' + mx} (${rate}%)`);
+      // "rolls", not another ×: the chip already spends × on the quantity, and
+      // a repeated row is a second independent chance at the same item
+      c.append(im, `${pretty(item)} ×${mn === mx ? mn : mn + '–' + mx} (${rate}%)`
+        + (times > 1 ? ` · ${times} rolls` : ''));
       dl.appendChild(c);
     }
     ds.appendChild(dl);
@@ -783,13 +877,16 @@ function openModal(p, rentry) {
   }
 
   overlay.classList.add('open');
-  overlay.scrollTop = 0;
+  modalEl.scrollTop = 0;   // the modal scrolls, not the overlay
   document.body.style.overflow = 'hidden';
   if (!wasOpen) close.focus();
   else {
-    // stepping: back to the control that was pressed, so ›››  walks three pals
+    // stepping: back to the control that was pressed, so ›››  walks three pals.
+    // Through focusOnScreen, because .mdesc is per-species flavour text — the
+    // same button sits at a different y on every card, and a bare focus() with
+    // preventScroll left it up to 40px below the fold on a 640-high phone.
     const back = held && modalEl.querySelector(`[data-mfk="${CSS.escape(held)}"]`);
-    (back || close).focus({preventScroll: true});
+    focusOnScreen(back || close);
     liveText(modalSay, p.n + ', ' + zk(p));
   }
   // reflect the open pal in the URL so browser Back closes the modal

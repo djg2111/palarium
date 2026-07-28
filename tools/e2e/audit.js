@@ -61,8 +61,13 @@ function makeChecks() {
       if (!a || a === document.body) return null;
       const r = a.getBoundingClientRect();
       const hd = document.querySelector('header');
-      const hb = hd ? hd.getBoundingClientRect().bottom : 0;
-      // a sticky header covering the control counts as not visible
+      // A sticky header covering the control counts as not visible — but only
+      // when it is actually in front of it. Inside an open dialog it is not:
+      // the overlay is z-index 100 to the header's 50, and clamping anyway
+      // reported "✕ focused but only 18px of 37px on screen" for every entry
+      // into the pal card.
+      const inDialog = [...document.querySelectorAll('.overlay.open')].some(o => o.contains(a));
+      const hb = hd && !inDialog ? hd.getBoundingClientRect().bottom : 0;
       const top = Math.max(r.top, hb);
       return {who: a.tagName + (a.id ? '#' + a.id : '') + (a.className ? '.' + String(a.className).split(' ')[0] : ''),
         px: Math.round(Math.max(0, Math.min(r.bottom, innerHeight) - top)), h: Math.round(r.height)};

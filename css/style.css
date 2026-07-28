@@ -506,7 +506,8 @@ tbody tr:hover{background:var(--surface)}
   /* .child-card used to stack and centre here; it stays a row at every width
      now and only the art shrinks at <=640 — stacking cost ~100px of height and
      centred the running text the redesign moved to the start edge. */
-  .modal{padding:18px 16px 22px}
+  .modal{padding:0 var(--sp-4) var(--sp-5)}
+  .mbar{margin:0 calc(var(--sp-4) * -1) var(--sp-3);padding:var(--sp-2) var(--sp-3)}
   .mhead{flex-direction:column;text-align:center}
   .mhead h2{justify-content:center}
   .mhead .crow{justify-content:center}
@@ -514,15 +515,29 @@ tbody tr:hover{background:var(--surface)}
 }
 
 /* ---------- modal ---------- */
-.overlay{position:fixed;inset:0;z-index:100;background:var(--scrim);display:none;align-items:flex-start;justify-content:center;padding:36px 16px;overflow-y:auto}
+/* The DIALOG scrolls, not the overlay. Every one of the 299 pal cards is taller
+   than the viewport at 360 (median 1581px, tallest 2332px) and the close button
+   used to be absolutely positioned at the top of the card, so it left the screen
+   85px in — with no Escape on touch, the only remaining exit was a 16px strip
+   of scrim down each edge, under 2.5.8's floor and undiscoverable. */
+.overlay{position:fixed;inset:0;z-index:100;background:var(--scrim);display:none;align-items:center;justify-content:center;padding:var(--sp-6) var(--sp-4);overflow:hidden}
 .overlay.open{display:flex}
-.modal{width:min(640px,100%);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-xl);padding:26px 30px 30px;position:relative;animation:pop var(--t-base) var(--ease-out);margin-bottom:36px}
-.modal .close{position:absolute;top:14px;right:16px;color:var(--muted);font-size:var(--fs-h2);padding:4px 10px;border-radius:var(--r-md)}
+.modal{width:min(640px,100%);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-xl);padding:0 var(--sp-6) var(--sp-6);position:relative;animation:pop var(--t-base) var(--ease-out);
+  max-height:calc(100vh - var(--sp-6) * 2);max-height:calc(100dvh - var(--sp-6) * 2);overflow-y:auto;overscroll-behavior:contain}
+/* the card's own action bar: sticky to the top of the scrollport, so ‹ › and ✕
+   are reachable at any scroll depth. Negative margins carry it out to the
+   modal's padding box so it spans the full width and can carry the surface. */
+.mbar{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:var(--sp-1);
+  margin:0 calc(var(--sp-6) * -1) var(--sp-3);padding:var(--sp-2) var(--sp-4);
+  background:var(--surface);border-bottom:1px solid var(--border);border-radius:var(--r-xl) var(--r-xl) 0 0}
+.modal .close{margin-left:auto;color:var(--muted);font-size:var(--fs-h2);padding:var(--sp-1) var(--sp-3);border-radius:var(--r-md)}
 .modal .close:hover{background:var(--raised);color:var(--text)}
 .mhead{display:flex;gap:20px;align-items:center}
 .mhead .pico{width:96px;height:96px;font-size:34px}
-.mhead h2{font-size:var(--fs-h1);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.mhead .zk{color:var(--muted);font-size:16px;font-weight:400}
+.mtitle{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap}
+.mhead h2{font-size:var(--fs-h1);display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap}
+/* --fs-lg, not a bare 16px: 16 is not on the type scale (§3) */
+.mhead .zk{color:var(--muted);font-size:var(--fs-lg);font-weight:400}
 .mdesc{margin-top:16px;color:var(--text-2);font-size:var(--fs-md);background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 16px;font-style:italic}
 .msec{margin-top:18px}
 .msec h3{font-size:var(--fs-sm);letter-spacing:.7px;text-transform:uppercase;color:var(--accent);margin-bottom:9px;font-weight:700}
@@ -1048,10 +1063,13 @@ select#genderSel{padding:10px 12px}
 .tchip.final{border-color:var(--gold)}
 .tchip .own{color:var(--gold);font-size:var(--fs-xs)}
 .tchip .g{font-size:var(--fs-sm)}
-.mnav{position:absolute;top:13px;color:var(--muted);font-size:var(--fs-h2);line-height:1;padding:5px 11px;border-radius:var(--r-md)}
-.mnav:hover{color:var(--text);background:var(--raised)}
-.mnav.prev{right:104px}
-.mnav.next{right:60px}
+/* a resting fill, not a bare glyph: what these do lived entirely in a title,
+   and touch has no hover (§8). They sit together at the left of .mbar so the
+   cluster reads as [‹ ›] … [✕] — two groups, not three peers. */
+.mnav{display:inline-flex;align-items:center;justify-content:center;color:var(--muted);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+  line-height:1;padding:var(--sp-1) var(--sp-2);min-width:32px;min-height:32px}
+.mnav:hover{color:var(--text);background:var(--raised);border-color:var(--border-strong)}
 .pop .srcrow{display:flex;gap:4px;padding:7px 10px;border-bottom:1px solid var(--border)}
 .pop .srcrow button{flex:1;padding:5px 10px;border-radius:var(--r-sm);font-size:var(--fs-sm);font-weight:700;color:var(--muted);background:var(--raised)}
 .pop .srcrow button.on{color:var(--text);background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-line)}
@@ -1152,8 +1170,10 @@ select#genderSel{padding:10px 12px}
 
 /* not .alink.primary: a solid --accent fill on a destructive default invites the
    mis-press this whole mode exists to make safe. The view's primary stays +Add. */
-.bulkbar .alink.danger{color:var(--danger);border-color:var(--danger-line)}
-.bulkbar .alink.danger:hover:not(:disabled){background:var(--danger-tint);border-color:var(--danger)}
+/* unscoped: the pal card's ✕ Remove is the same destructive tier, and was
+   drawn as a peer of Edit and Duplicate (§4 button tiers) */
+.alink.danger{color:var(--danger);border-color:var(--danger-line)}
+.alink.danger:hover:not(:disabled){background:var(--danger-tint);border-color:var(--danger)}
 /* the last row must be able to scroll clear of the bar (2.4.11) */
 body.selecting #rosterList{padding-bottom:var(--bulkbar-h,72px)}
 body.selecting .toasts{bottom:calc(var(--bulkbar-h,72px) + 18px)}
@@ -1423,11 +1443,12 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
 .rankdet summary::-webkit-details-marker{display:none}
 .rankdet summary::before{content:'▸';color:var(--muted);transition:transform var(--t-fast)}
 .rankdet[open] summary::before{transform:rotate(90deg)}
-/* the pan moves to a focusable .rankscroll (js/skills.js) — on the <table>
-   itself it was a scrollport with no focusable cell, so axe flagged
-   scrollable-region-focusable and Rank 4-5 were pointer-only */
-.rankdet .rankscroll{margin-top:6px;overflow-x:auto}
-.rankdet .ranktbl{margin-top:0}
+/* the pan moves to a focusable .rankscroll (js/skills.js, js/core.js) — on the
+   <table> itself it was a scrollport with no focusable cell, so axe flagged
+   scrollable-region-focusable and Rank 4-5 were pointer-only. Unscoped: the pal
+   card shows the same table in a 294px box at 360 and needs the same wrapper. */
+.rankscroll{margin-top:6px;overflow-x:auto}
+.rankscroll .ranktbl{margin-top:0}
 .pvgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(270px,100%),1fr));gap:10px}
 .pvcard{gap:6px}
 .pvn{font-weight:700;font-size:var(--fs-base);flex:1;min-width:0}
@@ -1532,7 +1553,7 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .pcard{padding:16px 14px}
   .gcard{padding:18px 16px}
   .gcard ol,.gcard ul{margin:10px 0 10px 18px}
-  .modal{padding:20px 16px 24px}
+  .modal{padding:0 var(--sp-4) var(--sp-5)}
   .setup{position:relative;padding:10px 42px 10px 14px}
   .setup .dismiss{position:absolute;top:5px;right:4px;margin:0}
 
@@ -1665,6 +1686,10 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .planhead .pushr{margin-left:0}
 
   /* --- pal card: aligned action grid instead of a centred staircase --- */
+  /* the same grid .mbtns gets two sections below — it was a 3-line, 127px
+     staircase against an aligned block */
+  .rentacts{display:grid;grid-template-columns:1fr 1fr;margin-left:0;width:100%}
+  .rentacts .alink{text-align:center;padding:9px 10px}
   .mbtns{display:grid;grid-template-columns:1fr 1fr}
   .mbtns .alink{text-align:center;padding:9px 10px}
 
