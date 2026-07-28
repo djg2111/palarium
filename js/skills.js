@@ -431,8 +431,15 @@ const psTagIsel = makeIconSelect(psTagSel, 'work', v => (TAG_ICON[v] || [])[1]);
 psTagIsel.refresh();
 psSearch.addEventListener('input', () => { psShown = 60; renderPS(); });
 psTagSel.addEventListener('change', () => {
-  // a tag and a family that disagree would just show nothing — the tag wins
-  if (psTagSel.value && psFamily && tagFamily(psTagSel.value) !== psFamily) setPsFamily('', true);
+  // A tag and a family that disagree would just show nothing, so the tag wins —
+  // but the family button un-pressing itself silently read as a bug. Say it, the
+  // same rule a refused .pset press follows (DESIGN.md §4).
+  if (psTagSel.value && psFamily && tagFamily(psTagSel.value) !== psFamily) {
+    const was = psFamilyEl.querySelector('button.on');
+    const lbl = was ? was.textContent.trim() : 'that family';
+    setPsFamily('', true);
+    toast(`Showing every family, so “${psTagSel.value}” has somewhere to land — ${lbl} had none.`);
+  }
   psShown = 60; renderPS();
 });
 function setPsFamily(f, silent) {
@@ -451,15 +458,14 @@ psOwnedBtn.addEventListener('click', () => {
 psMoreBtn.addEventListener('click', () => {
   const from = psShown;          // index of the first card about to appear
   psShown += 60; renderPS();
-  // focusOnScreen, not focus: this press appends 60 cards ABOVE the button, so
-  // the control the user is standing on moves off the bottom of the page —
-  // measured at 0px visible, and this is a button you press repeatedly (2.4.11)
-  if (!psMoreBtn.hidden) { focusOnScreen(psMoreBtn); return; }
-  // The last press hides this button, so focus would fall to <body>. Land on
-  // the first newly revealed skill instead — that is what the press asked for.
+  // Land on the first newly revealed skill, every press — that is what the
+  // press asked for, and it is already on screen, so it costs no scroll.
+  // Chasing the button instead dragged the page 14,757px over 1,654ms (§5 caps
+  // motion at 300ms) to a place where none of the 60 new cards were visible.
+  // #psMore stays one Tab past the last card.
   const cards = document.querySelectorAll('#psList .skillcard');
   const c = cards[from] || cards[cards.length - 1];
-  ((c && c.querySelector('.palref')) || psSearch).focus();
+  focusOnScreen((c && c.querySelector('.palref')) || (psMoreBtn.hidden ? psSearch : psMoreBtn));
 });
 document.getElementById('psClear').addEventListener('click', () => {
   psSearch.value = ''; psTagSel.value = ''; psTagIsel.sync();
@@ -475,7 +481,7 @@ function openSkillTag(t) {
   navTab('skills');
   // this can be pressed from a pal modal, which it closes, or from another tab —
   // either way the control that was pressed is gone (DESIGN.md §4)
-  landAfterNav('#psSearch');
+  landAfterNav('#psTag ~ .isel .isel-btn, #skillPartnerBlock .isel-btn, #psSearch');
   toast(PS_TAGS.has(t) ? PS_TAGS.get(t) + ' partner skills tagged ' + t : 'Showing all partner skills');
 }
 function renderPS() {
@@ -496,11 +502,21 @@ function renderPS() {
     filtered ? rows.length + ' of ' + PS_PALS.length + ' partner skills' : PS_PALS.length + ' partner skills';
   document.getElementById('psClear').hidden = !filtered;
   const list = document.getElementById('psList');
+  // Which rank tables were open. renderPS rebuilds all 60-299 cards on every
+  // keystroke and every page, so a user comparing two pals' rank-5 values lost
+  // both every time. The rebuild costs 16ms at 299 cards — there was no perf
+  // reason to throw the disclosure state away with it.
+  psOpenRanks = new Set([...list.querySelectorAll('.rankdet[open]')]
+    .map(d => d.closest('.skillcard')).filter(Boolean).map(c => c.dataset.k));
   list.textContent = '';
   if (!rows.length) {
     const h = document.createElement('div'); h.className = 'hint';
-    h.textContent = psOwnedOnly ? 'No pals you own have this effect — clear “Owned only” to see who does.'
-      : 'No partner skills match these filters.';
+    h.append(psOwnedOnly ? 'None of your pals have this effect. '
+      : 'No partner skills match these filters. ');
+    const cb = document.createElement('button'); cb.type = 'button'; cb.className = 'alink';
+    cb.textContent = '✕ Clear filters';
+    cb.addEventListener('click', () => document.getElementById('psClear').click());
+    h.appendChild(cb);
     list.appendChild(h);
     psMoreBtn.hidden = true;
     return;
@@ -510,14 +526,23 @@ function renderPS() {
   psMoreBtn.hidden = !left;
   psMoreBtn.textContent = 'Show more (' + left + ' left)';
 }
+let psOpenRanks = new Set();
 function psCard(p) {
   const card = document.createElement('div'); card.className = 'skillcard';
+  card.dataset.k = p.k;
   const head = document.createElement('div'); head.className = 'shead';
   head.appendChild(palLink(p, 40, true));
   if ((p.ps.t || []).includes('Base Aura')) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'badge aura';
     b.textContent = 'Base aura'; b.title = 'Lifts every other pal at the base — see the Base auras tab';
-    b.addEventListener('click', () => { setSkillMode('auras'); scrollTo({top: 0, behavior: SMOOTH}); });
+    // setSkillMode hides the block this button is in, so focus fell to <body> —
+    // §4's rule is about the control being hidden, not about which function
+    // hides it, so a sub-tab switch counts the same as navTab. The scrollTo it
+    // used to do measured 64,564px; focusOnScreen moves only what it must.
+    b.addEventListener('click', () => {
+      setSkillMode('auras');
+      focusOnScreen(document.querySelector('#skillMode button[data-m="auras"]'));
+    });
     head.appendChild(b);
   }
   card.appendChild(head);
@@ -534,9 +559,20 @@ function psCard(p) {
   const rows = psRankRows(p.ps);
   if (rows.length) {
     const det = document.createElement('details'); det.className = 'rankdet';
+    det.open = psOpenRanks.has(p.k);
     const sum = document.createElement('summary');
     sum.textContent = rows.some(r => !r.flat) ? 'Rank scaling' : 'Rank values (flat)';
-    det.append(sum, psRankTable(p));
+    // 410px of columns in a 304px card at 360, and the table holds no focusable
+    // cell — so the pannable box needs its own tab stop and a name, or Rank 4-5
+    // (the columns the caption says you are deciding whether to pay for) are
+    // pointer-only. 156 of 249 tables overflow at 360. role=group, not region:
+    // 249 landmarks would be worse than the bug.
+    const scroll = document.createElement('div');
+    scroll.className = 'rankscroll'; scroll.tabIndex = 0;
+    scroll.setAttribute('role', 'group');
+    scroll.setAttribute('aria-label', p.ps.n + ' rank table — scrolls sideways');
+    scroll.appendChild(psRankTable(p));
+    det.append(sum, scroll);
     card.appendChild(det);
   }
   return card;
@@ -613,7 +649,9 @@ function renderPassives() {
     grp.sort((a, b) => a.m.n.localeCompare(b.m.n));
     const sec = document.createElement('section'); sec.className = 'pvsec' + (r < 0 ? ' bad' : '');
     const h = document.createElement('h3'); h.textContent = label;
-    const c = document.createElement('span'); c.className = 'rstats'; c.textContent = grp.length;
+    // a unit, like the aura groups' "12 pals" — bare, "Rank 4 24" reads as two numbers
+    const c = document.createElement('span'); c.className = 'rstats';
+    c.textContent = grp.length + (grp.length === 1 ? ' passive' : ' passives');
     h.appendChild(c);
     sec.appendChild(h);
     const grid = document.createElement('div'); grid.className = 'pvgrid';
@@ -629,7 +667,14 @@ function pvCard(e, mine) {
   const n = document.createElement('span'); n.className = 'pvn'; n.textContent = e.m.n;
   head.appendChild(n);
   const rk = document.createElement('span'); rk.className = 'mchip pvrank';
-  rk.textContent = e.m.r > 0 ? '★'.repeat(e.m.r) : '▼'.repeat(-e.m.r);
+  // The glyph run is decorative: §7 settles that a repeated symbol is never a
+  // chart, and this announced "star star star star star" while the rank's real
+  // name sat in a title touch never shows.
+  const gl = document.createElement('span'); gl.setAttribute('aria-hidden', 'true');
+  gl.textContent = e.m.r > 0 ? '★'.repeat(e.m.r) : '▼'.repeat(-e.m.r);
+  rk.appendChild(gl);
+  const sr = document.createElement('span'); sr.className = 'sr-only'; sr.textContent = pvTier(e.m.r);
+  rk.appendChild(sr);
   rk.title = pvTier(e.m.r);
   head.appendChild(rk);
   card.appendChild(head);

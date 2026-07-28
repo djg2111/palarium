@@ -283,6 +283,7 @@ siblings, so grouping is the shape of the data, not a preference):
 | `.rostile` | One species in **Tiles** view: a `<button aria-expanded aria-controls="rosPanel">` carrying art, a count badge on the art, the name and the gender tally. The whole tile is the press target. |
 | `.rospanel` | The expanding panel. A `<section role="region" aria-labelledby>` spanning `1/-1`, placed as a real sibling **after the last tile of the open tile's visual row** — so grid auto-placement puts it on its own row, the board resumes underneath, and DOM order stays visual order. `grid-auto-flow:dense` remains **forbidden**, and is not needed. |
 | `#view-skills` heading | **Every view names itself in an `h2`**, so group headings inside it are `h3`. Skills had no view heading at all, which put its section titles ("Work suitability +1 for every other pal") at the level every other view uses for its name — and left the view unnamed to heading navigation. |
+| `.rankscroll` | The focusable box around a `.ranktbl` inside a `.rankdet`. A table wider than its card is a scrollport, and `.ranktbl` holds no focusable cell — so the box itself takes `tabindex="0"` + `role="group"` + a name, or the clipped columns are pointer-only (axe `scrollable-region-focusable`; 156 of 249 tables overflow at 360). `role="group"`, not `region`: 249 landmarks would be worse than the bug. The Paldex's `.tablewrap` escapes this only because its rows are focusable. |
 | `.rosband` | The species header band. One implementation, two homes: a Rows section and the panel header — **so its responsive rules are written unscoped**. The ≤640 wrap fix was scoped to `.rospanel .rosband`, and in a Rows section the one-gender warn chip ate the row the same way: at 360 the header read `La…` and nothing on screen named the species. The `✕` is a sibling **after** the `<h3>`, never inside it — a control is not part of a heading's name. |
 | `.roster` | The grid. `.tileview` auto-fills a **single 120px track** above 640px and 96px below; `.rowview` is a single `minmax(0,1fr)` column. One track, not a ladder — every extra breakpoint steps the tile up and the column count down, so a wider window produces a *taller* board. **`minmax(0,1fr)`, never a bare `1fr`**: `1fr` floors the track at the widest section's min-content, so one long passive chip row pushed the whole page to 356px and broke 1.4.10 Reflow at 320. |
 | `.chiprow` | The chip line inside a header band, a tile, or a Find parents group. A low-specificity global base rule. It sets `flex-wrap:wrap`, which `.rostile` re-declares but `.rosband` did **not** — so the base rule silently gave the roster's species band wrapping it never had, +28px per section at 360. `.rosband .chiprow` now pins `nowrap`. When you add a property to a shared base, check every variant re-declares it; inheriting one is how a component in another view grows. |
@@ -472,11 +473,20 @@ which shows no breeding power, and "Browse every passive" landed on whichever
 Skills section was last used — Base auras on a cold start, with no passive on
 screen. Gate these with `focusVisible`, never `focusSane`.
 
-`focusOnScreen(el)` is the same guard without the navigation: focus, then
-scroll **only if** the target is out of sight. Any press that moves the control
-it is standing on needs it — the Skills "Show more" appends 60 cards *above*
-its own button, so the button the user is pressing repeatedly ends up below the
-fold at 0px visible. `landAfterNav` is a thin wrapper over it.
+`focusOnScreen(el)` is the same guard without the navigation, and it holds the
+**same bar `focusVisible` does** — half the control or 24px, between the header
+and the tab bar. "Not entirely hidden" is not the bar: 30px of a 45px combobox
+under the sticky header passes that and fails this. (`offsetParent` is `null`
+for a `position:fixed` element, so read the bottom bar's rect, not its
+`offsetParent`.) `landAfterNav` is a thin wrapper over it.
+
+**A press that moves the control it is standing on lands on its own result, not
+on itself.** Skills' "Show more" appends 60 cards *above* its button, so
+re-focusing the button dragged the page 14,757px over 1,654ms — past the 60
+cards the press had just revealed, to a place where none were visible. Landing
+on the first new card costs **0px**: it is already on screen, which is the point.
+§4's hidden-control rule covers sub-tab switches too, not just `navTab` — what
+matters is that the control is gone, not which function removed it.
 
 Plain **text symbols** (★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×) are typography, not emoji — they
 render monochrome, inherit color, and remain allowed where established (ownership
@@ -671,6 +681,25 @@ is still a 2.4.11 failure — which is how it shipped twice.
   `<li class="mchip">` costs nothing; `.recipe{display:flex}` already handles it.
   The Ancient Breeding Facility's ingredients are inline prose while the five
   cakes are chips — same content, two presentations (§4 reuse-first).
+
+- **The partner-skill list is 999 tab stops fully paged** — 299 pal links, 421
+  tag chips, 249 rank disclosures and 30 controls. This is **not** the Paldex
+  table's question (§11 above): that is a data table with AT's own navigation
+  mode and two stops per uniform row. Nor is `.skillgrid` a §4 grid board —
+  `.dextile`, `.combo` and `.rostile` are each one press target, while a
+  `.skillcard` holds a pal link, up to four independent tag-filter chips and a
+  disclosure, so a roving `tabindex` over cards cannot reach three kinds of
+  control without a second axis. The cheap 40% is a roving `role="toolbar"` on
+  each card's tag row, which `rovingRow` already does elsewhere: −421 stops for
+  +53.
+- **The two sections page by item count, at a threshold no user can see.**
+  Measured at 360: one page of partner skills (60 cards) is **15,064px** —
+  *longer* than the entire unpaginated Passives section at 12,975px. Meanwhile
+  the Paldex renders 299 items in 9,553px with no pager at all. Card height, not
+  list length, is what decides whether a list needs paging, so a page size
+  counted in cards will always drift. Paging by scroll distance (~6–8 viewports)
+  would give both sections the same rule and put the mobile pager before the
+  19th screen instead of after it.
 
 - **Duplicate uses `⧉` (U+29C9), which is not on §7's plain-symbol allowlist**
   (`★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×`), and §7 says not to add one where a Lucide icon

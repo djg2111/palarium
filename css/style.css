@@ -1352,7 +1352,10 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
 /* a section heading inside a view — smaller than the page h1, with its count
    trailing it rather than sitting in a separate row */
 .aurasec,.pvsec{margin-bottom:26px}
-.aurasec h3,.pvsec h3{font-size:var(--fs-h2);font-weight:700;margin-bottom:6px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+/* --fs-lg, not --fs-h2: the view's own h2 is 19px, so a group heading rendered
+   at the same size made "Skills" the smallest heading on screen. §3's ladder
+   wants the step down to be visible, not only announced. */
+.aurasec h3,.pvsec h3{font-size:var(--fs-lg);font-weight:700;margin-bottom:6px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .aurasec h3 .rstats,.pvsec h3 .rstats{font-weight:400}
 .aurasec .viewsub{max-width:78ch}
 .pvsec.bad h3{color:var(--danger)}
@@ -1395,11 +1398,15 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   font-size:var(--fs-sm);line-height:1.3;cursor:help}
 .rankdet{border-top:1px solid var(--border);padding-top:6px;margin-top:auto}
 .rankdet summary{color:var(--accent);font-size:var(--fs-sm);font-weight:600;cursor:pointer;list-style:none;
-  display:inline-flex;align-items:center;gap:6px;border-radius:var(--r-sm)}
+  display:inline-flex;align-items:center;gap:6px;border-radius:var(--r-sm);padding:3px 2px;margin:-3px -2px;min-height:24px}
 .rankdet summary::-webkit-details-marker{display:none}
 .rankdet summary::before{content:'▸';color:var(--muted);transition:transform var(--t-fast)}
 .rankdet[open] summary::before{transform:rotate(90deg)}
-.rankdet .ranktbl{margin-top:6px;display:block;overflow-x:auto}
+/* the pan moves to a focusable .rankscroll (js/skills.js) — on the <table>
+   itself it was a scrollport with no focusable cell, so axe flagged
+   scrollable-region-focusable and Rank 4-5 were pointer-only */
+.rankdet .rankscroll{margin-top:6px;overflow-x:auto}
+.rankdet .ranktbl{margin-top:0}
 .pvgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(270px,100%),1fr));gap:10px}
 .pvcard{gap:6px}
 .pvn{font-weight:700;font-size:var(--fs-base);flex:1;min-width:0}

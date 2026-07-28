@@ -150,17 +150,25 @@ function liveText(el, txt) {
 // rule DESIGN.md §4 states for Breedable now, applied wherever it is needed.
 // Focus something and make sure the user can see it. preventScroll first, so a
 // hand-off doesn't fight a scroll the destination is already doing — then scroll
-// only if the target really is out of sight, whether because the page kept the
+// if the target isn't sufficiently visible, whether because the page kept the
 // scroll position of the view we left or because the press itself moved the
-// control (a "Show more" that appends 60 cards below its own button).
+// control (a "Show more" that appends 60 cards ABOVE its own button).
 function focusOnScreen(el) {
   if (!el) return;
   el.focus({preventScroll: true});
   const r = el.getBoundingClientRect();
   const top = document.querySelector('header').getBoundingClientRect().bottom;
   const nav = document.getElementById('bottomnav');
-  const bot = nav && nav.offsetParent ? nav.getBoundingClientRect().top : innerHeight;
-  if (r.bottom <= top || r.top >= bot) el.scrollIntoView({block: 'center', behavior: SMOOTH});
+  // getBoundingClientRect, not offsetParent: offsetParent is null for a
+  // position:fixed element by spec, so the bar was never subtracted at all
+  const nr = nav && nav.getBoundingClientRect();
+  const bot = nr && nr.height ? nr.top : innerHeight;
+  // the same bar audit.js's focusVisible holds every hand-off to — half the
+  // control or 24px between header and tab bar, not merely "not entirely
+  // hidden". 30px of a 45px combobox under the sticky header passed the old
+  // test and fails this one (DESIGN.md §10).
+  if (Math.min(r.bottom, bot) - Math.max(r.top, top) < Math.min(24, r.height / 2))
+    el.scrollIntoView({block: 'center', behavior: SMOOTH});
 }
 function landAfterNav(sel) { focusOnScreen(document.querySelector(sel)); }
 let toastReturn = null;                  // where focus was when Alt+Z was pressed

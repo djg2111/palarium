@@ -612,10 +612,42 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await page.waitForTimeout(400);
     await page.waitForSelector('#psMore:not([hidden])', {timeout: 3000});
   }, "the partner list's Show more")) {
-    await page.evaluate(() => { const b = document.getElementById('psMore'); b.focus(); b.click(); });
-    await page.waitForTimeout(1400);
-    await focusVisible(page, 'Show more keeps its own button on screen');
+    await page.evaluate(() => { const b = document.getElementById('psMore'); b.scrollIntoView({block: 'center'}); b.focus(); });
+    await page.waitForTimeout(400);
+    const y0 = await page.evaluate(() => Math.round(scrollY));
+    await page.evaluate(() => document.getElementById('psMore').click());
+    await page.waitForTimeout(700);
+    await focusVisible(page, 'Show more lands on the first card it revealed');
+    const moved = await page.evaluate(() => Math.round(scrollY)) - y0;
+    // the press reveals 60 cards where the user is looking; chasing the button
+    // to the new end of the list instead travelled 14,757px over 1,654ms (§5)
+    if (Math.abs(moved) < 40) console.log(`  ✓ Show more scrolls ${moved}px — the new cards are where the user was`);
+    else { console.log(`  ✗ Show more scrolled ${moved}px away from the cards it revealed`); fail(); }
     await audit(page, 'skills partner, paged');
+  }
+  // A rank table is wider than its card at every viewport, so the pannable box
+  // needs its own tab stop — axe's scrollable-region-focusable, in a state no
+  // suite had ever opened.
+  if (await reach(page, async () => {
+    await page.evaluate(() => { const i = document.getElementById('psSearch'); i.value = 'Astegon'; i.dispatchEvent(new Event('input')); });
+    await page.waitForTimeout(500);
+    await page.waitForSelector('#psList .rankdet', {timeout: 3000});
+  }, 'a rank disclosure')) {
+    await page.evaluate(() => document.querySelectorAll('#psList .rankdet').forEach(d => { d.open = true; }));
+    await page.waitForTimeout(400);
+    await audit(page, 'skills, rank table open');
+    await overflow(page, 'skills, rank table open');
+    const sc = await page.evaluate(() => {
+      const all = [...document.querySelectorAll('#psList .rankscroll')];
+      const pan = all.filter(x => x.scrollWidth > x.clientWidth + 1);
+      return {pan: pan.length, tabbable: pan.filter(x => x.tabIndex >= 0).length,
+        named: pan.filter(x => x.getAttribute('aria-label')).length};
+    });
+    if (!sc.pan || (sc.tabbable === sc.pan && sc.named === sc.pan))
+      console.log(`  ✓ every pannable rank table is a named tab stop (${sc.pan})`);
+    else { console.log(`  ✗ pannable rank tables unreachable by keyboard: ${JSON.stringify(sc)}`); fail(); }
+    await page.evaluate(() => { const i = document.getElementById('psSearch'); i.value = ''; i.dispatchEvent(new Event('input')); });
+    await page.waitForTimeout(400);
   }
 
   console.log('\nMAP — base, marker selected, spawn overlay');
