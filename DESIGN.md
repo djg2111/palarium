@@ -449,6 +449,11 @@ sits beside an icon must keep that text **inside** its accessible name — an
 2.5.3 Label in Name, and axe cannot see it (`label-content-name-mismatch` is
 experimental and off by default, so a clean suite is not a clearance).
 
+**`↗` means this control leaves the view you are on.** Breed, Breedable now and
+the Planner all mark their cross-tab jumps with it; an in-page jump (the Guide's
+"See the new cakes", which only opens a section below) stays bare. Every one of
+them also lands focus on the control it set — see `landAfterNav`.
+
 Plain **text symbols** (★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×) are typography, not emoji — they
 render monochrome, inherit color, and remain allowed where established (ownership
 stars, gender marks, close/clear, step arrows). Don't add new ones when a Lucide

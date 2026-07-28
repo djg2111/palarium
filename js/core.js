@@ -150,7 +150,15 @@ function liveText(el, txt) {
 // rule DESIGN.md §4 states for Breedable now, applied wherever it is needed.
 function landAfterNav(sel) {
   const el = document.querySelector(sel);
-  if (el) el.focus({preventScroll: true});
+  if (!el) return;
+  el.focus({preventScroll: true});
+  // preventScroll keeps a hand-off from fighting a scroll the destination is
+  // already doing — but the page keeps the scroll position of the tab we left,
+  // so a jump from far down the Guide landed on a control above the viewport.
+  // Scroll only when it is actually out of sight.
+  const r = el.getBoundingClientRect();
+  const top = document.querySelector('header').getBoundingClientRect().bottom;
+  if (r.bottom <= top || r.top >= innerHeight) el.scrollIntoView({block: 'center', behavior: SMOOTH});
 }
 let toastReturn = null;                  // where focus was when Alt+Z was pressed
 function restoreFromToast() {

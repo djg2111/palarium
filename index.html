@@ -427,8 +427,8 @@
           <li><b>Which pal comes out?</b> Three simple rules:
             <ul>
               <li>Same species parents → <b>same species baby</b>. Lamball + Lamball = Lamball.</li>
-              <li>Different species → the game does secret math (see the deep dive). Just use the <b>Breed</b> tab — it tells you exactly what you'll get. <button type="button" class="alink gjump" data-nav="breed">Open Breed</button></li>
-              <li>A few pairs are <span class="gold">special recipes</span> that ignore the math — they're marked with a gold <b>UNIQUE</b> badge in this app. Example: Relaxaurus + Sparkit = Relaxaurus Lux. <button type="button" class="alink gjump" data-nav="combos">Browse all unique combos</button></li>
+              <li>Different species → the game does secret math (see the deep dive). Just use the <b>Breed</b> tab — it tells you exactly what you'll get. <button type="button" class="alink gjump" data-nav="breed">Open Breed ↗</button></li>
+              <li>A few pairs are <span class="gold">special recipes</span> that ignore the math — they're marked with a gold <b>UNIQUE</b> badge in this app. Example: Relaxaurus + Sparkit = Relaxaurus Lux. <button type="button" class="alink gjump" data-nav="combos">Browse all unique combos ↗</button></li>
             </ul>
           </li>
           <li><b>Why bother?</b> Babies can <b>inherit passive skills</b> from both parents. Breed a pal with great passives into a strong species and you get a super-pal you could never catch in the wild.</li>
@@ -443,12 +443,12 @@
         <details open id="g-formula"><summary>The species formula (breeding power)</summary><div>
           <p>Every species has a hidden number called <b>breeding power</b> (internally <code>CombiRank</code> — you can see it for every pal in the Paldex tab). When two different species breed:</p>
           <p><code>target = floor((powerA + powerB + 1) ÷ 2)</code></p>
-          <p>The child is the species whose breeding power is <b>closest to that target</b>. If two species are exactly equally close, a hidden priority value decides the winner. That's it — the whole species system is one averaging formula. <button type="button" class="alink gjump" data-nav="dex">See breeding power in the Paldex</button></p>
+          <p>The child is the species whose breeding power is <b>closest to that target</b>. If two species are exactly equally close, a hidden priority value decides the winner. That's it — the whole species system is one averaging formula. <button type="button" class="alink gjump" data-nav="dex">See breeding power in the Paldex ↗</button></p>
           <ul>
-            <li>Not every pal can be a "math result": <b>legendaries and all sub-species</b> (Relaxaurus Lux, Incineram Noct, etc.) are excluded from the pool — only 183 of the 288 species can hatch from averaging. The excluded ones need their unique recipe or same-species parents.</li>
+            <li>Not every pal can be a "math result": <b>legendaries and all sub-species</b> (Relaxaurus Lux, Incineram Noct, etc.) are excluded from the pool — only 183 of the 299 species can hatch from averaging. The excluded ones need their unique recipe or same-species parents.</li>
             <li><b>Unique recipes override the math.</b> This app checks them first, exactly like the game.</li>
             <li>A handful of recipes are <b>gender-dependent</b>: Katress ♀ × Wixen ♂ gives Katress Ignis, but Katress ♂ × Wixen ♀ gives Wixen Noct. The Breed tab shows both outcomes when it matters.</li>
-            <li>Because it's an average, you can often reach the same child from hundreds of different pairs — that's what the <b>Find Parents</b> tab enumerates. <button type="button" class="alink gjump" data-nav="reverse">Open Find Parents</button></li>
+            <li>Because it's an average, you can often reach the same child from hundreds of different pairs — that's what the <b>Find parents</b> tab enumerates. <button type="button" class="alink gjump" data-nav="reverse">Open Find parents ↗</button></li>
           </ul>
         </div></details>
 
@@ -476,7 +476,7 @@
             <li>Classic workflow: combine 2 desired passives on one parent, 2 on the other → hatch until a child has 3–4 → use that child as a new parent. Passives have no gender, so any keeper can pair with any opposite-gender partner of the right species chain.</li>
             <li>Popular combat set: <b>Legend</b> (from legendaries — yes, it inherits!), <b>Musclehead</b>, <b>Ferocious</b>, <b>element +20%</b>. Work set: <b>Artisan</b>, <b>Serious</b>, <b>Lucky</b>, <b>Work Slave</b>.</li>
             <li>Endgame: the <b>Special Cake</b> (Tech 74) sharply raises how much of the parents' pool carries over. The odds shown in this app assume a regular Cake — treat them as a floor once you're baking Special Cakes.</li>
-            <li>Which passives are worth the effort — and which 15 are worth breeding <i>out</i> — is the <b>Skills</b> tab, with every effect in numbers. <button type="button" class="alink gjump" data-nav="skills">Browse every passive</button></li>
+            <li>Which passives are worth the effort — and which 15 are worth breeding <i>out</i> — is the <b>Skills</b> tab, with every effect in numbers. <button type="button" class="alink gjump" data-nav="skills">Browse every passive ↗</button></li>
           </ul>
         </div></details>
 

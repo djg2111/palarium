@@ -10,15 +10,38 @@ document.querySelectorAll('.recipe .mchip[data-item]').forEach(c => {
   c.classList.add('drop');
 });
 
-// guide jump links: hand the reader to the tab being described
+// Guide jump links: hand the reader to the tab being described — and land them
+// on it. navTab hides the button that was pressed, so a bare navTab() ends on
+// <body>; all five of these did. The Breed footnote that jumps the other way
+// (js/breed.js) already gets this right, so it was drift, not a missing rule.
+const GUIDE_LANDING = {
+  breed: '#pickA .picker-btn',
+  reverse: '#pickT .picker-btn',
+  dex: '#dexSearch',
+  combos: '#comboSearch',
+  skills: '#skillMode button.active',
+};
 document.querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', () => {
-  if (b.dataset.nav === 'combos') { navTab('dex'); setDexMode('combos'); }
-  else navTab(b.dataset.nav);
+  const n = b.dataset.nav;
+  // Both Paldex links name a sub-pane, so both have to select it. "dex" used to
+  // only call navTab, so after following "Browse all unique combos" it landed on
+  // the Paldex still showing combos — with #dexSearch hidden, so nowhere at all.
+  if (n === 'combos') { navTab('dex'); setDexMode('combos'); }
+  else if (n === 'dex') { navTab('dex'); setDexMode('pals'); }
+  else navTab(n);
+  landAfterNav(GUIDE_LANDING[n] || '#tabs button.active');
 }));
-// in-guide anchors: open the referenced <details> section and scroll to it
+// in-guide anchors: open the referenced <details> section and scroll to it —
+// then move focus onto the summary. Left on the button, focus sat above the
+// scrolled viewport at 0px visible (2.4.11), which is exactly what the same
+// jump in js/breed.js avoids by focusing the summary it just opened.
 document.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
   const d = document.getElementById(b.dataset.open);
-  if (d) { d.open = true; d.scrollIntoView({block: 'start', behavior: SMOOTH}); }
+  if (!d) return;
+  d.open = true;
+  d.scrollIntoView({block: 'start', behavior: SMOOTH});
+  const s = d.querySelector('summary');
+  if (s) s.focus({preventScroll: true});
 }));
 booting = false;
 if (!applyHash(initialHash)) showTab(state.tab && document.getElementById('view-' + state.tab) ? state.tab : currentTab);

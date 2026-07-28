@@ -553,7 +553,39 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await page.waitForTimeout(300);
   }
 
-  console.log('\nSKILLS — all three sections');
+  console.log('\nGUIDE — its jumps out, and its jump within');
+  await nav(page, '#/guide', 500);
+  await audit(page, 'guide');
+  await overflow(page, 'guide');
+  // Every cross-tab jump lands on the control it set (§4). All five of these
+  // ran a bare navTab and ended on <body>, and the in-guide one scrolled the
+  // page while leaving focus on a button now above the viewport.
+  {
+    const navs = await page.evaluate(() => [...document.querySelectorAll('#view-guide [data-nav]')].map(b => b.dataset.nav));
+    for (const n of navs) {
+      await nav(page, '#/guide', 400);
+      await page.evaluate(x => { const b = document.querySelector(`[data-nav="${x}"]`); b.focus(); b.click(); }, n);
+      await page.waitForTimeout(600);
+      await focusVisible(page, `the guide's "${n}" jump lands on screen`);
+    }
+    await nav(page, '#/guide', 400);
+    await page.evaluate(() => { const b = document.querySelector('#view-guide [data-open]'); b.focus(); b.click(); });
+    await page.waitForTimeout(700);
+    await focusVisible(page, "the guide's in-page jump lands on the section it opened");
+    const opened = await page.evaluate(() => {
+      const d = document.getElementById('g-cakes');
+      return {open: d.open, onSummary: document.activeElement === d.querySelector('summary')};
+    });
+    if (opened.open && opened.onSummary) console.log('  ✓ it opened the target section and focused its summary');
+    else { console.log(`  ✗ the in-page jump left ${JSON.stringify(opened)}`); fail(); }
+  }
+  await nav(page, '#/guide', 400);
+  await page.evaluate(() => document.querySelectorAll('#view-guide details').forEach(d => d.open = true));
+  await page.waitForTimeout(300);
+  await audit(page, 'guide, every section open');
+  await overflow(page, 'guide, every section open');
+
+  console.log('SKILLS — all three sections');
   for (const m of ['auras', 'partner', 'passives']) {
     await nav(page, '#/skills/' + m, 500);
     await audit(page, `skills · ${m}`);
