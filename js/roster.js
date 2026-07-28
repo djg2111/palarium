@@ -695,9 +695,8 @@ function renderRoster() {
   const stats = document.getElementById('rosterStats');
   // #rosterStats is aria-live, so writing it unconditionally re-announced the
   // same sentence on every keystroke of the search field — 10 mutations for
-  // "Musclehead", 8 of them identical. syncSelectUI already guards bulkCount
-  // this way (4.1.3).
-  const say = txt => { if (stats.textContent !== txt) stats.textContent = txt; };
+  // "Musclehead", 8 of them identical (4.1.3). liveText is the shared guard.
+  const say = txt => liveText(stats, txt);
 
   // A re-render throws the whole list away, so remember what had focus and
   // hand it back afterwards — DESIGN.md §7. Every caller gets this for free.

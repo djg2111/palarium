@@ -33,10 +33,10 @@ function setComboKind(k, silent) {
   });
   // the choice explained itself only in title attributes, which touch can't
   // reach — one visible line describes whichever option is selected
-  document.getElementById('comboKindWhy').textContent =
+  liveText('comboKindWhy',
     comboKind === 'mix' ? 'Recipes you can plan a route to.'
     : comboKind === 'self' ? 'Legendaries and sub-species — each needs two of itself.'
-    : 'Every unique recipe in the game.';
+    : 'Every unique recipe in the game.');
   if (!silent) { save(); renderCombos(); }
 }
 comboKindEl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setComboKind(b.dataset.k); });
@@ -49,8 +49,8 @@ function renderCombos() {
     .filter(r => !comboKind || (comboKind === 'self' ? r.a === r.b : r.a !== r.b))
     .filter(r => !q || r.a.n.toLowerCase().includes(q) || r.b.n.toLowerCase().includes(q) || r.c.n.toLowerCase().includes(q));
   rows.sort((x, y) => x.c.n.localeCompare(y.c.n));
-  document.getElementById('comboCount').textContent =
-    rows.length === DATA.combos.length ? DATA.combos.length + ' combos' : rows.length + ' of ' + DATA.combos.length + ' combos';
+  liveText('comboCount',
+    rows.length === DATA.combos.length ? DATA.combos.length + ' combos' : rows.length + ' of ' + DATA.combos.length + ' combos');
   if (!rows.length) {
     const h = document.createElement('div'); h.className = 'hint';
     h.append('No combos match. ');
@@ -100,7 +100,40 @@ function renderCombos() {
     row.title = 'Load this pair in the Breed tab';
     row.setAttribute('aria-label', `${r.a.n} × ${r.b.n} makes ${r.c.n} — load this pair in the Breed tab`);
     row.addEventListener('click', () => { pickA.set(r.a, true); pickB.set(r.b, true); renderBreed(); navTab('breed'); });
+    // the board is one tab stop; arrows move within it (DESIGN.md §4). 250
+    // combos otherwise cost 250 stops, in the same view whose gallery costs 1.
+    row.tabIndex = -1;
     list.appendChild(row);
   }
+  const first = list.querySelector('.combo');
+  if (first) first.tabIndex = 0;
 }
+// Same contract as .dexgrid and .roster.tileview: vertical movement is
+// geometric via gridStep, never index ± columns — the last row is short and
+// index math strands you in a column you were never in.
+function focusCombo(el, move) {
+  if (!el) return;
+  for (const c of document.querySelectorAll('#comboList .combo')) c.tabIndex = -1;
+  el.tabIndex = 0;
+  if (move) el.focus();
+}
+document.getElementById('comboList').addEventListener('keydown', e => {
+  const cur = e.target.closest('.combo');
+  if (!cur) return;
+  const items = [...document.querySelectorAll('#comboList .combo')];
+  const i = items.indexOf(cur);
+  let j = null;
+  if (e.key === 'ArrowRight') j = Math.min(i + 1, items.length - 1);
+  else if (e.key === 'ArrowLeft') j = Math.max(i - 1, 0);
+  else if (e.key === 'ArrowDown') j = gridStep(items, cur, 1);
+  else if (e.key === 'ArrowUp') j = gridStep(items, cur, -1);
+  else if (e.key === 'Home') j = 0;
+  else if (e.key === 'End') j = items.length - 1;
+  // an arrow with no row that way still belongs to the board, not to the page
+  if (j === null) { if (e.key.startsWith('Arrow')) e.preventDefault(); return; }
+  e.preventDefault();
+  focusCombo(items[j], true);
+  items[j].scrollIntoView({block: 'nearest',
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+});
 

@@ -267,10 +267,14 @@
     <p id="dexGridHelp" class="sr-only">Arrow keys move between species. Press Tab to reach the star for the focused species.</p>
     <div class="tablewrap" id="dexTableWrap" hidden>
     <table>
+      <!-- The gallery's <ul> is named "Species"; the table showed the same 299
+           rows as an unnamed table. scope="col" makes the association explicit
+           rather than inferred. -->
+      <caption class="sr-only">Species — sortable. Press Enter on a row to open that species.</caption>
       <thead><tr>
-        <th class="thstar"><span class="sr-only">Owned</span><span aria-hidden="true">★</span></th>
-        <th data-s="z">#</th><th data-s="n">Pal</th><th data-s="t" class="hn">Element</th>
-        <th data-s="r">Breeding power</th><th data-s="m" class="hn">♂ chance</th><th data-s="w">Work suitability</th><th class="thmetric" id="dexMetricTh"></th>
+        <th scope="col" class="thstar"><span class="sr-only">Owned</span><span aria-hidden="true">★</span></th>
+        <th scope="col" data-s="z">#</th><th scope="col" data-s="n">Pal</th><th scope="col" data-s="t" class="hn">Element</th>
+        <th scope="col" data-s="r">Breeding power</th><th scope="col" data-s="m" class="hn">♂ chance</th><th scope="col" data-s="w">Work suitability</th><th scope="col" class="thmetric" id="dexMetricTh"></th>
       </tr></thead>
       <tbody id="dexBody"></tbody>
     </table>

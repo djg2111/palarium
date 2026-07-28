@@ -138,6 +138,13 @@ function syncToastRegion() {
     toastsEl.removeAttribute('aria-label');
   }
 }
+// Writing an aria-live region re-announces it even when the string is
+// identical, so an unguarded assignment inside a render function fires on every
+// keystroke. Every polite count in the app goes through this (4.1.3).
+function liveText(el, txt) {
+  const n = typeof el === 'string' ? document.getElementById(el) : el;
+  if (n && n.textContent !== txt) n.textContent = txt;
+}
 let toastReturn = null;                  // where focus was when Alt+Z was pressed
 function restoreFromToast() {
   const next = toastsEl.lastElementChild;

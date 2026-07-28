@@ -445,10 +445,50 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
   await nav(page, '#/dex', 600);
   await audit(page, 'paldex gallery, lived-in');
   await overflow(page, 'paldex gallery');
+  // an aria-live count re-announces even when the string has not changed, so a
+  // render inside a keystroke handler must not rewrite it (4.1.3)
+  {
+    // A count that genuinely changes per keystroke SHOULD announce. What must
+    // never happen is a rewrite to the string already there — that re-announces
+    // without saying anything new. #dexOwnedCount is the case in point: no
+    // filter can change it, so it should never fire while typing at all.
+    const muts = await page.evaluate(async () => {
+      const seen = [], last = {};
+      const obs = ['dexOwnedCount', 'dexCount'].map(id => {
+        last[id] = document.getElementById(id).textContent;
+        const o = new MutationObserver(() => {
+          const now = document.getElementById(id).textContent;
+          seen.push({id, redundant: now === last[id]});
+          last[id] = now;
+        });
+        o.observe(document.getElementById(id), {childList: true, characterData: true, subtree: true});
+        return o;
+      });
+      const inp = document.getElementById('dexSearch');
+      for (const c of 'lamb') { inp.value += c; renderDex(); await new Promise(r => setTimeout(r, 40)); }
+      obs.forEach(o => o.disconnect());
+      inp.value = ''; renderDex();
+      return {total: seen.length, redundant: seen.filter(x => x.redundant).length,
+        owned: seen.filter(x => x.id === 'dexOwnedCount').length};
+    });
+    if (!muts.redundant && !muts.owned)
+      console.log(`  ✓ the Paldex live counts announce only real changes (${muts.total} in 4 keystrokes, none redundant)`);
+    else { console.log(`  ✗ live counts re-announced without changing: ${JSON.stringify(muts)}`); fail(); }
+  }
   if (await reach(page, () => page.click('#dexView button[data-v="table"]'), 'the table view switch')) {
     await page.waitForTimeout(500);
     await audit(page, 'paldex table');
     await overflow(page, 'paldex table');
+    const named = await page.evaluate(() => {
+      const t = document.querySelector('#dexTableWrap table');
+      const cap = t.querySelector('caption');
+      return {name: t.getAttribute('aria-label') || (cap && cap.textContent) || null,
+        cols: document.querySelectorAll('#dexTableWrap thead th[scope="col"]').length,
+        heads: document.querySelectorAll('#dexTableWrap thead th').length};
+    });
+    if (named.name && named.cols === named.heads)
+      console.log(`  ✓ the species table is named and every header is scoped (${named.cols}/${named.heads})`);
+    else { console.log(`  ✗ the species table is unnamed or unscoped: ${JSON.stringify(named)}`); fail(); }
     await page.click('#dexView button[data-v="gallery"]');
     await page.waitForTimeout(300);
   }
@@ -456,6 +496,20 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await page.waitForTimeout(500);
     await audit(page, 'unique combos');
     await overflow(page, 'unique combos');
+    // §4: a grid board is ONE tab stop with a roving tabindex, like .dexgrid
+    // in the same view. 250 combos otherwise cost 250 stops.
+    const board = await page.evaluate(() => {
+      const items = [...document.querySelectorAll('#comboList .combo')];
+      return {n: items.length, stops: items.filter(c => c.tabIndex >= 0).length};
+    });
+    if (board.n > 1 && board.stops === 1) console.log(`  ✓ the combos board is one tab stop for ${board.n} recipes`);
+    else { console.log(`  ✗ the combos board costs ${board.stops} tab stops for ${board.n} recipes`); fail(); }
+    await page.evaluate(() => document.querySelector('#comboList .combo').focus());
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(200);
+    const moved = await page.evaluate(() => document.activeElement.classList.contains('combo'));
+    if (moved) console.log('  ✓ arrows move within the combos board');
+    else { console.log('  ✗ ArrowDown left the combos board'); fail(); }
   }
 
   console.log('\nSKILLS — all three sections');

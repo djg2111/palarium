@@ -607,6 +607,22 @@ is still a 2.4.11 failure — which is how it shipped twice.
   rarity. Computed 6.33 / 6.15 / 5.98 / 5.31:1, so this is token discipline, not
   contrast — wants `--neutral-tint/line` and `--dark-tint/line` and matrix rows.
 
+- **The Paldex table is 598 tab stops** — 299 `tr[tabindex="0"]` rows plus 299
+  stars — in the same view whose gallery is **one**, over the same 299 species.
+  §4 settles that a grid board is one stop, but a data table is a different
+  component and the rule does not simply transfer: rows also carry AT's own
+  table-navigation mode, so the answer (roving rows? make only the name cell a
+  button, as `.dextile-open` already is? leave it?) is a design decision. The
+  gallery's `gridStep` is right there if roving wins.
+- **The Paldex table has no row headers.** Every cell is a `<td>`, so a cell
+  announces "3050" with no row context; the pal-name cell should be
+  `<th scope="row">`. Not done yet because the global `th` rule is written for
+  the sticky header row (`position:sticky`, uppercase, `--muted`) and a body
+  `<th>` inherits all of it — the fix is scoping that rule to `thead th` and
+  giving `tbody th` the `td` treatment, which also changes the Skills tab's
+  `.ranktbl`, whose own `scope="row"` cells inherit the same rule today. Worth
+  doing with the Skills review rather than blind.
+
 - **Duplicate uses `⧉` (U+29C9), which is not on §7's plain-symbol allowlist**
   (`★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×`), and §7 says not to add one where a Lucide icon
   exists — it has `copy`. It does render (13×16px in Segoe UI), so this is a

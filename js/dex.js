@@ -177,11 +177,10 @@ function renderDex() {
   });
 
   const filtering = !!(q || ty || wk || dexShow !== 'all');
-  document.getElementById('dexCount').textContent =
-    filtering ? `${rows.length} of ${PALS.length} species` : '';
+  liveText('dexCount', filtering ? `${rows.length} of ${PALS.length} species` : '');
   // a visible way out of persisted filters ("1 of 299" a week later)
   document.getElementById('dexClear').hidden = !filtering;
-  document.getElementById('dexOwnedCount').textContent = `${os.size} of ${PALS.length} owned`;
+  liveText('dexOwnedCount', `${os.size} of ${PALS.length} owned`);
   // said once to someone who has starred nothing, then gone for good
   document.getElementById('dexIntro').hidden = owned.size > 0;
 
@@ -248,7 +247,7 @@ function emitGallery(rows, wk, os) {
         star.setAttribute('aria-pressed', String(now));
         li.classList.toggle('on', ownedSpeciesSet().has(p.k));
         const oc = ownedSpeciesSet();
-        document.getElementById('dexOwnedCount').textContent = `${oc.size} of ${PALS.length} owned`;
+        liveText('dexOwnedCount', `${oc.size} of ${PALS.length} owned`);
         document.getElementById('dexIntro').hidden = owned.size > 0;
       } else {
         // the tile leaves the set; hand focus to whatever takes its place
