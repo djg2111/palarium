@@ -8,15 +8,25 @@ const ROUTE_HINT_TEXT = 'Pick at least Start pal 1 and a target species — the 
 const ROUTE_HINT = '<div class="hint">' + ROUTE_HINT_TEXT + '</div>';
 // recompute automatically (debounced) once a starter and target are both set
 let autoTimer = null;
+// Breedable now's "Plan this route" focuses the target picker, and 600ms later
+// computeRoute's own scrollIntoView carries that picker 460-512px above the
+// viewport at 360 — focused, announced and entirely off-screen. A one-shot flag
+// rather than a timer guessing when the route lands (WCAG 2.4.11, DESIGN.md §9).
+let focusRouteOnArrival = false;
+function planFocusOnArrival() { focusRouteOnArrival = true; }
 function scheduleAuto() {
   if (booting) return;
   clearTimeout(autoTimer);
   autoTimer = setTimeout(() => {
     if (pickPT.get() && SLOTS.some(n => pickS[n].get())) computeRoute();
-    else if (currentRoute) { // inputs no longer complete — drop the stale route
-      currentRoute = null;
-      document.getElementById('routeOut').innerHTML = ROUTE_HINT; setPlanStatus(ROUTE_HINT_TEXT);
-      save();
+    else {
+      // no route is coming, so a pending hand-off must not steal the next one
+      focusRouteOnArrival = false;
+      if (currentRoute) { // inputs no longer complete — drop the stale route
+        currentRoute = null;
+        document.getElementById('routeOut').innerHTML = ROUTE_HINT; setPlanStatus(ROUTE_HINT_TEXT);
+        save();
+      }
     }
   }, 600);
 }
@@ -428,7 +438,20 @@ function pairOutcomes(aK, bK, prefixSteps) {
   return r.children.map(c => ({steps: [...prefixSteps, stepOf(aK, bK, c, r.kind)], k: c.pal.k}));
 }
 function computeRoute() {
+  // consumed on entry, not at the tail: this function has two early returns (no
+  // inputs, and the async spawn-table fetch), and a flag surviving one of those
+  // stole focus from the *next* route — one the user asked for themselves
+  const landOnArrival = focusRouteOnArrival;
+  focusRouteOnArrival = false;
   const out = document.getElementById('routeOut');
+  // "somewhere real" has to include every outcome, not just a route: this
+  // function renders a hint and returns at three points before the tail, and a
+  // hand-off that hit one of them landed nowhere
+  const landNow = () => {
+    if (!landOnArrival) return;
+    const el = out.querySelector('.rsummary') || out.querySelector('.hint');
+    if (el) { el.tabIndex = -1; el.focus({preventScroll: true}); }
+  };
   const t = pickPT.get();
   const starters = [];
   for (const n of SLOTS) { const p = pickS[n].get(); if (p) starters.push({k: p.k, ps: slotPassives[n], g: slotGenders[n]}); }
@@ -451,10 +474,13 @@ function computeRoute() {
         // full pool, and say so on the result rather than pretending
         .catch(() => { accPending = false; accFailed = true; computeRoute(); });
     }
+    // this branch renders a "loading" line and re-enters once the fetch lands —
+    // hand the pending focus to that call rather than spending it on the spinner
+    focusRouteOnArrival = landOnArrival;
     return;
   }
   const pool = partnerPool();
-  if (partnerMode === 'mine' && pool.length < 2) { out.innerHTML = '<div class="hint">Your owned pool is too small — star more species or switch chain partners off "Only mine".</div>'; return; }
+  if (partnerMode === 'mine' && pool.length < 2) { out.innerHTML = '<div class="hint">Your owned pool is too small — star more species or switch chain partners off "Only mine".</div>'; landNow(); return; }
   const carried = [...new Set(starters.flatMap(s => s.ps))];
   const desired = desiredPick.get();
   const goal = desired.length ? desired : carried;
@@ -526,6 +552,9 @@ function computeRoute() {
     }
   }
   out.scrollIntoView({block: 'nearest', behavior: SMOOTH});
+  // land inside the region that scroll just revealed — .hint when there is no
+  // route, which is the sentence explaining why
+  landNow();
   save();
 }
 

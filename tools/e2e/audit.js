@@ -51,7 +51,30 @@ function makeChecks() {
     else console.log(`  ✓ ${label}: focus on ${who}`);
   }
 
-  return {audit, overflow, focusSane, fail: () => { failures++; }, failed: () => failures};
+  // focusSane only asks whether focus EXISTS. Twice now a hand-off has put focus
+  // on a real control that an author-initiated scroll then carried off-screen and
+  // left there — focus present, indicator invisible, and the next Tab jumping the
+  // page hundreds of px. This asks whether the user can actually see it (2.4.11).
+  async function focusVisible(page, label) {
+    const m = await page.evaluate(() => {
+      const a = document.activeElement;
+      if (!a || a === document.body) return null;
+      const r = a.getBoundingClientRect();
+      const hd = document.querySelector('header');
+      const hb = hd ? hd.getBoundingClientRect().bottom : 0;
+      // a sticky header covering the control counts as not visible
+      const top = Math.max(r.top, hb);
+      return {who: a.tagName + (a.id ? '#' + a.id : '') + (a.className ? '.' + String(a.className).split(' ')[0] : ''),
+        px: Math.round(Math.max(0, Math.min(r.bottom, innerHeight) - top)), h: Math.round(r.height)};
+    });
+    if (!m) { failures++; console.log(`  ✗ ${label}: focus fell to <body>`); return; }
+    // half the control, or 24px — the §8 target-size floor
+    const need = Math.min(24, m.h / 2);
+    if (m.px < need) { failures++; console.log(`  ✗ ${label}: ${m.who} is focused but only ${m.px}px of ${m.h}px is on screen`); }
+    else console.log(`  ✓ ${label}: ${m.who} focused and visible (${m.px}px of ${m.h}px)`);
+  }
+
+  return {audit, overflow, focusSane, focusVisible, fail: () => { failures++; }, failed: () => failures};
 }
 
 module.exports = {makeChecks, TAGS};

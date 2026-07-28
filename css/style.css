@@ -855,7 +855,7 @@ select#genderSel{padding:10px 12px}
 .hcard:hover{border-color:var(--border-strong)}
 .hcard .nm{font-weight:600;font-size:var(--fs-md);min-width:0;overflow:hidden;text-overflow:ellipsis}
 .hcard .ways{margin-left:auto;font-size:var(--fs-xs);color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:var(--r-full);padding:1px 8px;flex-shrink:0}
-.hcard .newb{font-size:var(--fs-xs);font-weight:700;letter-spacing:.5px;color:var(--success);border:1px solid var(--success-line);border-radius:var(--r-sm);padding:1px 6px}
+.hcard .newb{font-size:var(--fs-xs);font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--success);border:1px solid var(--success-line);border-radius:var(--r-sm);padding:1px 6px}
 .hcard.expanded{border-color:var(--accent)}
 .hatchpanel{grid-column:1/-1;background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--r-lg);padding:13px 15px;display:flex;flex-direction:column;gap:10px}
 .hatchpanel .hpttl{font-size:var(--fs-sm);font-weight:700;color:var(--muted)}
@@ -1487,6 +1487,10 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
   .pgroup .tchip{min-height:32px}
   /* still used by Breedable now's .hatchpanel .pair */
   .pair{flex-wrap:wrap}
+  /* identical to .pgroup .x above: once the sides wrap to their own lines the
+     separator parks in the card's top-right and reads as a close button on a
+     row that is itself a press target. The sr-only "and" carries the meaning. */
+  .pair .x{display:none}
   .pair .pside{flex:1 1 128px;min-width:128px}
 
   /* --- roster: the header buttons stop being pushed into the middle by

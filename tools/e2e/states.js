@@ -16,7 +16,7 @@
  */
 const {open, problems} = require('./lib');
 const {makeChecks} = require('./audit');
-const {audit, overflow, focusSane, fail, failed} = makeChecks();
+const {audit, overflow, focusSane, focusVisible, fail, failed} = makeChecks();
 
 // A state we can't reach is a broken contract, not a skipped test.
 async function reach(page, action, what) {
@@ -226,6 +226,50 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await page.waitForTimeout(400);
     await audit(page, 'breedable now with pairs expanded');
     await overflow(page, 'breedable now with pairs expanded');
+    await focusVisible(page, 'expanding a card keeps focus on it, on screen');
+    // the panel spans the grid, so it must sit on a row of its own — appended
+    // straight after its own card it left up to cols-1 empty cells beside it
+    const gap = await page.evaluate(() => {
+      const list = document.getElementById('hatchList');
+      const pn = list.querySelector('.hatchpanel');
+      if (!pn) return 'no panel';
+      const cards = [...list.querySelectorAll('.hcard')];
+      const rows = {};
+      for (const c of cards) { const t = Math.round(c.getBoundingClientRect().top); rows[t] = (rows[t] || 0) + 1; }
+      const counts = Object.keys(rows).sort((a, b) => a - b).map(k => rows[k]);
+      const full = Math.max(...counts);
+      // every row but the last must be full
+      return counts.slice(0, -1).every(n => n === full) ? null : counts.join(',');
+    });
+    if (gap) { console.log(`  ✗ the open panel left a hole in the board: rows ${gap}`); fail(); }
+    else console.log('  ✓ the open panel sits on its own row, board resumes underneath');
+  }
+  // "Plan this route" crosses tabs, then the route it renders 600ms later scrolls
+  // itself into view — the hand-off has to survive that scroll (WCAG 2.4.11)
+  await nav(page, '#/hatch', 600);
+  await page.evaluate(() => setHatchDepth(0));
+  await page.waitForTimeout(900);
+  if (await reach(page, async () => {
+    const ok = await page.evaluate(() => {
+      const c = [...document.querySelectorAll('.hcard')].find(x => /steps/.test(x.textContent));
+      if (!c) return false; c.click(); return true;
+    });
+    if (!ok) throw new Error('no multi-step card');
+    await page.waitForTimeout(500);
+    await page.evaluate(() => {
+      const b = [...document.querySelectorAll('.hatchpanel .alink')].find(x => /Plan this route/.test(x.textContent));
+      b.click();
+    });
+  }, 'a multi-step chain and its Plan this route')) {
+    await page.waitForTimeout(1800);
+    await focusVisible(page, 'Plan this route lands on the route, on screen');
+    await audit(page, 'planner after Plan this route');
+    const said = await page.evaluate(() => document.getElementById('planStatus').textContent);
+    if (/steps? to /.test(said)) console.log('  ✓ the route announced itself: ' + JSON.stringify(said.slice(0, 40)));
+    else { console.log('  ✗ the route arrived silently: ' + JSON.stringify(said)); fail(); }
+    const undo = await page.evaluate(() => !!document.querySelector('.toast .undo'));
+    if (undo) console.log('  ✓ the planner overwrite offers Undo');
+    else { console.log('  ✗ the planner overwrite offers no Undo'); fail(); }
   }
 
   console.log('\nPALDEX — gallery with owned tiles, table, unique combos');

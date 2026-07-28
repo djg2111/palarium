@@ -318,6 +318,28 @@ trap, and the bar is viewport-fixed. Actions are revealed on hover only under
 `@media (hover:hover)`; under `@media (hover:none)` they are always visible, and the
 gutter is reserved in both cases so nothing shifts.
 
+Breedable now (a board of disclosures, so it inherits the roster's panel rules):
+
+| Class | Role |
+|---|---|
+| `.hcard` | One breedable species: a `<button aria-expanded>` carrying **decorative, inert** art, the name, an optional `.tier`, `New`, and the pair count or step count. `aria-controls` is set **only while expanded** — the panel does not exist before that, and an unresolvable IDREF is a no-op that "move to controlled element" walks into. Art inside a button is never clickable: a second action no keyboard can reach, whose `alt` announces the species twice. |
+| `.hatchpanel` | The expanding panel. Same contract as `.rospanel` — a `<section role="region" aria-labelledby>` spanning `1/-1`, placed after the **last card of the open card's visual row**, re-placed on resize behind a `previousElementSibling` guard so the `ResizeObserver` can't loop. Appended straight after its own card it left up to `cols-1` empty cells beside it. |
+| `.pair .x` | The `×` between the two sides, `aria-hidden` with an `.sr-only` "and". **Hidden at ≤640** for the same reason as `.pgroup .x`: once the sides wrap it parks in the top-right of a row that is itself a press target and reads as a close button. |
+| `#hatchStats` | The view's `aria-live` count. States the population it actually counted — `N species from M owned` unfiltered, `N of M species match “q”` with a search. A search-filtered numerator under an ownership denominator produced `0 species from 11 owned`, which says the roster breeds nothing. Same denominator rule as Find parents' `.resline`. |
+
+**Every cross-tab jump from a panel restores focus.** `navTab` hides the control
+that was pressed, so a bare `navTab(…)` always ends on `<body>`. Land on the
+control the press just set — `#pickA`/`#pickT`'s trigger for Breed and Find
+parents. "Plan this route" is the exception: the route it hands off to renders
+600ms later and `scrollIntoView`s itself, which carried the focused picker 460px
+above the viewport at 360 — focused, announced and entirely off-screen. It sets a
+one-shot `planFocusOnArrival()` flag that `computeRoute` consumes **after** its
+own scroll, so focus lands inside what the scroll revealed. Never a `setTimeout`
+guessing when the debounce fires. It also replaces four start slots, every slot's
+passives and genders, the target and both modes — a destructive default whose
+only warning was a `title`, which does not exist on touch — so it fires the canon
+`.toast` with **Undo** over a snapshot taken before the overwrite.
+
 `[hidden]{display:none!important}` is set globally in the reset. The UA's own
 rule is a bare attribute selector, so **any** class that sets `display` outranks
 it and the element stays on screen — which shipped three separate visible-but-
@@ -513,10 +535,19 @@ msedge --headless=new --disable-gpu --enable-logging=stderr --virtual-time-budge
 Measure claims (getBoundingClientRect / getComputedStyle); screenshot evidence for
 visual claims; contrast ratios computed, not eyeballed.
 
+`audit.js` exposes two focus checks and they are not interchangeable. `focusSane`
+asks only whether focus **exists** — it catches the `<body>` drop. `focusVisible`
+asks whether the user can **see** it: at least half the control, or 24px, below
+the sticky header and inside the viewport. Every hand-off that crosses tabs or is
+followed by an author-initiated scroll wants the second one, because focus on a
+real control that a later `scrollIntoView` carries off-screen passes the first and
+is still a 2.4.11 failure — which is how it shipped twice.
+
 ## 11 · Known-clunky backlog (ux-designer: start here)
 
-- **Breedable now is 85 tab stops at "Any chain"** — 80 result cards plus the five
-  controls, one stop per card. §4 settles that a grid board is **one** stop with a
+- **Breedable now is 239 tab stops at "Any chain"** — 234 result cards plus the five
+  controls, one stop per card, measured on the §10 seed (4 owned; a 34-species
+  roster gives 263). §4 settles that a grid board is **one** stop with a
   roving `tabindex`, which `.dexgrid` and `.roster.tileview` both do through
   `gridStep`. `.hatchgrid` is the last grid in the app that doesn't, and it is the
   hardest one: its cards are disclosures whose panel is appended **into** the grid
@@ -525,8 +556,16 @@ visual claims; contrast ratios computed, not eyeballed.
   movement exists.
 - **`.hcard` renders at two heights, 62px and 94px**, because a card carrying both
   a rarity badge and its `.ways` count wraps to a second line. At "Any chain" that
-  is most of the board, so rows come out ragged. Either let the count sit under the
-  name always, or drop the rarity badge from a card whose job is "can I breed it".
+  is most of the board, so rows come out ragged (216 of 253 cards tall at 1366;
+  three columns at 900 is the worst case). Either let the count sit under the name
+  always, or drop the rarity badge from a card whose job is "can I breed it".
+- **`.hcard` is the one canon card with no fill delta from its container.** It is
+  `--surface` on a `--surface` `.pcard`, so `--border` at **1.36:1** (and
+  `--border-strong` at 1.82:1 on hover) is the only thing delimiting the control —
+  §1 forbids a sub-3:1 border as the *sole* boundary indicator. Every other card
+  has the delta (`.pair` is `--surface` on the panel's `--bg`). The art and bold
+  name still read as a discrete item, so this wants a §1 decision on card-on-card
+  nesting rather than a one-off patch.
 
 - **The Planner's start slots reflow every time one is revealed.** `.slotgrid` is
   `auto-fit`, and `[hidden]` slots collapse their tracks — so slot 1 alone is a
@@ -549,10 +588,11 @@ visual claims; contrast ratios computed, not eyeballed.
   scroll and the horizontal pan these trees actually need.
 - **`Clear inputs` sits in section 1 and clears section 2 as well.** Its own title
   admits the wider scope; the placement doesn't.
-- **`.accb.mid` / `.accb.alpha` carry three raw `rgba()`s** outside §1's two-alpha
-  tint recipe, and use `--neutral`/`--dark` (an *element* colour) for catch
-  difficulty. Computed 6.33:1 and 6.15:1, so this is token discipline, not
-  contrast — wants `--neutral-tint/line` and `--dark-tint/line` and two matrix rows.
+- **`.accb.mid` / `.accb.alpha` and `.tier.common/rare/epic` carry six raw
+  `rgba()`s** between them, outside §1's two-alpha tint recipe, and use
+  `--neutral`/`--water`/`--dark` (*element* colours) for catch difficulty and
+  rarity. Computed 6.33 / 6.15 / 5.98 / 5.31:1, so this is token discipline, not
+  contrast — wants `--neutral-tint/line` and `--dark-tint/line` and matrix rows.
 
 - **Find parents is dominated by Terraria collab species, with no way to filter
   them.** Measured over the full pair lists: **22 of Lamball's 30 pairs (73%)**
