@@ -131,6 +131,28 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
   await nav(page, '#/roster', 500);
   await audit(page, 'roster tiles (with the all-male gender chip)');
   await overflow(page, 'roster tiles');
+  // A tile and its species band carry the same facts, so they must announce them
+  // in the same order — and the species has to lead, because that is what you
+  // scan a board of tiles for. The count badge is painted over the art, which
+  // precedes the name in DOM order, so the tile used to open with a number.
+  {
+    const order = await page.evaluate(() => {
+      const t = document.querySelector('.rostile');
+      const name = t.querySelector('.tname').textContent.trim();
+      // the accessible name, in announcement order
+      const parts = [];
+      const walk = el => { for (const c of el.children) {
+        if (c.getAttribute('aria-hidden') === 'true') continue;
+        const l = c.getAttribute('aria-label');
+        if (l) { parts.push(l); continue; }
+        if (!c.children.length) { const x = c.textContent.trim(); if (x) parts.push(x); continue; }
+        walk(c); } };
+      walk(t);
+      return {name, parts};
+    });
+    if (order.parts[0] === order.name) console.log(`  ✓ a species tile leads with its name (${JSON.stringify(order.parts.slice(0, 2))})`);
+    else { console.log(`  ✗ a species tile announces ${JSON.stringify(order.parts[0])} before its name ${JSON.stringify(order.name)}`); fail(); }
+  }
   if (await reach(page, () => page.click('#rosterList .rostile'), 'a species tile')) {
     await page.waitForTimeout(400);
     await audit(page, 'roster tiles with a species panel open');
@@ -152,6 +174,16 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await page.waitForTimeout(200);
     const errShown = await page.$eval('#rosterErr', e => !e.hidden);
     if (!errShown) { fail(); console.log('  ✗ submitting without a species did not show the inline error'); }
+    // the message must also be attached to the control it is about, and focus
+    // must land there — a live region announced once is not a field you can find
+    const wired = await page.evaluate(() => {
+      const b = document.querySelector('#pickR .picker-btn');
+      return {invalid: b.getAttribute('aria-invalid'), desc: b.getAttribute('aria-describedby'),
+        focused: document.activeElement === b};
+    });
+    if (wired.invalid === 'true' && wired.desc === 'rosterErr' && wired.focused)
+      console.log('  ✓ the invalid species field is marked, described and focused');
+    else { console.log(`  ✗ the validation error is not wired to its field: ${JSON.stringify(wired)}`); fail(); }
     await audit(page, 'roster editor with the validation error');
     await page.click('#rosterCancel');
     await page.waitForTimeout(250);

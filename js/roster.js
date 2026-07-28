@@ -37,8 +37,17 @@ function pairGenderIssue(aK, bK) {
   if (aOne && bOne && !!A.M === !!B.M) return `both recorded ${A.M ? '♂' : '♀'}`;
   return null;
 }
+// one place to drop the error state, so aria-invalid and aria-describedby can
+// never outlive the .invalid class they were added beside
+function clearSpeciesError() {
+  const btn = document.querySelector('#pickR .picker-btn');
+  if (!btn) return;
+  btn.classList.remove('invalid');
+  btn.removeAttribute('aria-invalid');
+  btn.removeAttribute('aria-describedby');
+}
 const pickR = makePicker(document.getElementById('pickR'), {placeholder:'Pick a species…', allowClear:true, ownedToggle:true, onChange: p => {
-  if (p) { document.getElementById('rosterErr').hidden = true; pickR.root.querySelector('.picker-btn').classList.remove('invalid'); }
+  if (p) { document.getElementById('rosterErr').hidden = true; clearSpeciesError(); }
   if (!editingId) setAddTitle(p);
   renderPsetRow(); // the offered passive sets depend on which species is picked
 }});
@@ -152,7 +161,7 @@ function openRosterEditor(entry, presetPal) {
     setAddTitle(presetPal || null);
     rosterAddBtn.textContent = '+ Add to roster';
   }
-  pickR.root.querySelector('.picker-btn').classList.remove('invalid');
+  clearSpeciesError();
   document.getElementById('rosterErr').hidden = true;
   document.getElementById('rosterAddAnother').style.display = entry ? 'none' : '';
   renderCarryNote(); renderPsetRow();
@@ -212,8 +221,16 @@ rosterCancelBtn.addEventListener('click', closeRosterEditor);
 function commitRosterEntry() {
   const p = pickR.get();
   if (!p) {
-    pickR.root.querySelector('.picker-btn').classList.add('invalid');
+    const btn = pickR.root.querySelector('.picker-btn');
+    btn.classList.add('invalid');
     document.getElementById('rosterErr').hidden = false; // color alone isn't a message
+    // ...and the message has to be attached to the control it is about. The live
+    // region announced it once; a user who then tabs back to the picker got a
+    // button with no hint that it is the field in error (3.3.1, 4.1.2).
+    btn.setAttribute('aria-invalid', 'true');
+    btn.setAttribute('aria-describedby', 'rosterErr');
+    // and land on it, rather than leaving them to hunt from the submit button
+    btn.focus();
     return null;
   }
   const entry = {k: p.k, ps: rosterPassives.get(), g: genderVal || null, nick: nickInp.value.trim(),
@@ -920,7 +937,9 @@ function renderRoster() {
       const chip = document.createElement('span');
       chip.className = 'mchip' + (oneSided ? ' warn' : '');
       const tally = [gi.M ? gi.M + '♂' : '', gi.F ? gi.F + '♀' : '', gi.U ? gi.U + ' ?' : ''].filter(Boolean).join(' · ');
-      const counts = entries.length < total ? `of all ${total}: ${tally}` : tally;
+      // "all 3:", not "of all 3:" — the count badge right before it already says
+      // "1 pal of 3", and the two "of" clauses ran together in one breath
+      const counts = entries.length < total ? `all ${total}: ${tally}` : tally;
       // The reason wraps to four lines in a 97px tile and adds ~35px to every
       // row of the board, so a tile states the fact and the panel states why.
       // Sighted: the plain tally has no chip chrome, the warning keeps it, so
@@ -1049,13 +1068,18 @@ function renderRoster() {
       const cnt = document.createElement('span'); cnt.className = 'cntb';
       const x = document.createElement('span'); x.setAttribute('aria-hidden', 'true'); x.textContent = '×';
       cnt.appendChild(x); cnt.append(String(entries.length));
-      const sr = document.createElement('span'); sr.className = 'sr-only';
-      sr.textContent = ' pal' + (entries.length === 1 ? '' : 's') + (entries.length < total ? ' of ' + total : '');
-      cnt.appendChild(sr);
+      // The badge is painted over the art, which sits before the name — so the
+      // tile announced "3 pals, Lamball" while the identical band announced
+      // "Lamball, 3 pals". You scan a board of tiles for a species, so the name
+      // leads: hide the badge from AT here and re-state the count after the name.
+      cnt.setAttribute('aria-hidden', 'true');
       art.appendChild(cnt);
       tile.appendChild(art);
       const nm = document.createElement('span'); nm.className = 'tname'; nm.textContent = p.n;
       tile.appendChild(nm);
+      const sr = document.createElement('span'); sr.className = 'sr-only';
+      sr.textContent = ' ' + entries.length + ' pal' + (entries.length === 1 ? '' : 's') + (entries.length < total ? ' of ' + total : '');
+      tile.appendChild(sr);
       tile.appendChild(chipsFor(k, entries, total, true));
       tile.appendChild(chev());
       tile.addEventListener('click', () => {
