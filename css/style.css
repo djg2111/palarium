@@ -1352,10 +1352,10 @@ footer code{background:var(--surface);border:1px solid var(--border);border-radi
 /* a section heading inside a view — smaller than the page h1, with its count
    trailing it rather than sitting in a separate row */
 .aurasec,.pvsec{margin-bottom:26px}
-.aurasec h2,.pvsec h2{font-size:var(--fs-h2);font-weight:700;margin-bottom:6px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.aurasec h2 .rstats,.pvsec h2 .rstats{font-weight:400}
+.aurasec h3,.pvsec h3{font-size:var(--fs-h2);font-weight:700;margin-bottom:6px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.aurasec h3 .rstats,.pvsec h3 .rstats{font-weight:400}
 .aurasec .viewsub{max-width:78ch}
-.pvsec.bad h2{color:var(--danger)}
+.pvsec.bad h3{color:var(--danger)}
 .auragrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:10px}
 .auracard,.skillcard,.pvcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:13px 15px;display:flex;flex-direction:column;gap:8px;min-width:0}
 .auracard:hover,.skillcard:hover,.pvcard:hover{border-color:var(--border-strong)}

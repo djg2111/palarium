@@ -29,9 +29,9 @@ function renderHatch() {
     const h = document.createElement('div'); h.className = 'hint'; h.style.gridColumn = '1/-1';
     h.append('Mark what you own first — then this page shows everything you can hatch from it. ');
     const bd = document.createElement('button'); bd.className = 'alink'; bd.textContent = '★ Star pals in the Paldex';
-    bd.addEventListener('click', () => navTab('dex'));
+    bd.addEventListener('click', () => { navTab('dex'); landAfterNav('#dexSearch'); });
     const br = document.createElement('button'); br.className = 'alink'; br.textContent = '+ Add roster pals';
-    br.addEventListener('click', () => navTab('roster'));
+    br.addEventListener('click', () => { navTab('roster'); landAfterNav('#rosterOpenAdd'); });
     h.append(bd, ' ', br);
     list.appendChild(h);
     return;

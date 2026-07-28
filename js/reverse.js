@@ -203,7 +203,7 @@ function renderReverse() {
   } else {
     setReverseStatus('None of your pals make ' + t.n + '. ', strongName(tot), ' pair' + plural(total) + (total === 1 ? ' does.' : ' do.') + filtered);
   }
-  if (!os.size && !selfOnly) linkrow(act('Star pals you own in the Paldex', false, () => navTab('dex')));
+  if (!os.size && !selfOnly) linkrow(act('Star pals you own in the Paldex', false, () => { navTab('dex'); landAfterNav('#dexSearch'); }));
 
   // ---- the groups ----
   // the lead band carries the tier a player acts on first, so it is not

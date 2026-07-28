@@ -1000,6 +1000,7 @@ function mapRenderSpawnInfo(p) {
     fp.type = 'button'; fp.className = 'alink'; fp.textContent = 'Find parents';
     fp.addEventListener('click', () => {
       pickT.set(p, true); reverseShown = {}; renderReverse(); navTab('reverse');
+      landAfterNav('#pickT .picker-btn');
     });
     acts.appendChild(fp);
     mapInfoEl.appendChild(acts);

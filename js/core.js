@@ -148,18 +148,21 @@ function liveText(el, txt) {
 // navTab hides the control that was pressed, so a bare navTab() always ends on
 // <body>. Every cross-tab jump lands on the control the press just set — the
 // rule DESIGN.md §4 states for Breedable now, applied wherever it is needed.
-function landAfterNav(sel) {
-  const el = document.querySelector(sel);
+// Focus something and make sure the user can see it. preventScroll first, so a
+// hand-off doesn't fight a scroll the destination is already doing — then scroll
+// only if the target really is out of sight, whether because the page kept the
+// scroll position of the view we left or because the press itself moved the
+// control (a "Show more" that appends 60 cards below its own button).
+function focusOnScreen(el) {
   if (!el) return;
   el.focus({preventScroll: true});
-  // preventScroll keeps a hand-off from fighting a scroll the destination is
-  // already doing — but the page keeps the scroll position of the tab we left,
-  // so a jump from far down the Guide landed on a control above the viewport.
-  // Scroll only when it is actually out of sight.
   const r = el.getBoundingClientRect();
   const top = document.querySelector('header').getBoundingClientRect().bottom;
-  if (r.bottom <= top || r.top >= innerHeight) el.scrollIntoView({block: 'center', behavior: SMOOTH});
+  const nav = document.getElementById('bottomnav');
+  const bot = nav && nav.offsetParent ? nav.getBoundingClientRect().top : innerHeight;
+  if (r.bottom <= top || r.top >= bot) el.scrollIntoView({block: 'center', behavior: SMOOTH});
 }
+function landAfterNav(sel) { focusOnScreen(document.querySelector(sel)); }
 let toastReturn = null;                  // where focus was when Alt+Z was pressed
 function restoreFromToast() {
   const next = toastsEl.lastElementChild;
@@ -624,7 +627,7 @@ function openModal(p, rentry) {
   btns.appendChild(mkBtn('Find parents', true, () => { closeModal(true); pickT.set(p, true); reverseShown = {}; renderReverse(); navTab('reverse'); landAfterNav('#pickT .picker-btn'); }));
   btns.appendChild(mkBtn('Set as Parent 1', false, () => { closeModal(true); pickA.set(p, true); renderBreed(); navTab('breed'); landAfterNav('#pickA .picker-btn'); }));
   btns.appendChild(mkBtn('Set as Parent 2', false, () => { closeModal(true); pickB.set(p, true); renderBreed(); navTab('breed'); landAfterNav('#pickB .picker-btn'); }));
-  btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(true); pickPT.set(p, true); setPlanMode('new'); navTab('plan'); scheduleAuto(); }));
+  btns.appendChild(mkBtn('Plan route to this', false, () => { closeModal(true); pickPT.set(p, true); setPlanMode('new'); navTab('plan'); scheduleAuto(); landAfterNav('#pickPT .picker-btn'); }));
   btns.appendChild(mkBtn('+ Add to roster', false, () => { leaveModal(); openRosterEditor(null, p); }));
   if (MAP) {
     // one button, three honest outcomes: spawn areas, the single alpha that is

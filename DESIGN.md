@@ -282,6 +282,7 @@ siblings, so grouping is the shape of the data, not a preference):
 | `.rosgrp` | One species section in **Rows** view: a `<section>` with an `<h3 class="rosband">` and its `.roslist`. No disclosure — Rows shows every pal. |
 | `.rostile` | One species in **Tiles** view: a `<button aria-expanded aria-controls="rosPanel">` carrying art, a count badge on the art, the name and the gender tally. The whole tile is the press target. |
 | `.rospanel` | The expanding panel. A `<section role="region" aria-labelledby>` spanning `1/-1`, placed as a real sibling **after the last tile of the open tile's visual row** — so grid auto-placement puts it on its own row, the board resumes underneath, and DOM order stays visual order. `grid-auto-flow:dense` remains **forbidden**, and is not needed. |
+| `#view-skills` heading | **Every view names itself in an `h2`**, so group headings inside it are `h3`. Skills had no view heading at all, which put its section titles ("Work suitability +1 for every other pal") at the level every other view uses for its name — and left the view unnamed to heading navigation. |
 | `.rosband` | The species header band. One implementation, two homes: a Rows section and the panel header — **so its responsive rules are written unscoped**. The ≤640 wrap fix was scoped to `.rospanel .rosband`, and in a Rows section the one-gender warn chip ate the row the same way: at 360 the header read `La…` and nothing on screen named the species. The `✕` is a sibling **after** the `<h3>`, never inside it — a control is not part of a heading's name. |
 | `.roster` | The grid. `.tileview` auto-fills a **single 120px track** above 640px and 96px below; `.rowview` is a single `minmax(0,1fr)` column. One track, not a ladder — every extra breakpoint steps the tile up and the column count down, so a wider window produces a *taller* board. **`minmax(0,1fr)`, never a bare `1fr`**: `1fr` floors the track at the widest section's min-content, so one long passive chip row pushed the whole page to 356px and broke 1.4.10 Reflow at 320. |
 | `.chiprow` | The chip line inside a header band, a tile, or a Find parents group. A low-specificity global base rule. It sets `flex-wrap:wrap`, which `.rostile` re-declares but `.rosband` did **not** — so the base rule silently gave the roster's species band wrapping it never had, +28px per section at 360. `.rosband .chiprow` now pins `nowrap`. When you add a property to a shared base, check every variant re-declares it; inheriting one is how a component in another view grows. |
@@ -470,6 +471,12 @@ to select it too**: "See breeding power in the Paldex" landed on the gallery,
 which shows no breeding power, and "Browse every passive" landed on whichever
 Skills section was last used — Base auras on a cold start, with no passive on
 screen. Gate these with `focusVisible`, never `focusSane`.
+
+`focusOnScreen(el)` is the same guard without the navigation: focus, then
+scroll **only if** the target is out of sight. Any press that moves the control
+it is standing on needs it — the Skills "Show more" appends 60 cards *above*
+its own button, so the button the user is pressing repeatedly ends up below the
+fold at 0px visible. `landAfterNav` is a thin wrapper over it.
 
 Plain **text symbols** (★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×) are typography, not emoji — they
 render monochrome, inherit color, and remain allowed where established (ownership

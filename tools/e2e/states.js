@@ -592,6 +592,32 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
   }
   await overflow(page, 'skills · passives');
 
+  // The view names itself, so its group headings are one level down — without
+  // an h2 the first heading here was a GROUP heading and the view was unnamed.
+  {
+    const hs = await page.evaluate(() => {
+      const v = document.getElementById('view-skills');
+      const all = [...v.querySelectorAll('h1,h2,h3,h4')].filter(e => e.getBoundingClientRect().height > 0);
+      return {first: all[0] && all[0].tagName + ':' + all[0].textContent.trim(),
+        groups: all.slice(1).map(e => e.tagName)};
+    });
+    if (/^H2:Skills/.test(hs.first || '') && hs.groups.every(t => t === 'H3'))
+      console.log(`  ✓ Skills names itself in an h2 and its ${hs.groups.length} groups sit at h3`);
+    else { console.log(`  ✗ Skills heading structure: ${JSON.stringify(hs)}`); fail(); }
+  }
+  // "Show more" appends 60 cards ABOVE its own button, so the control the user
+  // is standing on moves off the bottom of the page
+  if (await reach(page, async () => {
+    await page.click('#skillMode button[data-m="partner"]');
+    await page.waitForTimeout(400);
+    await page.waitForSelector('#psMore:not([hidden])', {timeout: 3000});
+  }, "the partner list's Show more")) {
+    await page.evaluate(() => { const b = document.getElementById('psMore'); b.focus(); b.click(); });
+    await page.waitForTimeout(1400);
+    await focusVisible(page, 'Show more keeps its own button on screen');
+    await audit(page, 'skills partner, paged');
+  }
+
   console.log('\nMAP — base, marker selected, spawn overlay');
   await nav(page, '#/map', 1200);
   await audit(page, 'map');

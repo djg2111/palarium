@@ -1215,7 +1215,7 @@ function renderRosterStrip() {
     const h = document.createElement('div'); h.className = 'hint'; h.style.padding = '6px 0';
     h.append('No pals in your roster yet — ');
     const b = document.createElement('button'); b.className = 'alink'; b.textContent = 'open the Roster tab';
-    b.addEventListener('click', () => navTab('roster'));
+    b.addEventListener('click', () => { navTab('roster'); landAfterNav('#rosterOpenAdd'); });
     h.appendChild(b);
     strip.appendChild(h);
     return;

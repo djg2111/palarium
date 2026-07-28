@@ -374,7 +374,8 @@ function renderAuras() {
     if (g.k === 'work') list.sort((a, b) => WORK_LABEL(a.work).localeCompare(WORK_LABEL(b.work)));
     else list.sort((a, b) => a.p.n.localeCompare(b.p.n));
     const sec = document.createElement('section'); sec.className = 'aurasec';
-    const h = document.createElement('h2');
+    // h3: the view's own h2 is "Skills", so a group inside it is one level down
+    const h = document.createElement('h3');
     h.textContent = g.t;
     const c = document.createElement('span'); c.className = 'rstats';
     c.textContent = list.length + (list.length === 1 ? ' pal' : ' pals');
@@ -450,7 +451,10 @@ psOwnedBtn.addEventListener('click', () => {
 psMoreBtn.addEventListener('click', () => {
   const from = psShown;          // index of the first card about to appear
   psShown += 60; renderPS();
-  if (!psMoreBtn.hidden) { psMoreBtn.focus(); return; }
+  // focusOnScreen, not focus: this press appends 60 cards ABOVE the button, so
+  // the control the user is standing on moves off the bottom of the page —
+  // measured at 0px visible, and this is a button you press repeatedly (2.4.11)
+  if (!psMoreBtn.hidden) { focusOnScreen(psMoreBtn); return; }
   // The last press hides this button, so focus would fall to <body>. Land on
   // the first newly revealed skill instead — that is what the press asked for.
   const cards = document.querySelectorAll('#psList .skillcard');
@@ -469,6 +473,9 @@ function openSkillTag(t) {
   setPsFamily('', true); psShown = 60;
   setSkillMode('partner', true);
   navTab('skills');
+  // this can be pressed from a pal modal, which it closes, or from another tab —
+  // either way the control that was pressed is gone (DESIGN.md §4)
+  landAfterNav('#psSearch');
   toast(PS_TAGS.has(t) ? PS_TAGS.get(t) + ' partner skills tagged ' + t : 'Showing all partner skills');
 }
 function renderPS() {
@@ -605,7 +612,7 @@ function renderPassives() {
     if (!grp.length) continue;
     grp.sort((a, b) => a.m.n.localeCompare(b.m.n));
     const sec = document.createElement('section'); sec.className = 'pvsec' + (r < 0 ? ' bad' : '');
-    const h = document.createElement('h2'); h.textContent = label;
+    const h = document.createElement('h3'); h.textContent = label;
     const c = document.createElement('span'); c.className = 'rstats'; c.textContent = grp.length;
     h.appendChild(c);
     sec.appendChild(h);
@@ -647,6 +654,8 @@ function pvCard(e, mine) {
     b.title = 'Show these in your roster';
     b.addEventListener('click', () => {
       rosterPassiveFilter.value = e.m.n; rosterPassiveSel.sync(); renderRoster(); navTab('roster');
+      // land on the filter this press just set, not <body>
+      landAfterNav('.roscontrols .isel-btn');
     });
     foot.appendChild(b);
   }
