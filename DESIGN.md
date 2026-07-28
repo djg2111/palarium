@@ -763,3 +763,27 @@ is still a 2.4.11 failure — which is how it shipped twice.
   primary button (§4). Legal — the rows are identified by their text, and hover
   (7.66:1) and focus (14.64:1) both clear 3:1 — but if any route-choice view ever
   grows past two options, the resting affordance needs revisiting first.
+
+- **The pal card's CSS carries a dozen off-scale values.** §2's scale is 4·8·12·16·20·24·32
+  and the card predates it: `.msec{margin-top:18px}`, `.msec h3{margin-bottom:9px}`,
+  `.stat{padding:7px 12px}`, `.pskill{padding:14px 16px}`, `.mbtns{gap:10px}`,
+  `.mbtns .alink{padding:9px 18px}`, `.crow{gap:7px;margin-top:7px}`. The dialog
+  chrome was moved onto tokens in 302765a (`.overlay`, `.modal`, `.mbar`, `.mnav`,
+  `.mtitle`, and `.zk`'s off-scale 16px → `--fs-lg`); the section interiors were
+  left alone deliberately, because each is a 1–2px change across seven rules and
+  the visual diff is worth reviewing on its own rather than buried in a focus fix.
+
+- **`pretty()` leaves the index glued to internal item ids.** The card's drop chips
+  read `Pal Upgrade Stone3`, `Exp Boost 04`, `World Tree Relic 01`, `Technology
+  Book G2`. `pretty()` (`js/core.js`) splits camelCase and underscores but has no
+  rule for a trailing number, and it can't get one blindly — `Exp Boost 04` wants
+  the digits dropped, `Technology Book G2` does not, and some are genuine tiers the
+  player sees in-game. Wants a small display-name map in `tools/`, generated
+  against the item table, not a regex.
+
+- **"In your roster" names a species-scoped fact and shows one individual.** Open a
+  card from a roster row when you hold two of that species and you get the entry
+  you clicked, under a heading that reads as though it covers your roster. §6 keeps
+  species and pal apart everywhere else. `Your "Woolly"` or `This pal` says what it
+  is, but the honest fix may be listing the siblings — which is a layout question
+  inside an already long card, so it needs a spec.
