@@ -288,13 +288,18 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     const at4 = await page.evaluate(() => ({
       status: document.getElementById('planStatus').textContent,
       pressed: document.querySelectorAll('#carryFrom .pset[aria-pressed="true"]').length,
-      disabled: [...document.querySelectorAll('#carryFrom .pset')].filter(b => b.disabled).length,
+      disabled: document.querySelectorAll('#carryFrom .pset[aria-disabled="true"]').length,
+      // the row's one roving tab stop must be a button that can take focus —
+      // assigned by index it could land on a refused chip and strand the toolbar
+      reachable: [...document.querySelectorAll('#carryFrom .pset')].filter(b => b.tabIndex >= 0 && !b.disabled).length,
       odds: document.querySelectorAll('#routeOut button.odds:not(.wild)').length,
       steps: document.querySelectorAll('#routeOut .rstep').length,
       named: (document.getElementById('planStatus').textContent.match(/carrying (.+)\.$/) || [0, ''])[1].split(', ').filter(Boolean).length,
     }));
     if (at4.pressed === 4 && at4.disabled === 4) console.log('  ✓ at four carried, the remaining chips are refused preventively');
-    else { console.log(`  ✗ the cap is not enforced: ${at4.pressed} pressed, ${at4.disabled} disabled`); fail(); }
+    else { console.log(`  ✗ the cap is not enforced: ${at4.pressed} pressed, ${at4.disabled} refused`); fail(); }
+    if (at4.reachable === 1) console.log('  ✓ the carry row still has exactly one reachable tab stop at the cap');
+    else { console.log(`  ✗ the carry row has ${at4.reachable} reachable tab stops at the cap — it must have exactly 1`); fail(); }
     if (at4.named > 0 && at4.named <= 4) console.log(`  ✓ the status names ${at4.named} passives, never more than four`);
     else { console.log(`  ✗ the status names ${at4.named}: ${JSON.stringify(at4.status)}`); fail(); }
     if (at4.odds === at4.steps) console.log('  ✓ every step is priced again once a set is chosen');

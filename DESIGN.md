@@ -196,7 +196,7 @@ Planner (a form that computes itself, so the result has no press to correlate it
 | `.wildinfo` family | The catch panel behind `Where?`, with its own `.accb` difficulty tier. |
 | `.resline` `#planStatus` | The view's one sentence, **in the markup and never rebuilt**. The route computes 600ms after the last input change, so nothing the user pressed correlates to it appearing — without this the whole result arrived silently. Says the step count and what is carried, the no-route sentence, or the empty-form prompt. **Invariant: the clause after `carrying` is what the route actually delivers (`wo.carry`), is never longer than four names, and is omitted when empty.** Every branch that renders a result writes it — the "already is the target" branch used to return early and leave the previous route's claim standing. |
 | `#carryRow` | The passive goal, in § 1 with the passives it governs — it is a function of the start slots directly above it, not of the target species, and at 350px (1366) / 668px (360) away in § 2 the problem was created long before the control that solves it came into view. A pal has **four passive slots**, so a route carries at most four. When the starters' distinct passives exceed that and the user has picked nothing, the app **states the cap** rather than claiming a pal the game cannot produce: the route still renders in full, and only the passive claim withdraws — no chips, no `.carrier` tags, no odds, no expected-eggs line, one `.alink` back to the row. It does not auto-pick four. With eight distinct passives there are 70 candidate subsets and no signal which is wanted, and a machine-made choice would then be *priced* — `≈22%/egg` for four passives the user never chose is a more confident wrong answer than none. Not a `.warnbox`: nothing is wrong, a choice is waiting (§6 — never scold). |
-| `.pset[aria-pressed]` | The carry chips: the roster editor's Reuse row as a **toggle**, not add-and-vanish. A chip that disappears under a finger reflows the row mid-tap. At four pressed the rest go `disabled` — the cap is refused preventively, with the reason in the adjacent `#carryHint`, not as an error after the press. One tab stop via `rovingRow`; up to 16 chips would otherwise cost 16. |
+| `.pset[aria-pressed]` | The carry chips: the roster editor's Reuse row as a **toggle**, not add-and-vanish. A chip that disappears under a finger reflows the row mid-tap. At four pressed the rest go **`aria-disabled`, never `disabled`** — the cap is refused preventively, with the reason in the adjacent `#carryHint`, not as an error after the press, and a real `disabled` would drop the chip out of AT's reach so it announced "unavailable" with no reason. One tab stop via `rovingRow`; up to 16 chips would otherwise cost 16. |
 | `#carryHint` | The consequence line, reached by AT through `aria-describedby` on the combobox input (3.3.2). **Never `aria-live`** — it changes on every recompute. |
 
 The passive tag input (`makePassivePicker`, five instances in this view alone) is a
@@ -311,7 +311,13 @@ way, stay put" and must still `preventDefault`, or the page scrolls instead.
 
 **Row action toolbars** use `role="toolbar"` with roving `tabindex` (arrows/Home/End
 move within, Tab leaves), so a row costs **two** tab stops — its name and its
-toolbar — not one per action. **Except in the roster's selection mode**, where
+toolbar — not one per action. `rovingRow` picks that stop from the buttons that
+can **take** focus, not by index: assigned to index 0 it landed on a `disabled`
+button whenever the first one happened to be disabled, leaving every other button
+at `-1` and the row with zero keyboard stops — unreachable and unleavable. Prefer
+`aria-disabled` inside a roving row for the same reason. It also binds its
+`keydown` **once** (`dataset.roving`) and reads its buttons live, because three
+call sites re-render and re-call it. **Except in the roster's selection mode**, where
 neither is rendered — Edit and Duplicate are the wrong verbs while you are
 operating on a set — so a row costs **zero**, and the whole list is one stop with
 a roving `tabindex` like the grid boards. Measured on a 36-pal roster: 82 stops

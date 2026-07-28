@@ -58,8 +58,14 @@ function navTab(v) {
 // row costs two stops (its identity and its actions) however many buttons it
 // holds — the convention DESIGN.md §4 settles for rows and tiles.
 function rovingRow(container) {
-  const live = () => [...container.children].filter(b => b.tagName === 'BUTTON');
-  live().forEach((b, i) => { b.tabIndex = i ? -1 : 0; });
+  const all = () => [...container.children].filter(b => b.tagName === 'BUTTON');
+  // The single tab stop must be a button that can actually take focus. Assigned
+  // by index, it landed on a `disabled` chip whenever the first one happened to
+  // be disabled — every other button sat at -1, so the row had ZERO keyboard
+  // stops and could not be reached or left by Tab at all (2.1.1).
+  const live = () => all().filter(b => !b.disabled);
+  const stop = live()[0] || all()[0];
+  all().forEach(b => { b.tabIndex = b === stop ? 0 : -1; });
   // Called again on every re-render by #carryFrom, #rosterStrip and Find
   // parents' chip rows, so bind once and read the buttons live — capturing the
   // array at call time stacked a dead listener per render and left the handler

@@ -628,12 +628,12 @@ select#genderSel{padding:10px 12px}
 .pset{background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--r-full);
   padding:3px 12px;font-size:var(--fs-sm);font-weight:600;color:var(--muted);max-width:100%;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pset:hover:not(:disabled){color:var(--text);border-color:var(--accent);border-style:solid}
+.pset:hover:not(:disabled):not([aria-disabled="true"]){color:var(--text);border-color:var(--accent);border-style:solid}
 /* the planner's carry row toggles rather than consuming its chips — a chip that
    vanishes under a finger reflows the row mid-tap. Solid border + tint, so the
    pressed state is shape and fill, not hue alone (§1). 8.20:1 on --surface. */
 .pset[aria-pressed="true"]{color:var(--success);border:1px solid var(--success-line);background:var(--success-tint)}
-.pset:disabled{opacity:.45;cursor:not-allowed}
+.pset:disabled,.pset[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
 /* 24px target floor without moving anything, the .rosrow .thbtn recipe */
 #carryFrom .pset{padding-top:6px;padding-bottom:6px;margin-top:-3px;margin-bottom:-3px}
 #carryRow{margin-bottom:14px}

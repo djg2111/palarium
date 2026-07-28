@@ -82,9 +82,14 @@ function renderCarryRow() {
   const row = document.getElementById('carryFrom');
   const hint = document.getElementById('carryHint');
   const union = starterUnion(), picked = desiredPick.get();
-  const lb = document.getElementById('carryFromLb');
-  row.replaceChildren(lb);
+  // Clearing a start pal removes the chips it contributed. If one of them had
+  // focus, replaceChildren drops it on <body> — so remember where it was and
+  // land on the successor, the same rule every other rebuild in the app follows.
+  const held = row.contains(document.activeElement)
+    ? [...row.querySelectorAll('.pset')].indexOf(document.activeElement) : -1;
+  row.replaceChildren();
   row.hidden = !union.length;
+  let i = 0;
   for (const n of union) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'pset';
     const on = picked.includes(n);
@@ -95,19 +100,37 @@ function renderCarryRow() {
     const meta = PASSIVES.find(p => p.n === n);
     if (meta) b.appendChild(passiveIcon(meta, 14));
     b.append(n);
-    // at the cap the remaining options are refused preventively, rather than by
-    // an error after the press — the reason is in #carryHint directly below
-    if (!on && picked.length >= 4) b.disabled = true;
+    // At the cap the remaining options are refused preventively, rather than by
+    // an error after the press. aria-disabled, not disabled: a `disabled` button
+    // leaves the tab order and AT's reach entirely, so the chip announced as
+    // "unavailable" with no reason, and the row's single roving tab stop could
+    // land on one and strand the whole toolbar (2.1.1). The reason is in
+    // #carryHint, which the row points at.
+    const full = !on && picked.length >= 4, idx = i;
+    if (full) b.setAttribute('aria-disabled', 'true');
     b.addEventListener('click', () => {
+      if (full) return;
       desiredPick.set(on ? picked.filter(x => x !== n) : [...picked, n]);
       renderCarryRow(); save(); scheduleAuto();
-      // the row was just rebuilt — put focus back on the same chip
-      const again = [...row.querySelectorAll('.pset')].find(x => x.textContent.trim() === n);
+      // the row was just rebuilt — put focus back on the same chip, or on its
+      // successor when this press removed it from the row entirely
+      const now = [...row.querySelectorAll('.pset')];
+      // idx, not i: `let i` is one binding for the whole loop, so every closure
+      // would have read its final value
+      const again = now.find(x => x.dataset.p === n) || now[Math.min(idx, now.length - 1)];
       if (again) again.focus();
     });
+    b.dataset.p = n;
     row.appendChild(b);
+    i++;
   }
   rovingRow(row);
+  if (held >= 0) {
+    const now = [...row.querySelectorAll('.pset')];
+    const land = now[Math.min(held, now.length - 1)]
+      || document.querySelector('#carryPass .taginp');
+    if (land) land.focus();
+  }
   hint.textContent = !union.length ? 'Nothing to carry yet — add passives under a start pal.'
     : !picked.length ? (union.length <= 4
         ? `Carrying all ${union.length} your starters hold. Pick fewer to raise the odds.`
@@ -1104,7 +1127,7 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
       // land on a chip, not the input: a touch user gets their own passives with
       // no keyboard, and the combobox's focus-opens-listbox would cover the row
       // this press just revealed. After the scroll, never on a guessed timer.
-      const chip = document.querySelector('#carryFrom .pset:not(:disabled)');
+      const chip = document.querySelector('#carryFrom .pset:not([aria-disabled="true"])');
       (chip || document.querySelector('#carryPass .taginp')).focus({preventScroll: true});
     });
     sum.appendChild(jump);

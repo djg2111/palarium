@@ -177,9 +177,11 @@
            solves it came into view (DESIGN.md §4, §9). -->
       <div id="carryRow" hidden>
         <div class="slotlb">Passives to carry · up to 4</div>
-        <div class="psets" id="carryFrom" role="toolbar" aria-orientation="horizontal" aria-labelledby="carryFromLb" hidden>
-          <span class="psetlb" id="carryFromLb">From your starters</span>
-        </div>
+        <!-- aria-label, not a visible span inside the toolbar: labelling a group
+             with its own first child makes AT read "From your starters" as the
+             group name and again as its first content node. The .slotlb above
+             gives the visible heading, and #carryHint states the provenance. -->
+        <div class="psets" id="carryFrom" role="toolbar" aria-orientation="horizontal" aria-label="Passives your starters hold" hidden></div>
         <div id="carryPass"></div>
         <div class="fldhint" id="carryHint"></div>
       </div>
