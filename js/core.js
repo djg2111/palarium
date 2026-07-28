@@ -166,7 +166,10 @@ function focusOnScreen(el) {
       el.scrollIntoView({block: 'center', behavior: SMOOTH});
     return;
   }
-  const top = document.querySelector('header').getBoundingClientRect().bottom;
+  // nothing inside the header is obscured by the header — the tab bar lives in
+  // it, and clamping to it made every tab button measure as fully hidden
+  const hd = document.querySelector('header');
+  const top = el.closest('header') ? 0 : hd.getBoundingClientRect().bottom;
   const nav = document.getElementById('bottomnav');
   // getBoundingClientRect, not offsetParent: offsetParent is null for a
   // position:fixed element by spec, so the bar was never subtracted at all
@@ -305,9 +308,20 @@ function updateChecklist() {
     all = all && d;
   }
   if (all) {
-    bar.hidden = true; localStorage.setItem('palbreed_tipseen', '1');
+    hideChecklist();
     if (!booting) toast('Setup complete — happy hatching!');
   }
+}
+// One way out, whether it was dismissed or finished. Hiding the bar while it
+// holds the focus leaves it on a hidden button, so the next Tab starts from
+// nowhere — the checklist sits at the top of <main>, so that is where to land.
+function hideChecklist() {
+  const bar = document.getElementById('setupbar');
+  if (!bar || bar.hidden) return;
+  const held = bar.contains(document.activeElement);
+  bar.hidden = true;
+  localStorage.setItem('palbreed_tipseen', '1');
+  if (held) { const b = activeTabButton(); if (b) b.focus(); }
 }
 
 const pairKey = (a,b) => a < b ? a+'|'+b : b+'|'+a;

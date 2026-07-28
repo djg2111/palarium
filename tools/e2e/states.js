@@ -60,6 +60,38 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await overflow(page, `cold ${t}`);
   }
 
+  // The hash IS the router, so the skip link's own href was a route: it used to
+  // answer the app's accessibility affordance with "Link not recognized".
+  {
+    await page.evaluate(() => document.querySelector('.skip').focus());
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+    const sk = await page.evaluate(() => ({
+      landed: document.activeElement === document.getElementById('main'),
+      hash: location.hash,
+      toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.replace(/\s+/g, ' ').trim()),
+    }));
+    if (sk.landed && sk.hash === '#/guide' && !sk.toasts.length)
+      console.log('  ✓ Skip to content lands on <main> and leaves the route alone');
+    else { console.log(`  ✗ Skip to content: ${JSON.stringify(sk)}`); fail(); }
+  }
+
+  // Dismissing the checklist hides the button that was pressed.
+  await nav(page, '#/breed', 350);
+  {
+    const bar = await page.evaluate(() => {
+      const b = document.getElementById('setupbar');
+      return {shown: !b.hidden, role: b.getAttribute('role'), named: !!b.getAttribute('aria-labelledby')};
+    });
+    if (bar.shown && bar.role === 'group' && bar.named) console.log('  ✓ the setup checklist is one named group');
+    else { console.log(`  ✗ the setup checklist: ${JSON.stringify(bar)}`); fail(); }
+    if (bar.shown) {
+      await page.evaluate(() => { const d = document.getElementById('tipDismiss'); d.focus(); d.click(); });
+      await page.waitForTimeout(300);
+      await focusVisible(page, 'dismissing the checklist');
+    }
+  }
+
   console.log('\nLIVED-IN — seeding a roster and reloading');
   await page.evaluate(([roster, owned]) => {
     localStorage.clear();

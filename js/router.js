@@ -168,6 +168,20 @@ moreSheetEl.addEventListener('click', e => {
   const b = e.target.closest('button[data-v]');
   if (b) navTab(b.dataset.v); // showTab closes the sheet
 });
+// The hash is the router, so the skip link's own href was a route: pressing it
+// set location.hash = '#main', which applyHash could not parse — it answered
+// the app's own accessibility affordance with a "Link not recognized" toast and
+// left the URL somewhere a reload could not restore. Keep the href for the
+// no-JS case; in-app, just move the focus. #main carries tabindex="-1" so it
+// can actually receive it — without that the browser only moves the sequential
+// starting point and activeElement stays <body>.
+document.querySelector('.skip').addEventListener('click', e => {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  const m = document.getElementById('main');
+  m.focus();
+  scrollTo({top: 0, behavior: SMOOTH});
+});
 // The logo goes home like any other site's does. It's a real <a href="./"> so
 // ctrl/middle-click and "open in new tab" behave normally; a plain click stays
 // in-app rather than reloading the whole PWA.

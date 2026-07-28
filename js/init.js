@@ -54,7 +54,7 @@ if (state.pm === 'saved' && plans.length) setPlanMode('saved');
   if (!localStorage.getItem('palbreed_tipseen')) {
     bar.hidden = false;
     document.getElementById('tipDismiss').addEventListener('click', () => {
-      bar.hidden = true; localStorage.setItem('palbreed_tipseen', '1');
+      hideChecklist();   // the press hides the button that made it
     });
     bar.querySelector('[data-su="star"]').addEventListener('click', () => {
       navTab('dex');

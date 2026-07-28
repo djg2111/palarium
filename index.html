@@ -36,9 +36,9 @@
   </a>
 </div></header>
 
-<main id="main">
-  <div class="setup" id="setupbar" hidden>
-    <span class="lb">Get set up:</span>
+<main id="main" tabindex="-1">
+  <div class="setup" id="setupbar" role="group" aria-labelledby="setupLb" hidden>
+    <span class="lb" id="setupLb">Get set up:</span>
     <button type="button" class="step" data-su="star" title="Opens the Paldex — tap ☆ on species you own">★ Star species you own</button>
     <!-- × as a hidden glyph + a spoken "and" (DESIGN.md §4) — bare, NVDA reads
          "Relaxaurus times Sparkit" -->
