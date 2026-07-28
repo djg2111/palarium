@@ -115,9 +115,50 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
   }, 'the pal picker popover')) {
     await audit(page, 'picker popover open');
     await focusSane(page, 'opening the picker keeps focus');
+    // Focus stays in the search box while the arrows move a highlight through
+    // 299 options, so the highlight has to be named — otherwise you arrow blind
+    // and press Enter on a row you were never told about.
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(200);
+    const ad = await page.evaluate(() => {
+      const inp = document.querySelector('#pickA .pop input');
+      const id = inp.getAttribute('aria-activedescendant');
+      const el = id && document.getElementById(id);
+      return {role: inp.getAttribute('role'), points: !!el, isHl: !!(el && el.classList.contains('hl')),
+        says: el ? el.textContent.replace(/\s+/g, ' ').trim().slice(0, 18) : null};
+    });
+    if (ad.role === 'combobox' && ad.points && ad.isHl) console.log(`  ✓ the arrow keys name what they land on: ${JSON.stringify(ad.says)}`);
+    else { console.log(`  ✗ the picker's highlight is unnamed: ${JSON.stringify(ad)}`); fail(); }
+    // a listbox may hold only options — the "no pals match" line used to sit in it
+    await page.evaluate(() => { const i = document.querySelector('#pickA .pop input'); i.value = 'zzzzq'; i.dispatchEvent(new Event('input')); });
+    await page.waitForTimeout(300);
+    await audit(page, 'picker with no matches');
     await page.keyboard.press('Escape');
     await page.waitForTimeout(150);
     await focusSane(page, 'Escape hands focus back to the picker button');
+  }
+
+  // Clearing a picker was pointer-only: a <span> with a title inside the
+  // trigger button, and the popup offers no "none" row, so a keyboard user who
+  // set a parent could not unset it.
+  {
+    await page.evaluate(() => document.querySelector('#pickA .picker-btn').focus());
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(150);
+    const onClear = await page.evaluate(() => {
+      const a = document.activeElement;
+      return {isClear: a.classList.contains('pclear'), name: a.getAttribute('aria-label')};
+    });
+    if (onClear.isClear && /^Clear /.test(onClear.name || '')) {
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(300);
+      const done = await page.evaluate(() => ({
+        empty: !pickA.get(), gone: document.querySelector('#pickA .pclear').hidden,
+        back: document.activeElement.classList.contains('picker-btn'),
+      }));
+      if (done.empty && done.gone && done.back) console.log(`  ✓ ${JSON.stringify(onClear.name)} is a real button, and hands focus back`);
+      else { console.log(`  ✗ clearing with the keyboard: ${JSON.stringify(done)}`); fail(); }
+    } else { console.log(`  ✗ Tab from the picker does not reach a clear: ${JSON.stringify(onClear)}`); fail(); }
   }
 
   // the chain card is a Breed state reachable only through the Planner

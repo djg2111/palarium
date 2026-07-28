@@ -954,6 +954,7 @@ function fitPopup(root, pop, list, cap) {
   list.style.maxHeight = Math.max(120, Math.min(cap, (up ? above : below) - chrome)) + 'px';
 }
 
+let pickerSeq = 0;
 function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, ariaLabel}) {
   const root = document.createElement('div'); root.className = 'picker';
   const btn = document.createElement('button'); btn.className = 'picker-btn'; btn.type = 'button';
@@ -962,6 +963,15 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
   const inp = document.createElement('input'); inp.placeholder = 'Search…'; inp.setAttribute('aria-label', 'Search pals');
   const list = document.createElement('div'); list.className = 'list'; list.setAttribute('role', 'listbox');
   list.setAttribute('aria-label', 'Matching pals');
+  // Focus stays in the search box while the arrow keys move a highlight through
+  // 299 options, so without activedescendant a screen reader was told nothing
+  // at all — you arrowed blind and pressed Enter on a row you could not hear.
+  const pickerN = ++pickerSeq;
+  list.id = 'pickerList' + pickerN;
+  inp.setAttribute('role', 'combobox');
+  inp.setAttribute('aria-controls', list.id);
+  inp.setAttribute('aria-autocomplete', 'list');
+  inp.setAttribute('aria-expanded', 'false');
   let ownedOnlyPick = false, srcAll = null, srcOwn = null;
   pop.appendChild(inp);
   if (ownedToggle) {
@@ -973,7 +983,21 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
     srcOwn.addEventListener('click', () => setSrc(true));
     row.append(srcAll, srcOwn); pop.appendChild(row);
   }
-  pop.appendChild(list); root.append(btn, pop); mount.appendChild(root);
+  // A sibling of the trigger, not a <span> inside it. As a span with a title it
+  // was pointer-only — #pickA had exactly one tab stop and the popup offers no
+  // "none" row, so a keyboard user who set a parent could not unset it (2.1.1).
+  // It cannot be nested: a button inside a button is not valid, and the
+  // trigger's own aria-label prunes the subtree, so the ✕ was invisible to AT.
+  const clr = document.createElement('button'); clr.type = 'button'; clr.className = 'pclear'; clr.textContent = '✕';
+  clr.hidden = true;
+  clr.addEventListener('click', e => { e.stopPropagation(); api.set(null); btn.focus(); });
+  // Outside the listbox, not inside it: a role="listbox" may only contain
+  // options, and the "no pals match" line sitting in it was an
+  // aria-required-children violation in every picker (axe critical) — a state
+  // no suite had audited. Polite, so typing past the last match says so.
+  const emptyEl = document.createElement('div'); emptyEl.className = 'empty'; emptyEl.hidden = true;
+  emptyEl.setAttribute('aria-live', 'polite');
+  pop.append(list, emptyEl); root.append(btn, clr, pop); mount.appendChild(root);
 
   let sel = null, hl = 0, rows = [];
   const api = { root, get: () => sel,
@@ -986,6 +1010,7 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
       // browser deliver the synthesized click to it and reopen the popup.
       const inside = root.contains(document.activeElement);
       root.classList.remove('open'); btn.setAttribute('aria-expanded', 'false');
+      inp.setAttribute('aria-expanded', 'false'); inp.removeAttribute('aria-activedescendant');
       if (openPicker === api) openPicker = null;
       if (inside) setTimeout(() => { if (!root.classList.contains('open')) btn.focus(); }, 0);
     } };
@@ -1002,11 +1027,10 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
       const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = sel.n;
       const z = document.createElement('span'); z.className = 'zk'; z.textContent = zk(sel);
       box.append(nm, z); btn.appendChild(box);
-      if (allowClear) {
-        const x = document.createElement('span'); x.className = 'clear'; x.textContent = '✕'; x.title = 'Clear';
-        x.addEventListener('click', e => { e.stopPropagation(); api.set(null); });
-        btn.appendChild(x);
-      }
+    }
+    if (allowClear) {
+      clr.hidden = !sel;
+      clr.setAttribute('aria-label', 'Clear ' + (ariaLabel || placeholder).toLowerCase());
     }
   }
   function renderList() {
@@ -1022,6 +1046,7 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
       const z = document.createElement('span'); z.className = 'zk'; z.textContent = zk(p);
       r.append(nm, z);
       if (os.has(p.k)) { const o = document.createElement('span'); o.className = 'own'; o.textContent = '★'; o.title = 'Owned'; r.appendChild(o); }
+      r.id = 'pk' + pickerN + '-' + rows.length;
       r.appendChild(typeDots(p));
       // close first: close() schedules its deferred refocus before any popup a
       // set() side effect opens (e.g. Parent 2 auto-open), which must win focus
@@ -1036,10 +1061,12 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
       && (!q || p.n.toLowerCase().includes(q) || zk(p).includes(q) || p.t.some(t => t.startsWith(q))));
     const recent = q ? [] : recentPicks.map(k => byKey.get(k)).filter(p => p && (!ownedOnlyPick || os.has(p.k)));
     if (!matches.length && !recent.length) {
-      const e = document.createElement('div'); e.className = 'empty';
-      e.textContent = ownedOnlyPick && !os.size ? 'No owned pals yet — star some in the Paldex or add roster pals.' : 'No pals match.';
-      list.appendChild(e); return;
+      liveText(emptyEl, ownedOnlyPick && !os.size
+        ? 'No owned pals yet — star some in the Paldex or add roster pals.' : 'No pals match.');
+      emptyEl.hidden = false;
+      inp.removeAttribute('aria-activedescendant'); return;
     }
+    emptyEl.hidden = true;
     if (recent.length) { addGroup('Recent'); recent.forEach(addRow); addGroup('All pals'); }
     matches.forEach(addRow);
     highlight(0);
@@ -1049,6 +1076,7 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
     hl = Math.max(0, Math.min(rows.length - 1, i));
     rows.forEach((r, j) => r.el.classList.toggle('hl', j === hl));
     rows[hl].el.scrollIntoView({block:'nearest'});
+    inp.setAttribute('aria-activedescendant', rows[hl].el.id);
   }
   // Autofocusing the search box summons the on-screen keyboard, which covers
   // the pal grid the popup just opened to show. Only do it when a keyboard is
@@ -1057,6 +1085,7 @@ function makePicker(mount, {placeholder, allowClear, onChange, ownedToggle, aria
     if (openPicker && openPicker !== api) openPicker.close();
     root.classList.add('open'); openPicker = api;
     btn.setAttribute('aria-expanded', 'true');
+    inp.setAttribute('aria-expanded', 'true');
     pop.style.left = ''; pop.style.right = '';
     pop.classList.toggle('flip', root.getBoundingClientRect().left + 340 > window.innerWidth - 12);
     inp.value = ''; renderList();
