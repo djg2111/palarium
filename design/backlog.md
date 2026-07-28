@@ -20,6 +20,12 @@ canonical repo-wide: "DESIGN.md §11" means this file.
   name cell a button, as `.dextile-open` already is" is the option that removes
   that as well as the stops.
 
+- **Nine Guide sentences run 26–36 words against §6's 25-word longform cap.**
+  Measured over `#view-guide`'s `p`/`li` with the same per-sentence splitter the
+  save reader was cleared with; the longest is the "Not every pal can be a 'math
+  result'…" bullet at 36. All pre-existing. Splitting them is copy work, not a
+  spec — logged so the cap has a record rather than a silent exception.
+
 - **The Guide's Deep dive hides 82% of itself behind five presses** — 6,399
   characters across six `<details>`, of which 1,143 are visible at rest, and
   nothing persists across a reload. It also has no per-section address: the app
@@ -33,12 +39,6 @@ canonical repo-wide: "DESIGN.md §11" means this file.
   the accessible name and Enter/Space — while adding six level-3 landmarks. It
   collides with §4's reasoning for `.cardopen` ("buried an `h3` in a button"),
   so this needs a §4 ruling, not a patch.
-- **`.recipe` is a `<div>` of `<span>`s** — five ingredient lists AT cannot count
-  or navigate, with no "Recipe" noun anywhere. `<ul aria-label="Cake recipe">` +
-  `<li class="mchip">` costs nothing; `.recipe{display:flex}` already handles it.
-  The Ancient Breeding Facility's ingredients are inline prose while the five
-  cakes are chips — same content, two presentations (§4 reuse-first).
-
 - **The partner-skill list is 999 tab stops fully paged** — 299 pal links, 421
   tag chips, 249 rank disclosures and 30 controls. This is **not** the Paldex
   table's question (§11 above): that is a data table with AT's own navigation
@@ -76,17 +76,6 @@ canonical repo-wide: "DESIGN.md §11" means this file.
   *statue* (footnote). Pick one — *waypoint* matches the chip the user sets —
   and add it to §6's lexicon.
 
-- **Duplicate uses `⧉` (U+29C9), which is not on §7's plain-symbol allowlist**
-  (`★ ☆ ♂ ♀ ✕ → ✓ ⇄ ✎ ↗ ×`), and §7 says not to add one where a Lucide icon
-  exists — it has `copy`. It does render (13×16px in Segoe UI), so this is a
-  policy deviation rather than a broken glyph; `.tchev` in the same component
-  family is already inline SVG, so the swap is consistent as well as compliant.
-- **"Save" is a verb in three roster controls while §6 reserves it for the
-  Palworld game file** — `✓ Save changes`, `+ Save & add another` and `Read my
-  save` sit in one flow. "Save changes" is unambiguous and universal, so the
-  likely resolution is amending §6 to reserve the *noun* only. Logged so the
-  decision is made rather than drifting.
-
 - **Find parents is dominated by Terraria collab species, with no way to filter
   them.** Measured over the full pair lists: **22 of Lamball's 30 pairs (73%)**
   and **44 of Chikipi's 46 (96%)** need a collab pal, and they crowd the tiers a
@@ -118,34 +107,6 @@ canonical repo-wide: "DESIGN.md §11" means this file.
   species and pal apart everywhere else. `Your "Woolly"` or `This pal` says what it
   is, but the honest fix may be listing the siblings — which is a layout question
   inside an already long card, so it needs a spec.
-
-- **§6's 15-word microcopy cap versus the save reader's explainer prose.** Seven
-  strings in that dialog run 16–27 words: the privacy promise (23), *"Browsers
-  can't open that folder for you…"* (27), the truncated-save error (26),
-  `#smConflictNote` (22), the ambiguous-match sentence (22), *"Close the game
-  first…"* (22). Four are genuinely two sentences and should be split whatever
-  else is decided. But the cap is written for labels, and a privacy promise and
-  a where-is-my-file guide are not labels — this dialog is a second longform
-  surface whether or not §6 admits it. Either §6 names the save reader's
-  explainer prose at the Guide's 25-word cap, or the prose moves into the Guide
-  and the dialog links to it. The doc should say which rather than let the code
-  drift against it silently.
-
-- **The save reader's component family is undocumented in §4.** `.privacy`,
-  `.smsum`, `.smh3`, `.smlist`/`.smitem`, `.smacts`, `.smchoose`, `.confrow`,
-  `.pbar` and `.smerr` were all one-offs; `.smerr` is gone (it was `.warnbox`
-  one type step smaller and without its triangle) and `.confrow` changed in
-  0954b69, but the rest still have no entry, against §4's own "a new class gets
-  documented here". One table pass, ideally alongside whatever next touches
-  those recipes.
-
-- **A 400 MB save reads silently for anyone not watching the bar.** `.pbar` has
-  no `role="progressbar"` or `aria-valuenow`, and `#smBusyMsg` is written once
-  ("Reading …sav (400.0 MB)…") and never again — only `bar.style.width` moves.
-  Sighted users get continuous feedback; everyone else gets one utterance and
-  then nothing until it finishes. Either put the role and values on `.pbar`, or
-  update the polite message at coarse milestones (25/50/75%). Coarse, because a
-  live region driven by a progress bar is a stream of interruptions.
 
 - **The toast dwell is not a conformant 2.2.1 "extend" mechanism, deliberately.**
   Hover and focus pause it and re-arm the full duration, and Alt+Z reaches it,

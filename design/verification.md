@@ -41,8 +41,12 @@ runs in its own context, seeded before the first paint, six at a time.
 **Read the artifact, don't re-run.** `--json` writes every check as
 `{group, ok, message}` in `results[]`, with axe rule ids under `violations`,
 overflowing widths under `bad`, and measured rects on the focus checks. It stamps
-the `commit` and `dirty` tree it described — if those match what you are reviewing,
-the file is current and a second run is waste.
+the `commit`, the `dirty` file list **and a `diff` hash** of the tree it described —
+if all three match what you are reviewing, the file is current and a second run is
+waste. Check the `diff` hash, not just the first two: `git status --porcelain` lists
+*files*, so a second edit to an already-modified file leaves `commit` and `dirty`
+byte-identical while the tree has moved underneath you. That has already produced
+one review of a tree that no longer existed.
 
 A state neither suite reaches is a missing group, not a reason to write a scratch
 script: add it to `states.js` and it is covered from then on. A group that reports

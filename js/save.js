@@ -373,13 +373,37 @@ function worldsFromFiles(files) {
   return [...byDir.values()].filter(w => w.level);
 }
 
+// The bar is continuous feedback for anyone watching it. role="progressbar"
+// makes the same number queryable by AT, and the milestones are what a screen
+// reader hears without going looking — a 400 MB save used to write #smBusyMsg
+// once and then say nothing until it finished. Coarse on purpose: a live region
+// driven by a progress bar is a stream of interruptions (§8).
+let smPctSaid = 0, smPctMax = 0, smPhase = '';
+// `msg` is the phase label WITHOUT its trailing ellipsis — a milestone re-states
+// it rather than replacing it, so the file name and size stay on screen for the
+// whole read instead of being overwritten by a bare percentage.
+function smProgress(pct, msg) {
+  const out = document.getElementById('smBusyMsg');
+  if (msg !== undefined) { smPhase = msg; smPctSaid = 0; smPctMax = 0; }
+  // The oodle decoder restarts with a larger `need`, so the raw percentage goes
+  // backwards mid-read (measured 93 -> 16 -> 93 on a 400 MB save). A bar that
+  // rewinds reads as a stall, so the value only ever climbs.
+  const p = smPctMax = Math.max(smPctMax, Math.max(0, Math.min(100, Math.round(pct))));
+  document.getElementById('smBar').style.width = p + '%';
+  document.getElementById('smPbar').setAttribute('aria-valuenow', p);
+  if (msg !== undefined) { out.textContent = smPhase + '…'; return; }
+  // The highest milestone crossed, once. A fast read clears all three in one
+  // task, and three writes to a polite region in one task is one utterance —
+  // so pick the last one rather than writing three. Nothing at 100: the
+  // preview lands and takes focus in the same tick.
+  const hit = [75, 50, 25].find(m => p >= m && smPctSaid < m);
+  if (hit && p < 100) { smPctSaid = hit; out.textContent = smPhase + ' — ' + hit + '%'; }
+}
+
 async function useFolder(files) {
   const token = ++smRead;
   smShow('smBusy');
-  const msg = document.getElementById('smBusyMsg');
-  const bar = document.getElementById('smBar');
-  bar.style.width = '15%';
-  msg.textContent = 'Looking for worlds…';
+  smProgress(15, 'Looking for worlds');
   document.getElementById('smCancel').focus();
 
   const worlds = worldsFromFiles(files);
@@ -388,8 +412,7 @@ async function useFolder(files) {
       ' — or use “Choose one Level.sav…”. Nothing was changed.');
     return;
   }
-  bar.style.width = '55%';
-  msg.textContent = `Reading ${worlds.length} world${worlds.length === 1 ? '' : 's'}…`;
+  smProgress(55, `Reading ${worlds.length} world${worlds.length === 1 ? '' : 's'}`);
   // LevelMeta.sav is about 2 KB, so naming every world costs almost nothing
   const items = [];
   for (let i = 0; i < worlds.length; i++) {
@@ -628,10 +651,7 @@ function smFail(msg, alt) {
 function readSaveFile(file) {
   const token = ++smRead;
   smShow('smBusy');
-  const bar = document.getElementById('smBar');
-  const msg = document.getElementById('smBusyMsg');
-  bar.style.width = '4%';
-  msg.textContent = `Reading ${file.name} (${(file.size / 1048576).toFixed(1)} MB)…`;
+  smProgress(4, `Reading ${file.name} (${(file.size / 1048576).toFixed(1)} MB)`);
   document.getElementById('smCancel').focus();
   file.arrayBuffer().then(buf => {
     if (token !== smRead || !sov.classList.contains('open')) return;
@@ -643,11 +663,11 @@ function readSaveFile(file) {
     smWorker.onmessage = ev => {
       if (token !== smRead) { w.terminate(); return; }
       const d = ev.data;
-      if (d.type === 'progress') { bar.style.width = Math.round(6 + d.pct * 88) + '%'; return; }
+      if (d.type === 'progress') { smProgress(6 + d.pct * 88); return; }
       if (d.type === 'error') { smWorker.terminate(); smWorker = null; smFail(d.message); return; }
       if (d.type === 'done') {
         smWorker.terminate(); smWorker = null;
-        bar.style.width = '100%';
+        smProgress(100);
         smParsed = d.res;
         showSavePreview();
       }

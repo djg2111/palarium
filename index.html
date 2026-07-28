@@ -113,7 +113,7 @@
         <div class="collacts">
           <button class="alink primary" id="rosterOpenAdd">+ Add pal</button>
           <button class="alink" id="rosterSelect" hidden>Select pals</button>
-          <button class="alink savebtn" id="importBtn" title="Fill your roster from your Palworld save file. Your save is never changed."><svg class="sicon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>Read my save</button>
+          <button class="alink icolink" id="importBtn" title="Fill your roster from your Palworld save file. Your save is never changed."><svg class="lui" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>Read my save</button>
           <button class="alink" id="exportBtn">Backup &amp; restore</button>
           <input type="file" id="importFile" accept="application/json,.json" style="display:none">
           <input type="file" id="saveFile" accept=".sav" style="display:none">
@@ -441,7 +441,7 @@
           <li><b>Build a Breeding Farm</b> (Technology level 19). Also build an <b>Egg Incubator</b> (level 7, needs Paldium).</li>
           <li><b>Put one boy pal and one girl pal in the farm.</b> Any two species can make a baby together — genders just have to be different. Check a pal's gender in your Palbox.</li>
           <li><b>Bake a Cake</b> and put it in the little chest attached to the farm. No cake, no baby. One cake = one egg.
-            <div class="recipe"><span class="mchip" data-item="Flour">5× Flour</span><span class="mchip" data-item="Berries">8× Red Berries</span><span class="mchip" data-item="Milk">7× Milk</span><span class="mchip" data-item="Egg">8× Eggs</span><span class="mchip" data-item="Honey">2× Honey</span></div>
+            <ul class="recipe" aria-label="Cake ingredients"><li class="mchip" data-item="Flour">5× Flour</li><li class="mchip" data-item="Berries">8× Red Berries</li><li class="mchip" data-item="Milk">7× Milk</li><li class="mchip" data-item="Egg">8× Eggs</li><li class="mchip" data-item="Honey">2× Honey</li></ul>
             <div class="fldhint">1.0 added four premium cakes — better passives, double eggs, mutations. <button type="button" class="alink gjump" data-open="g-cakes">See the new cakes</button></div>
           </li>
           <li><b>Wait about 5 minutes.</b> An egg pops out. Stick it in the incubator and wait for it to hatch (bigger and rarer eggs take longer).</li>
@@ -478,13 +478,13 @@
           <ul>
             <li><b>Cake</b> — the baseline. One egg, normal odds (recipe above).</li>
             <li><b>Mushroom Cake</b> · Tech 30 — slightly better stat (IV) rolls on the child.
-              <div class="recipe"><span class="mchip" data-item="Flour">5× Flour</span><span class="mchip" data-item="Mushroom">5× Mushrooms</span><span class="mchip" data-item="CaveMushroom">3× Cavern Mushrooms</span><span class="mchip" data-item="Egg">8× Eggs</span><span class="mchip" data-item="Honey">2× Honey</span></div></li>
+              <ul class="recipe" aria-label="Mushroom Cake ingredients"><li class="mchip" data-item="Flour">5× Flour</li><li class="mchip" data-item="Mushroom">5× Mushrooms</li><li class="mchip" data-item="CaveMushroom">3× Cavern Mushrooms</li><li class="mchip" data-item="Egg">8× Eggs</li><li class="mchip" data-item="Honey">2× Honey</li></ul></li>
             <li><b>Vegetable Cake</b> · Tech 47 — <b>two eggs</b> per breeding cycle. Doubles throughput, and each egg rolls its mutation chance separately.
-              <div class="recipe"><span class="mchip" data-item="Flour">8× Flour</span><span class="mchip" data-item="Tomato">8× Tomatoes</span><span class="mchip" data-item="Lettuce">7× Lettuce</span><span class="mchip" data-item="Egg">8× Eggs</span><span class="mchip" data-item="Honey">4× Honey</span></div></li>
+              <ul class="recipe" aria-label="Vegetable Cake ingredients"><li class="mchip" data-item="Flour">8× Flour</li><li class="mchip" data-item="Tomato">8× Tomatoes</li><li class="mchip" data-item="Lettuce">7× Lettuce</li><li class="mchip" data-item="Egg">8× Eggs</li><li class="mchip" data-item="Honey">4× Honey</li></ul></li>
             <li><b>Extravagant Vegetable Cake</b> · Tech 60 — mutation chance rises to <b>~3%</b> per egg, plus better stat rolls. The mutation-hunting pick.
-              <div class="recipe"><span class="mchip" data-item="Flour">12× Flour</span><span class="mchip" data-item="Sweet">8× Cotton Candy</span><span class="mchip" data-item="Potato">10× Potatoes</span><span class="mchip" data-item="Onion">6× Onions</span><span class="mchip" data-item="Carrot">8× Carrots</span></div></li>
+              <ul class="recipe" aria-label="Extravagant Vegetable Cake ingredients"><li class="mchip" data-item="Flour">12× Flour</li><li class="mchip" data-item="Sweet">8× Cotton Candy</li><li class="mchip" data-item="Potato">10× Potatoes</li><li class="mchip" data-item="Onion">6× Onions</li><li class="mchip" data-item="Carrot">8× Carrots</li></ul></li>
             <li><b>Special Cake</b> · Tech 74 — much better odds that the child inherits the parents' passives. With clean parents carrying exactly the 4 passives you want, keepers become common. No effect on mutation or egg count.
-              <div class="recipe"><span class="mchip" data-item="Flour">20× Flour</span><span class="mchip" data-item="Sweet_Caramel">8× Caramel Cotton Candy</span><span class="mchip" data-item="Milk">15× Milk</span><span class="mchip" data-item="Egg">15× Eggs</span><span class="mchip" data-item="Meat_GrassMammoth">2× Mammorest Meat</span></div></li>
+              <ul class="recipe" aria-label="Special Cake ingredients"><li class="mchip" data-item="Flour">20× Flour</li><li class="mchip" data-item="Sweet_Caramel">8× Caramel Cotton Candy</li><li class="mchip" data-item="Milk">15× Milk</li><li class="mchip" data-item="Egg">15× Eggs</li><li class="mchip" data-item="Meat_GrassMammoth">2× Mammorest Meat</li></ul></li>
           </ul>
           <div class="note">Rule of thumb: building a passive line → <b>Special</b> · hunting mutations → <b>Extravagant Vegetable</b> · mass production → <b>Vegetable</b> · stat polish on a budget → <b>Mushroom</b>.</div>
         </div></details>
@@ -530,7 +530,12 @@
             <li><b>1.0 halved default incubation times</b> in newly created Normal and Hard worlds — existing saves keep whatever they had. The world setting <code>PalEggDefaultHatchingTime</code> still scales everything; many servers set it to 0–2 h.</li>
             <li>One farm produces <b>one egg per cake per ~5 minutes</b> while both parents are assigned and fed (two eggs with a Vegetable Cake). Build multiple breeding farms to parallelize.</li>
             <li>Cakes stored in the breeding farm's chest <b>never spoil</b> — stock it up.</li>
-            <li>The <b>Ancient Breeding Facility</b> (Tech 76) automates the whole loop: assign two pals, pick a cake, and it breeds <i>and hatches</i> continuously with no separate incubator. It costs 100× Pal Metal Ingot, 50× AI Core, 30× Ancient Parts and 30× Ancient Core.</li>
+            <li>The <b>Ancient Breeding Facility</b> (Tech 76) automates the whole loop. Assign two pals, pick a cake, and it breeds <i>and hatches</i> continuously with no separate incubator.
+              <!-- Same content as the five cake lists above, so the same component (§4).
+                   No data-item on these four: only Ancient Civilization Core has extracted
+                   art, and one iconised chip beside three bare ones reads as three broken
+                   images rather than one bonus icon. -->
+              <ul class="recipe" aria-label="Ancient Breeding Facility build cost"><li class="mchip">100× Pal Metal Ingot</li><li class="mchip">50× AI Core</li><li class="mchip">30× Ancient Civilization Parts</li><li class="mchip">30× Ancient Civilization Core</li></ul></li>
           </ul>
         </div></details>
       </div>
@@ -587,7 +592,7 @@
         <p>Your worlds live under this folder — paste it into the address bar of File Explorer:</p>
         <p class="pathrow"><span class="mono" id="smPath">%LOCALAPPDATA%\Pal\Saved\SaveGames</span><button type="button" class="alink" id="smCopyPath">Copy</button></p>
         <p>Inside it is one folder per Steam account, and inside that one folder per world, each holding a <b>Level.sav</b>. Close the game first, or save and return to the title screen — a save that is still being written is incomplete.</p>
-        <p class="sub">Browsers can’t open that folder for you: a site able to point your file picker anywhere would be a security problem, so the path can’t be pre-filled. Pasting it is the closest thing there is.</p>
+        <p class="sub">Browsers can’t open that folder for you. A site able to point your file picker anywhere would be a security problem, so the path can’t be pre-filled. Pasting it is the closest thing there is.</p>
       </div>
     </details>
 
@@ -597,7 +602,7 @@
   <section id="smHub" hidden>
     <p class="privacy"><b>Backups are written and read on this device.</b> Nothing is uploaded or sent anywhere.</p>
 
-    <h3 class="smh3">Save a backup</h3>
+    <h3 class="smh3">Export a backup</h3>
     <p class="sub">One JSON file holding your roster, saved plans and owned list.</p>
     <p class="sub">Filters, toggles and map preferences stay on this device.</p>
     <p class="smsum" id="smHubCounts"></p>
@@ -644,7 +649,7 @@
 
   <section id="smBusy" hidden>
     <p id="smBusyMsg" aria-live="polite">Reading your save…</p>
-    <div class="pbar"><div class="pbarfill" id="smBar"></div></div>
+    <div class="pbar" id="smPbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Reading progress"><div class="pbarfill" id="smBar"></div></div>
     <button type="button" class="alink" id="smCancel">Cancel</button>
   </section>
 

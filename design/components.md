@@ -28,6 +28,15 @@ Required state coverage for every interactive element: default · hover · focus
 disabled (`opacity:.45`, no hover). Hover on touch devices must not gate any
 information (see §8 tooltips).
 
+`.icolink` — an `.alink` whose visible text sits beside a **leading icon**:
+`inline-flex`, `gap:6px`. It exists because a text glyph sits on the text baseline
+where a stroke icon does not (§7), so a button that swaps one for the other has to
+change layout mode. Was `.savebtn`, which named its one caller rather than the
+recipe; carries `#importBtn` and the pal card's `Duplicate`. In a grid cell
+(`.rentacts` at ≤640) it also takes `justify-content:center` — `text-align` does
+not centre a flex container, so without it the icon and label sit hard left in a
+126px cell while three plain-`.alink` siblings are centred.
+
 Breed (one skeleton, four fillings — every result kind produces *status sentence →
 card(s) → why → next → footnote*; the kind changes the copy and the card count,
 never the shape):
@@ -101,6 +110,18 @@ the rows. Its rows and the popup itself are `tabIndex=-1` — arrows and Enter d
 the list, and with 30 real tab stops the close-on-blur timer destroyed whichever
 row a user had just tabbed onto, dropping focus on `<body>` on the way out.
 
+`.recipe` — a wrapping row of `.mchip` ingredients or costs, as
+`<ul aria-label="… ingredients">` of `<li class="mchip">` (six instances, all in the
+Guide: five cakes and the Ancient Breeding Facility's build cost). `<li>` keeps
+`role=listitem` under `display:inline-flex` and renders no marker, so the semantics
+are free. **The rule is `.gcard .recipe`, not `.recipe`** — `.gcard ol,.gcard ul` is
+`0-1-1` and sets `flex-direction:column` plus a 22px indent, which a bare `.recipe`
+(`0-1-0`) loses to; as `<div>`s these never matched it, and the day they became real
+lists every chip became a full-width pill (89px → 674px at 1366, +131px per list).
+`data-item` is **all-or-nothing per list**: of the Ancient facility's four materials
+only Ancient Civilization Core has extracted art, and one iconised chip beside three
+bare ones reads worse than four bare ones.
+
 Other canon components: `.pcard` (view card), `.hint` (empty state — must include a
 next action; **a view with a persistent status line puts its empty-state sentence
 there instead**, or the sentence is announced twice — Breed does this), `.warnbox` (inline warning), `.toast` (feedback ≤8s, with Undo for
@@ -120,6 +141,22 @@ mode, `.confeff` for a save-reader conflict. A `title` per option is not enough:
 touch has no hover, and these are the controls deciding whether a nickname
 survives. The line is **not** a live region where its own renderer rebuilds it —
 a re-inserted polite region announces unreliably (same reason as `.resline`).
+
+**The save reader's own family.** These were all one-offs and undocumented, against
+§4's own "a new class gets documented here". Recorded now so the next change to the
+dialog reuses them instead of adding a ninth:
+
+| Class | Role |
+|---|---|
+| `.privacy` | The promise the whole feature rests on, said **where the file is picked** rather than in the Guide — a privacy promise reachable only by leaving the dialog is not a promise. `--raised`, a 3px `--accent` left rule, asymmetric radius so the rule reads as a spine. Two instances: the save picker and the backup hub, each naming what *that* screen touches. |
+| `.smsum` | A screen's one-sentence summary. **Four instances** — `#smHubCounts`, `#smBackupSum`, `#smWorldsSum`, `#smSummary` — of which `#smSummary` is also the `aria-labelledby` of `#smResult`. `--fs-md`/`--text-2`: body copy for a dialog, not a status line. |
+| `.smh3` | A section heading inside the dialog. `--fs-md`, i.e. **smaller than `--fs-h2`**: the dialog already has an `h2` in `.mbar`, and these sit under it. |
+| `.smlist` / `.smitem` | The scrolling preview of what will be written. Capped at 260px (200 at ≤640) so the list never pushes the commit button off-screen; `overflow-wrap:anywhere` because save names are arbitrary text. |
+| `.smacts` | The dialog's action row — a primary plus Cancel. Four instances (`#smBackup`, `#smWorlds`, `#smResult`, `#smError`), all holding plain `.alink`s. Full-width column at ≤640: two side-by-side `.alink`s do not fit a phone. |
+| `.smchoose` | The backup hub's action rows — **one** `.alink.big` each (`Export data`, `Choose a backup file…`), same ≤640 column rule as `.smacts`. **Not** the two ways into the reader: those are `.worldbtn` choice rows, documented below. |
+| `.confrow` | One conflict, `--raised`. Its `.segrow` buttons take `--overlay` — one more rung — because on `--raised` they had a 1.00:1 fill delta and only a 1.24:1 hairline to say where they were. |
+| `.pbar` / `.pbarfill` | The read progress. `role="progressbar"` with a live `aria-valuenow` on the box, and `#smBusyMsg` announces **the highest milestone crossed, at most one of 25/50/75 per task** — coarse, because a live region driven by a progress bar is a stream of interruptions, and silent at 100 because the preview lands and takes focus in the same tick. Two things a naive version gets wrong, both measured: a fast read clears all three thresholds in a single task, so writing three messages produces exactly one utterance and wastes two; and the raw percentage **goes backwards** (93 → 16 → 93 on a 400 MB save) because the oodle decoder restarts with a larger `need`, so the reported value is clamped monotonic — a bar that rewinds reads as a stall. The milestone re-states the phase label (`Reading Level.sav (400.0 MB) — 75%`) rather than replacing it, so the file name and size survive the whole read. |
+| ~~`.smerr`~~ | Gone. It was `.warnbox` one type step smaller and without its triangle; the error is a `.warnbox` now. |
 
 `.worldlist` / `.worldbtn` — a vertical stack of **choice rows**. One row is a title
 (`.wname`, optional leading 18px Lucide icon), a consequence line (`.wsub`), an

@@ -628,7 +628,11 @@ tbody tr:hover{background:var(--surface)}
 .gcard summary:hover{color:var(--accent)}
 .gcard details>div{padding:2px 18px 16px;color:var(--text-2);font-size:var(--fs-md)}
 .gcard details ul{margin-left:20px}
-.recipe{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+/* .gcard ol,.gcard ul above sets flex-direction:column and a 22px indent, and
+   it is 0-1-1 — a bare .recipe (0-1-0) never matched while these were <div>s
+   and lost to it the moment they became real <ul>s, stacking five chips into
+   five full-width pills. Scoped to .gcard to outrank it. */
+.gcard .recipe{display:flex;flex-direction:row;gap:var(--sp-2);flex-wrap:wrap;margin:var(--sp-2) 0}
 .note{border-left:3px solid var(--gold);background:var(--gold-tint);padding:10px 14px;border-radius:0 10px 10px 0;font-size:var(--fs-md);margin:12px 0;color:var(--text-2)}
 /* ---------- planner ---------- */
 .pcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:22px 26px;margin-bottom:22px}
@@ -1520,7 +1524,11 @@ button.badge.aura:hover,button.badge.have:hover{border-color:currentColor}
    Sits beside Export/Import data but must not read as the same thing: one
    restores a Palarium backup, this one reads a game file. Hence its own icon
    and wording, and a preview before anything is written. */
-.savebtn{display:inline-flex;align-items:center;gap:6px}
+/* An .alink whose visible text sits beside a leading icon. inline-flex because
+   a glyph sits on the text baseline where a stroke icon does not (§7). Was
+   .savebtn, which named one caller rather than the recipe. */
+.icolink{display:inline-flex;align-items:center;gap:6px}
+.rentacts .icolink{justify-content:center}
 .smodal{width:min(680px,100%)}
 /* the promise the whole feature rests on, said where the file is picked */
 .privacy{background:var(--raised);border:1px solid var(--border);border-left:3px solid var(--accent);

@@ -832,15 +832,20 @@ function renderRoster() {
     acts.className = 'acts'; acts.setAttribute('role', 'toolbar');
     acts.setAttribute('aria-label', 'Actions for ' + who);
     acts.setAttribute('aria-orientation', 'horizontal');
+    // glyph is a §7 text symbol or a Lucide node; ✎ and ✕ are on the
+    // plain-symbol allowlist, Duplicate had no symbol to be on it with.
     const mk = (act, glyph, label, title) => {
       const b = document.createElement('button');
-      b.type = 'button'; b.textContent = glyph; b.dataset.act = act;
+      b.type = 'button'; b.dataset.act = act;
+      if (typeof glyph === 'string') b.textContent = glyph; else b.appendChild(glyph);
       b.setAttribute('aria-label', label); b.title = title;
       acts.appendChild(b); return b;
     };
     mk('edit', '✎', 'Edit ' + who, 'Edit').addEventListener('click', () => openRosterEditor(r));
     // "another one like that" in one click — see duplicateEntry
-    mk('dup', '⧉', 'Duplicate ' + who, 'Duplicate — another with the same passives, gender and note')
+    // 12, not 14: a stroke icon reads ~1.3x a text symbol at the same nominal
+    // size, and this one stands between ✎ and ✕ (§7).
+    mk('dup', lucide('copy', 12), 'Duplicate ' + who, 'Duplicate — another with the same passives, gender and note')
       .addEventListener('click', () => duplicateEntry(r));
     mk('remove', '✕', 'Remove ' + who + ' from roster', 'Remove from roster')
       .addEventListener('click', () => removeEntry(r));

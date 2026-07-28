@@ -70,6 +70,8 @@ const LU = {
   rotateCcw: ['M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8', 'M3 3v5h5'],
   plus: ['M5 12h14', 'M12 5v14'],
   minus: ['M5 12h14'],
+  copy: [['rect', {width: 14, height: 14, x: 8, y: 8, rx: 2, ry: 2}],
+    'M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'],
 };
 const SVGNS = 'http://www.w3.org/2000/svg';
 function lucide(name, size, cls) {
@@ -745,12 +747,18 @@ function openModal(p, rentry) {
       ivc.textContent = 'IV ' + ent.iv.map((v, i) => (v === null ? '–' : v) + ' ' + IVN[i]).join(' · ');
       r1.appendChild(ivc);
     }
-    // The row in the Roster carries only ✎ ⧉ ✕; the rest of an entry's
-    // actions live here, at comfortable size, where there is room to name them.
+    // The row in the Roster carries only the same three glyphs; the rest of an
+    // entry's actions live here, at comfortable size, with room to name them.
     const acts = document.createElement('div'); acts.className = 'rentacts';
-    const mk = (label, title, fn, danger) => {
-      const b = document.createElement('button'); b.className = 'alink' + (danger ? ' danger' : '');
-      b.textContent = label; b.title = title; b.dataset.mfk = label;
+    // `icon` takes a Lucide name (§7 tier 2). A leading stroke icon needs the
+    // button to be inline-flex — a glyph sits on the text baseline where an
+    // icon does not — which is what .icolink is.
+    const mk = (label, title, fn, danger, icon) => {
+      const b = document.createElement('button');
+      b.className = 'alink' + (icon ? ' icolink' : '') + (danger ? ' danger' : '');
+      // 14, not 16 — stepped down one because ✎ and ✕ sit either side (§7)
+      if (icon) b.append(lucide(icon, 14), label); else b.textContent = label;
+      b.title = title; b.dataset.mfk = label;
       b.addEventListener('click', fn); acts.appendChild(b);
     };
     mk('✎ Edit', 'Edit this roster entry', () => { leaveModal(true); openRosterEditor(ent); });
@@ -759,8 +767,9 @@ function openModal(p, rentry) {
     // renderRoster's focus restore (which reads document.activeElement) sees
     // <body> and restores nothing, and the card's restore aims at a button
     // inside the overlay it just hid. Three of the four ended on <body>.
-    mk('⧉ Duplicate', 'Another with the same passives, gender and note',
-      () => { leaveModal(true); const copy = duplicateEntry(ent); focusRosterAct(copy ? copy.id : ent.id, 'dup'); });
+    mk('Duplicate', 'Another with the same passives, gender and note',
+      () => { leaveModal(true); const copy = duplicateEntry(ent); focusRosterAct(copy ? copy.id : ent.id, 'dup'); },
+      false, 'copy');
     mk('Use as planner start', 'Add to the next free Planner start slot',
       () => { leaveModal(true); setSlotAuto(ent); });   // lands on the slot it filled
     mk('✕ Remove', 'Remove this pal from your roster',

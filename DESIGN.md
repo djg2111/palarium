@@ -232,13 +232,36 @@ no looping/attention animation, ever.
   JSON file — you export and restore it) · **save** (the Palworld game file — Palarium
   only ever reads it). Never use the bare word "import" as a button label for either:
   it named two unrelated jobs and told the user nothing about which one they were in.
+- **The lexicon reserves the *noun* "save"; the verb is free.** The entry above is
+  about *a save* — the Palworld file. *To save* is the universal word for committing
+  an edit and has no competitor, so `✓ Save changes` and `+ Save & add another` keep
+  it and sit in the same roster flow as `Read my save` without ambiguity: one is what
+  you do, the other is what you read. What the entry enforces is that **the noun
+  always means the game file** — never "your saved data", never a backup, never a
+  plan. The heading over the backup hub was `Save a backup`, which broke no rule
+  about *save* but put a second verb on the **backup** entry's own action six pixels
+  above a button reading `Export data`; it is `Export a backup` now, so one action
+  has one verb.
 - The Paldex counts **species**; the Roster counts **pals**. Never say "pals"
   for a Paldex count — 299 is a species total, not an individual one.
 - Sentence case for all labels, buttons, and tab names. Title Case is not used.
 - **The ≤15-word cap is for microcopy** — labels, buttons, status lines, hints,
-  empty states. The Guide is the app's only longform surface: prose there caps at
-  **25 words**, and anything past that gets split. Measured over the Guide's 90
-  sentences the median is 14, so the cap is the exception, not the rule.
+  empty states. **Both caps are per sentence, not per string.** A paragraph of
+  three short sentences is not over the cap; one 30-word sentence is, however
+  short the paragraph around it.
+- **Two surfaces are longform and cap at 25 words: the Guide and the save
+  reader.** The Guide is prose by design. The save reader's dialog is prose by
+  necessity — a privacy promise, a where-is-my-file guide and a set of parse
+  errors that have to say what happened and what to do next. Measured over the
+  Guide's 90 sentences the median is 14; measured over every string in the save
+  reader and `savparse.js`, the median is well inside the cap and exactly **one**
+  sentence was over it (27 words, the file-picker explanation), now split.
+  **Anything past the cap gets split.** So the cap is the exception on both, and
+  the earlier reading — seven strings at 16–27 words — was counting whole
+  paragraphs against a per-sentence rule. The prose
+  stays in the dialog rather than moving to the Guide: a privacy promise has to
+  be where the file is chosen, and one reachable only by leaving the dialog is
+  not a promise.
 - **"child", not "baby"**, for what hatches — except in the Guide's first card,
   whose register is deliberately plainer than the rest of the app. Nowhere else.
 - Empty states: 1 sentence of what this is + 1 action button. Errors: what happened +
@@ -261,7 +284,13 @@ Priority order — always exhaust a tier before falling to the next:
    license): stroke-based, `fill="none" stroke="currentColor" stroke-width="2"`, so
    icons inherit text color and sit naturally on the dark palette. Self-host by
    inlining only the icons used as `<svg>` markup (offline PWA — no CDN, no icon
-   font, no full pack in the repo). Sizes 16/18/20/24 to match type scale. Use for:
+   font, no full pack in the repo). Sizes **12/13/14** inside a chip or beside a
+   `--fs-sm` label, **16/18/20/24** at body size and above. **A stroke icon reads
+   larger than a text symbol at the same nominal size** — Lucide's box is 20 of 24
+   units plus stroke (≈0.92× nominal) where a Segoe symbol glyph runs ≈0.78×, so
+   `copy` at 14 measured a 13.0px ink box against `✎`'s 9.75 in the same toolbar,
+   1.33× linear and 1.5× the ink. Step a stroke icon **down one** where it sits
+   among `★ ☆ ✕ ✎` rather than matching the number. Use for:
    search, close, edit, swap, external/link, upload/download, warning, dice/odds,
    tree/branch, settings, chevrons.
 3. **Emoji — last resort only.** Acceptable as a temporary placeholder during

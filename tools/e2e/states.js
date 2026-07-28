@@ -318,7 +318,7 @@ const GROUPS = [
 // The card carries the roster row's own actions. They run with the card
 // closing under them, so renderRoster's focus restore has nothing to read.
 {name: 'card-actions', seed: 'lived-in', title: 'PAL CARD ACTIONS — the four roster actions land somewhere real', run: async (page) => {
-  for (const act of ['✎ Edit', '⧉ Duplicate', 'Use as planner start', '✕ Remove']) {
+  for (const act of ['✎ Edit', 'Duplicate', 'Use as planner start', '✕ Remove']) {
     // ✎ leaves the editor open over the list
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
@@ -332,6 +332,12 @@ const GROUPS = [
       await page.waitForSelector('#modal .rentacts button', {timeout: 3000});
     }, 'a roster entry’s card');
     if (!ok) break;
+    // the card reached from a roster row is the only state that renders
+    // .rentacts, and it was reaching focusVisible without ever being axe'd
+    if (act === '✎ Edit') {
+      await audit(page, 'pal card from a roster entry');
+      await overflow(page, 'pal card from a roster entry');
+    }
     await page.evaluate(a => {
       [...document.querySelectorAll('#modal .rentacts button')].find(x => x.textContent.trim() === a).click();
     }, act);

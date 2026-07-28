@@ -53,9 +53,16 @@ function writeTimings(groups) {
 
 // Stamped into the artifact so a second reader can tell whether the run it
 // found still describes the working tree, instead of trusting a stale file.
+// `dirty` alone is not enough: --porcelain is a list of *files*, so editing a
+// file that was already modified leaves the stamp byte-identical. A reviewer
+// following §10's "if those match, the file is current" then read an artifact
+// describing a tree that no longer existed. The diff hash is what actually
+// moves when content does.
 function stamp() {
   const git = c => { try { return execSync(c, {encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore']}).trim(); } catch (e) { return null; } };
-  return {commit: git('git rev-parse HEAD'), dirty: git('git status --porcelain') || ''};
+  const diff = git('git diff HEAD') || '';
+  return {commit: git('git rev-parse HEAD'), dirty: git('git status --porcelain') || '',
+    diff: require('crypto').createHash('sha1').update(diff).digest('hex').slice(0, 12)};
 }
 
 function parseArgs(argv) {
