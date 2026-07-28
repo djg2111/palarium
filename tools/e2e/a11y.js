@@ -111,6 +111,20 @@ const {audit, overflow, focusSane, fail, failed} = makeChecks();
   await page.waitForTimeout(200);
   await focusSane(page, 'closing returns focus to the button that opened it');
 
+  // ...and when it cannot. The opener is often gone by the time the dialog
+  // closes — a toast's "Read my save" button is removed when the toast expires,
+  // and a view change underneath leaves #importBtn inside a display:none
+  // section, where focus() is a silent no-op.
+  await page.evaluate(() => { location.hash = '#/roster'; });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { const b = document.getElementById('importBtn'); b.focus(); b.click(); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => showTab('breed'));
+  await page.waitForTimeout(250);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  await focusSane(page, 'closing when the opener has been hidden underneath');
+
   console.log('\nSTATE 4+5 — the preview with collisions, one of them ambiguous');
   await page.evaluate(() => {
     localStorage.setItem('palbreed_roster', JSON.stringify([

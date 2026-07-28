@@ -479,7 +479,14 @@ function closeSaveReader() {
   smCancelRead();
   sov.classList.remove('open');
   document.body.style.overflow = '';
-  if (smLastFocus && document.contains(smLastFocus)) smLastFocus.focus();
+  // offsetParent, not just contains: the opener is often gone or hidden by the
+  // time this runs — a toast's "Read my save" button is removed when the toast
+  // expires, and a view change underneath leaves #importBtn in a display:none
+  // section, where focus() is a silent no-op. Same guard as closeModal and
+  // closeRosterEditor; the tab bar is the floor under all three.
+  const back = smLastFocus && document.contains(smLastFocus) && smLastFocus.offsetParent !== null
+    ? smLastFocus : activeTabButton();
+  if (back) back.focus();
   smLastFocus = null;
 }
 function setSeg(row, val, attr) {
