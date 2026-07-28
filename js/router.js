@@ -58,9 +58,16 @@ function navTab(v) {
 // row costs two stops (its identity and its actions) however many buttons it
 // holds — the convention DESIGN.md §4 settles for rows and tiles.
 function rovingRow(container) {
-  const btns = [...container.children].filter(b => b.tagName === 'BUTTON');
-  btns.forEach((b, i) => { b.tabIndex = i ? -1 : 0; });
+  const live = () => [...container.children].filter(b => b.tagName === 'BUTTON');
+  live().forEach((b, i) => { b.tabIndex = i ? -1 : 0; });
+  // Called again on every re-render by #carryFrom, #rosterStrip and Find
+  // parents' chip rows, so bind once and read the buttons live — capturing the
+  // array at call time stacked a dead listener per render and left the handler
+  // looking at buttons that are no longer in the DOM.
+  if (container.dataset.roving) return container;
+  container.dataset.roving = '1';
   container.addEventListener('keydown', e => {
+    const btns = live();
     const i = btns.indexOf(e.target);
     if (i < 0) return;
     let j = null;

@@ -66,6 +66,8 @@ not in this table needs a computed ratio before merge:
 | `--female` on `--accent-tint` over `--raised` | — | — | 4.96 | — | AA — the tightest pairing in the app |
 | `--danger` on `--danger-tint` over `--surface` | — | 6.72 | — | — | AA — the blocked partner chip. At `opacity:.9` (its `.why` reason line) 5.72, still AA |
 | `--text` on `--accent-tint` over `--bg` | 14.29 | — | — | — | AA — the selected roster row. `--male` 6.81, `--muted` 5.76, `--success` chip 8.04. The tint itself is 1.12:1 against a plain row, so it is atmosphere; the checkbox carries the state |
+| `--success` on `--success-tint` over `--surface` | — | 8.31 | — | — | AA — the pressed `.pset` carry chip. Its `--success-line` border is only 2.27 against its own fill, so the border is not the state: the text colour changes with it, the border goes dashed→solid, and `aria-pressed` carries it programmatically |
+| `--danger` on `--danger-tint` over `--bg` | 7.48 | — | — | — | AA — the legacy-plan `.mchip.warn` |
 | `--text` on `--gold-tint` over `--surface` | — | 14.15 | — | — | AA — the owned Paldex tile |
 | `--muted` on `--gold-tint` over `--surface` | — | 5.70 | — | — | AA — a tinted fill costs ~0.2 against the plain surface |
 | `--border-strong` | 1.99 | 1.82 | 1.66 | 1.50 | **Decorative only** — a border below 3:1 must never be the sole indicator of a control's boundary or state; pair with a fill, icon, or text change |
@@ -192,7 +194,10 @@ Planner (a form that computes itself, so the result has no press to correlate it
 | `.slot` / `.slotlb` | One dashed form slot and its micro-label. Start slots reveal progressively: only the next empty one shows, and a slot's passive input only once its species is chosen. |
 | `.rstep` | One route step — the skeleton Breed's chain card shares. Its `×` and `→` are `aria-hidden` with spoken "and"/"make" beside them. |
 | `.wildinfo` family | The catch panel behind `Where?`, with its own `.accb` difficulty tier. |
-| `.resline` `#planStatus` | The view's one sentence, **in the markup and never rebuilt**. The route computes 600ms after the last input change, so nothing the user pressed correlates to it appearing — without this the whole result arrived silently. Says the step count and what is carried, the no-route sentence, or the empty-form prompt. |
+| `.resline` `#planStatus` | The view's one sentence, **in the markup and never rebuilt**. The route computes 600ms after the last input change, so nothing the user pressed correlates to it appearing — without this the whole result arrived silently. Says the step count and what is carried, the no-route sentence, or the empty-form prompt. **Invariant: the clause after `carrying` is what the route actually delivers (`wo.carry`), is never longer than four names, and is omitted when empty.** Every branch that renders a result writes it — the "already is the target" branch used to return early and leave the previous route's claim standing. |
+| `#carryRow` | The passive goal, in § 1 with the passives it governs — it is a function of the start slots directly above it, not of the target species, and at 350px (1366) / 668px (360) away in § 2 the problem was created long before the control that solves it came into view. A pal has **four passive slots**, so a route carries at most four. When the starters' distinct passives exceed that and the user has picked nothing, the app **states the cap** rather than claiming a pal the game cannot produce: the route still renders in full, and only the passive claim withdraws — no chips, no `.carrier` tags, no odds, no expected-eggs line, one `.alink` back to the row. It does not auto-pick four. With eight distinct passives there are 70 candidate subsets and no signal which is wanted, and a machine-made choice would then be *priced* — `≈22%/egg` for four passives the user never chose is a more confident wrong answer than none. Not a `.warnbox`: nothing is wrong, a choice is waiting (§6 — never scold). |
+| `.pset[aria-pressed]` | The carry chips: the roster editor's Reuse row as a **toggle**, not add-and-vanish. A chip that disappears under a finger reflows the row mid-tap. At four pressed the rest go `disabled` — the cap is refused preventively, with the reason in the adjacent `#carryHint`, not as an error after the press. One tab stop via `rovingRow`; up to 16 chips would otherwise cost 16. |
+| `#carryHint` | The consequence line, reached by AT through `aria-describedby` on the combobox input (3.3.2). **Never `aria-live`** — it changes on every recompute. |
 
 The passive tag input (`makePassivePicker`, five instances in this view alone) is a
 **declared combobox**: `role="combobox"` + `aria-expanded` + `aria-controls` on the
@@ -207,7 +212,10 @@ there instead**, or the sentence is announced twice — Breed does this), `.warn
 destructive; **12s when one Undo covers more than one record**, and the dwell
 pauses while the toast has hover or focus so a toast you have just reached
 cannot expire under your hands), `.pchip` (passive), `.tchip` (pal chip), `.badge` (outcome kinds),
-`.mchip` (meta), `.picker` (pal select), `.ptag` (tag input), `.needrow`, `.rsummary`.
+`.mchip` (meta), `.picker` (pal select), `.ptag` (tag input), `.needrow`, `.rsummary`
+(the route's headline — prints **what the route actually delivers**, never the
+requested goal and never more than four passives; its label is invariantly
+`carrying:`, since the old `goal:` branch named the same fact under a second word).
 
 **A segmented choice whose options differ in consequence carries one visible line
 under it, naming the consequence of the selection** — sized to the block it
@@ -572,10 +580,6 @@ is still a 2.4.11 failure — which is how it shipped twice.
   1076px species picker at 1366, and filling it halves the width of the control
   under the user's cursor. Fixed `repeat(4,…)` tracks would hold the row still and
   advertise how many starters the planner takes; needs a look at 768–900 first.
-- **The Planner's Target card is a quarter empty** (75px of 288px at 1366) under
-  the row's only `--accent` border, while Route options beside it has 1px of slack.
-  Either `align-items:flex-start`, or move `My level` into the target card — it
-  describes catches, and the target card is where the goal lives.
 - **`.spal` and `.strip` duplicate `.tchip` and `.chiprow`** to within 1–1.5px, and
   `.prog` duplicates `.mchip`. Now that the strip is a roving toolbar it is doing
   `.chiprow`'s documented job under a second name.
@@ -586,8 +590,10 @@ is still a 2.4.11 failure — which is how it shipped twice.
 - **The route tree eats vertical swipes at 360**: `.tvp` is `touch-action:none` and
   23% of the viewport height, sitting in the scroll path. `pan-y` would keep page
   scroll and the horizontal pan these trees actually need.
-- **`Clear inputs` sits in section 1 and clears section 2 as well.** Its own title
-  admits the wider scope; the placement doesn't.
+- **`Clear inputs` sits in section 1 and clears section 2 as well.** Reduced, not
+  closed: two of the three things it clears (the start pals, the passives to
+  carry) now live in section 1, and its title names all three. Only the target
+  still reaches across a section band.
 - **`.accb.mid` / `.accb.alpha` and `.tier.common/rare/epic` carry six raw
   `rgba()`s** between them, outside §1's two-alpha tint recipe, and use
   `--neutral`/`--water`/`--dark` (*element* colours) for catch difficulty and

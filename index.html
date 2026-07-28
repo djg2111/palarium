@@ -159,9 +159,9 @@
       <h2>Plan a breeding route</h2>
       <div class="sub">Pick a starting pal (up to four) and a target species — the planner finds the shortest breeding chain and tracks the passives you want to carry along it.</div>
       <details class="moredet plannerhow"><summary>How the planner works</summary>
-        <div><p>Pick up to four starting pals (from your roster, or any species — add the passives each one carries under its slot). The planner merges your starters into one line, trying every merge order, then finds the shortest chain of partners to reach the target. At every step, hatch until a child inherits the passives you're carrying, then continue with that child. Set <b>desired passives</b> on the target to track a specific goal set — the route steps show the approximate odds per egg.</p></div>
+        <div><p>Pick up to four starting pals (from your roster, or any species — add the passives each one carries under its slot). The planner merges your starters into one line, trying every merge order, then finds the shortest chain of partners to reach the target. At every step, hatch until a child inherits the passives you're carrying, then continue with that child. A pal holds <b>four passives</b>, so a route carries at most four — pick which under <b>Passives to carry</b>, and the route steps show the approximate odds per egg.</p></div>
       </details>
-      <div class="plansec">1 · Starting pals<button class="alink" id="clearSlots" title="Clear all start slots and the target">✕ Clear inputs</button></div>
+      <div class="plansec">1 · Starting pals<button class="alink" id="clearSlots" title="Clear the start pals, the passives to carry and the target">✕ Clear inputs</button></div>
       <div class="quicklb">Quick add from your roster</div>
       <div class="strip" id="rosterStrip"></div>
       <div class="slotgrid">
@@ -170,11 +170,22 @@
         <div class="slot"><div class="slotlb">Start pal 3 · optional</div><div id="pickS3"></div><div id="passS3"></div></div>
         <div class="slot"><div class="slotlb">Start pal 4 · optional</div><div id="pickS4"></div><div id="passS4"></div></div>
       </div>
+      <!-- A pal has four passive slots, so a route carries at most four. This is
+           a function of the passives entered in the slots directly above it, not
+           of the target species — it lived in section 2, 350px away at 1366 and
+           668px at 360, so the problem was created long before the control that
+           solves it came into view (DESIGN.md §4, §9). -->
+      <div id="carryRow" hidden>
+        <div class="slotlb">Passives to carry · up to 4</div>
+        <div class="psets" id="carryFrom" role="toolbar" aria-orientation="horizontal" aria-labelledby="carryFromLb" hidden>
+          <span class="psetlb" id="carryFromLb">From your starters</span>
+        </div>
+        <div id="carryPass"></div>
+        <div class="fldhint" id="carryHint"></div>
+      </div>
       <div class="plansec">2 · Target &amp; options</div>
       <div class="targetrow">
-        <div class="slot"><div class="slotlb">Target species</div><div id="pickPT"></div>
-          <div class="slotlb mt">Desired passives · optional</div><div id="desiredPass"></div>
-          <div class="fldhint">Leave empty to track every passive your starters carry.</div></div>
+        <div class="slot"><div class="slotlb">Target species</div><div id="pickPT"></div></div>
         <div class="slot opts"><div class="slotlb">Route options</div>
           <div class="segrow" id="partnerMode" role="group" aria-label="Which species the route may use as chain partners">
             <button type="button" data-m="any" class="on" aria-pressed="true" title="Route through any species, whether or not you can get one">Any species</button>

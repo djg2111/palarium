@@ -20,7 +20,8 @@ for (const n of SLOTS) {
   }
 }
 if (state.pt && byKey.has(state.pt)) pickPT.set(byKey.get(state.pt), true);
-if (Array.isArray(state.dp) && state.dp.length) desiredPick.set(state.dp);
+// sliced: a hand-edited or pre-cap palbreed.dp must not reintroduce a five-passive pal
+if (Array.isArray(state.dp) && state.dp.length) desiredPick.set(state.dp.slice(0, 4));
 // `po` used to be a boolean, where true meant "only use my pals". Read both
 // shapes: an old true lands on 'mine', an old false (or anything unrecognised)
 // on 'any' — the two states that existed before, unchanged either way.

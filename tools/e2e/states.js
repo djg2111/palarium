@@ -219,6 +219,91 @@ const TABS = ['breed', 'reverse', 'plan', 'hatch', 'roster', 'dex', 'skills', 'm
     await overflow(page, 'saved plan with the tree open');
   }
 
+  console.log('\nPLANNER — the four-passive cap');
+  // A pal has four passive slots, so a route carries at most four. The >4 state
+  // is unreachable by deep link (applyHash clears slotPassives), so type them in.
+  await nav(page, '#/plan/SheepBall+ElecCat/Anubis', 900);
+  // the block above saved a plan and left the view on the saved sub-tab, which
+  // hides #planNewBlock and every control this block drives
+  await page.evaluate(() => { if (planMode !== 'new') setPlanMode('new'); });
+  await page.waitForTimeout(300);
+  const typePass = async (sel, names) => {
+    for (const n of names) {
+      await page.click(sel + ' .taginp');
+      await page.type(sel + ' .taginp', n);
+      await page.waitForTimeout(200);
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(120);
+    }
+  };
+  if (await reach(page, async () => {
+    await typePass('#passS1', ['Swift', 'Runner', 'Nimble', 'Lucky']);
+    await typePass('#passS2', ['Artisan', 'Serious', 'Brave', 'Legend']);
+    await page.waitForTimeout(1200);
+    await page.waitForSelector('#carryFrom .pset', {timeout: 3000});
+  }, 'eight distinct starter passives')) {
+    const over = await page.evaluate(() => ({
+      status: document.getElementById('planStatus').textContent,
+      chips: document.querySelectorAll('#routeOut .rsummary .pchip').length,
+      carrier: document.querySelectorAll('#routeOut .carrier').length,
+      odds: document.querySelectorAll('#routeOut button.odds:not(.wild)').length,
+      steps: document.querySelectorAll('#routeOut .rstep').length,
+      psets: document.querySelectorAll('#carryFrom .pset').length,
+      jump: !!document.querySelector('#routeOut .rsummary .alink'),
+    }));
+    // it must not claim a pal the game cannot produce...
+    if (/carrying/.test(over.status)) { console.log('  ✗ over the cap the status still claims a carry set: ' + JSON.stringify(over.status)); fail(); }
+    else if (!/pick up to 4 to carry/.test(over.status)) { console.log('  ✗ over the cap the status does not state the choice: ' + JSON.stringify(over.status)); fail(); }
+    else console.log('  ✓ over the cap the status states the choice, claims no carry set');
+    if (over.chips || over.carrier || over.odds) { console.log(`  ✗ over the cap the route still prices a set: ${over.chips} chips, ${over.carrier} carrier tags, ${over.odds} odds`); fail(); }
+    else console.log('  ✓ over the cap: no chips, no carrier tags, no odds');
+    // ...but the route itself is correct and must still render in full
+    if (over.steps > 0 && over.psets === 8 && over.jump) console.log(`  ✓ the route still renders in full (${over.steps} steps) with 8 carry chips and a jump link`);
+    else { console.log(`  ✗ the route was withheld: ${JSON.stringify(over)}`); fail(); }
+    await audit(page, 'planner over the passive cap');
+    await overflow(page, 'planner over the passive cap');
+
+    await page.click('#routeOut .rsummary .alink');
+    await page.waitForTimeout(700);
+    await focusVisible(page, 'the jump link lands on a carry chip, on screen');
+
+    // toggling a chip must not scroll the page out from under the user (2.4.11)
+    const y0 = await page.evaluate(() => Math.round(scrollY));
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(1400);
+    const y1 = await page.evaluate(() => Math.round(scrollY));
+    if (Math.abs(y1 - y0) > 8) { console.log(`  ✗ the recompute scrolled the page under the focused chip: ${y0} -> ${y1}`); fail(); }
+    else console.log('  ✓ toggling a carry chip leaves the page where it was');
+    await focusVisible(page, 'the toggled chip keeps focus, on screen');
+
+    // fill to the cap, then the rest must be refused preventively
+    await page.evaluate(() => {
+      const want = ['Runner', 'Artisan', 'Serious'];
+      for (const n of want) {
+        const b = [...document.querySelectorAll('#carryFrom .pset')].find(x => x.textContent.trim() === n && x.getAttribute('aria-pressed') === 'false');
+        if (b) b.click();
+      }
+    });
+    await page.waitForTimeout(1500);
+    const at4 = await page.evaluate(() => ({
+      status: document.getElementById('planStatus').textContent,
+      pressed: document.querySelectorAll('#carryFrom .pset[aria-pressed="true"]').length,
+      disabled: [...document.querySelectorAll('#carryFrom .pset')].filter(b => b.disabled).length,
+      odds: document.querySelectorAll('#routeOut button.odds:not(.wild)').length,
+      steps: document.querySelectorAll('#routeOut .rstep').length,
+      named: (document.getElementById('planStatus').textContent.match(/carrying (.+)\.$/) || [0, ''])[1].split(', ').filter(Boolean).length,
+    }));
+    if (at4.pressed === 4 && at4.disabled === 4) console.log('  ✓ at four carried, the remaining chips are refused preventively');
+    else { console.log(`  ✗ the cap is not enforced: ${at4.pressed} pressed, ${at4.disabled} disabled`); fail(); }
+    if (at4.named > 0 && at4.named <= 4) console.log(`  ✓ the status names ${at4.named} passives, never more than four`);
+    else { console.log(`  ✗ the status names ${at4.named}: ${JSON.stringify(at4.status)}`); fail(); }
+    if (at4.odds === at4.steps) console.log('  ✓ every step is priced again once a set is chosen');
+    else { console.log(`  ✗ ${at4.odds} odds for ${at4.steps} steps`); fail(); }
+    await audit(page, 'planner with four passives carried');
+    // a passive nothing on the route carries must not be announced as carried
+    if (/Legend/.test(at4.status)) { console.log('  ✗ the status names a passive the route does not carry'); fail(); }
+  }
+
   console.log('\nBREEDABLE NOW — results, expanded pairs');
   await nav(page, '#/hatch', 600);
   await audit(page, 'breedable now with results');

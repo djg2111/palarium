@@ -4,11 +4,14 @@ const PASSIVES = DATA.passives || [];
 // raw data order would greet users with obscure boss passives first
 const PASSIVES_SORTED = [...PASSIVES].sort((a, b) => (a.mt ? 1 : 0) - (b.mt ? 1 : 0) || a.n.localeCompare(b.n));
 let ptagSeq = 0;
-function makePassivePicker(mount, max = 4, onChange) {
+function makePassivePicker(mount, max = 4, onChange, opts = {}) {
   mount.classList.add('ptag');
   const uid = 'ptag' + (++ptagSeq);
   const inp = document.createElement('input'); inp.className = 'taginp'; inp.placeholder = 'Add passives (e.g. Artisan)…';
   inp.setAttribute('aria-label', 'Search and add passive skills');
+  // where the cap and the current count reach a screen-reader user (3.3.2) —
+  // the hint changes on every recompute, so it must not be a live region
+  if (opts.describedBy) inp.setAttribute('aria-describedby', opts.describedBy);
   // It already behaves like a combobox — a filtered list, one highlighted row,
   // Enter to take it — but declared as a bare textbox, so nothing said a list
   // had opened, how many options it held, or which one was current (4.1.2).
@@ -73,7 +76,7 @@ function makePassivePicker(mount, max = 4, onChange) {
   }
   function take(p) {
     // a refusal with no words is indistinguishable from a broken control
-    if (selected.length >= max) { toast(`That's the limit — ${max} passives per pal.`); return; }
+    if (selected.length >= max) { toast(`That’s the limit — ${max} passives per pal.`); return; }
     // close after each pick: a lingering full-width list would swallow the
     // next click on whatever sits beneath it (typing again reopens it)
     selected.push(p.n); renderChips(); inp.value = '';
@@ -126,7 +129,10 @@ function makePassivePicker(mount, max = 4, onChange) {
     // document handler that would dismiss the whole roster editor
     else if (e.key === 'Escape' && open) { e.stopPropagation(); setOpen(false); }
   });
-  return { get: () => [...selected], set(v) { selected = [...v]; renderChips(); }, clear() { selected = []; inp.value = ''; renderChips(); } };
+  // take() has always enforced the cap; set() never did, so a stored value or a
+  // programmatic set could seat more passives than a pal has slots. One clamp
+  // here covers all five instances.
+  return { get: () => [...selected], set(v) { selected = [...v].slice(0, max); renderChips(); }, clear() { selected = []; inp.value = ''; renderChips(); } };
 }
 function passiveChips(names, readonly = true) {
   const w = document.createElement('div'); w.className = 'pchips';

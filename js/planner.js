@@ -39,7 +39,9 @@ for (const n of SLOTS) {
     allowClear: true, ownedToggle: true,
     onChange: () => { slotPassives[n] = []; slotGenders[n] = null; slotPass[n].set([]); updateSlotUI(); save(); scheduleAuto(); }});
   slotPass[n] = makePassivePicker(document.getElementById('passS' + n), 4,
-    () => { slotPassives[n] = slotPass[n].get(); save(); scheduleAuto(); });
+    // renderCarryRow, or the candidate list stays stale: the carry row is a
+    // function of exactly these passives, so it has to rebuild when they change
+    () => { slotPassives[n] = slotPass[n].get(); renderCarryRow(); save(); scheduleAuto(); });
 }
 // progressive disclosure: show the next empty slot only once the previous one is
 // filled, and each slot's passive input only once its species is chosen
@@ -49,9 +51,70 @@ function updateSlotUI() {
     if (n > 1) document.getElementById('pickS' + n).closest('.slot').hidden = !has && !pickS[n - 1].get();
     document.getElementById('passS' + n).hidden = !has;
   }
+  // the carry block follows the same progressive-disclosure rule: it is a
+  // question about the starters, so it appears once there is a starter to ask about
+  document.getElementById('carryRow').hidden = !SLOTS.some(n => pickS[n].get());
+  renderCarryRow();
 }
 const pickPT = makePicker(document.getElementById('pickPT'), {placeholder:'Pick a species…', ariaLabel:'Target species', allowClear:true, ownedToggle:true, onChange: () => { save(); scheduleAuto(); }});
-const desiredPick = makePassivePicker(document.getElementById('desiredPass'), 4, () => { save(); scheduleAuto(); });
+const desiredPick = makePassivePicker(document.getElementById('carryPass'), 4,
+  () => { renderCarryRow(); save(); scheduleAuto(); }, {describedBy: 'carryHint'});
+
+// ---------- passives to carry ----------
+// The union of every starter's passives — what the route would carry if the cap
+// allowed it. A pal has four passive slots, so this is a candidate list, not a
+// promise (see starterUnion consumers in computeRoute).
+function starterUnion() {
+  return [...new Set(SLOTS.flatMap(n => (pickS[n].get() ? slotPassives[n] : [])))];
+}
+// The set the route will actually try to carry. Empty when the starters hold
+// more than four and the user hasn't chosen: with C(8,4)=70 candidate subsets
+// and no signal which one is wanted, the app states the cap rather than picking
+// four and then pricing them — a machine-made choice presented with odds is a
+// more confident wrong answer than no answer (DESIGN.md §4).
+function carryGoal() {
+  const picked = desiredPick.get();
+  if (picked.length) return picked;
+  const union = starterUnion();
+  return union.length <= 4 ? union : [];
+}
+function renderCarryRow() {
+  const row = document.getElementById('carryFrom');
+  const hint = document.getElementById('carryHint');
+  const union = starterUnion(), picked = desiredPick.get();
+  const lb = document.getElementById('carryFromLb');
+  row.replaceChildren(lb);
+  row.hidden = !union.length;
+  for (const n of union) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'pset';
+    const on = picked.includes(n);
+    b.setAttribute('aria-pressed', String(on));
+    // a toggle, not add-and-vanish: a chip that disappears under a finger
+    // reflows the row mid-tap, and aria-pressed gives AT the state directly
+    b.setAttribute('aria-label', 'Carry ' + n);
+    const meta = PASSIVES.find(p => p.n === n);
+    if (meta) b.appendChild(passiveIcon(meta, 14));
+    b.append(n);
+    // at the cap the remaining options are refused preventively, rather than by
+    // an error after the press — the reason is in #carryHint directly below
+    if (!on && picked.length >= 4) b.disabled = true;
+    b.addEventListener('click', () => {
+      desiredPick.set(on ? picked.filter(x => x !== n) : [...picked, n]);
+      renderCarryRow(); save(); scheduleAuto();
+      // the row was just rebuilt — put focus back on the same chip
+      const again = [...row.querySelectorAll('.pset')].find(x => x.textContent.trim() === n);
+      if (again) again.focus();
+    });
+    row.appendChild(b);
+  }
+  rovingRow(row);
+  hint.textContent = !union.length ? 'Nothing to carry yet — add passives under a start pal.'
+    : !picked.length ? (union.length <= 4
+        ? `Carrying all ${union.length} your starters hold. Pick fewer to raise the odds.`
+        : `A pal holds 4 passives. Your starters hold ${union.length} — pick up to 4.`)
+    : picked.length >= 4 ? 'Carrying these 4 — a pal’s limit. Remove one to swap.'
+    : `Carrying ${picked.length === 1 ? 'this one' : 'these ' + picked.length}. You can add ${4 - picked.length} more.`;
+}
 document.getElementById('clearSlots').addEventListener('click', () => {
   clearTimeout(autoTimer);
   const had = SLOTS.some(n => pickS[n].get()) || pickPT.get() || desiredPick.get().length;
@@ -481,9 +544,15 @@ function computeRoute() {
   }
   const pool = partnerPool();
   if (partnerMode === 'mine' && pool.length < 2) { out.innerHTML = '<div class="hint">Your owned pool is too small — star more species or switch chain partners off "Only mine".</div>'; landNow(); return; }
-  const carried = [...new Set(starters.flatMap(s => s.ps))];
+  const carried = starterUnion();
   const desired = desiredPick.get();
-  const goal = desired.length ? desired : carried;
+  // NOT the uncapped union: a pal has four passive slots, so carrying eight is a
+  // pal the game cannot produce — and passiveOdds returns 0 for D>4, so the view
+  // used to make the impossible claim AND silently drop the number that
+  // contradicts it. Over the cap with nothing picked, the route still computes
+  // in full; only the passive claim withdraws (DESIGN.md §4).
+  const goal = carryGoal();
+  const overCap = !desired.length && carried.length > 4;
   const missing = desired.filter(x => !carried.includes(x));
   let best = null;
   const consider = (steps, fromK) => {
@@ -514,10 +583,14 @@ function computeRoute() {
   currentRoute = best === null ? null : {steps: best, tK: t.k, passives: goal};
   if (best !== null) { localStorage.setItem('palbreed_planned', '1'); updateChecklist(); }
   const wo = best ? walkOdds(best, starters, goal) : null;
-  renderRoute(out, best, t, goal, {
-    label: desired.length ? 'goal:' : 'carrying:',
+  // what the route ACTUALLY delivers, not what was asked for. Asking for Legend
+  // when nothing on the route holds it used to announce "carrying Legend" in the
+  // live region while the warnbox directly below said nothing carries it.
+  const truly = wo ? goal.filter(x => wo.carry.includes(x)) : goal;
+  renderRoute(out, best, t, truly, {
     stepOdds: wo ? wo.odds : null,
     starterKs: starters.map(s => s.k),
+    overCap: overCap ? carried.length : 0,
   });
   // say it plainly when the wild filter couldn't be applied — the toggle still
   // reads "In the wild", and a route that quietly ignored it would be a lie
@@ -551,7 +624,14 @@ function computeRoute() {
       }
     }
   }
-  out.scrollIntoView({block: 'nearest', behavior: SMOOTH});
+  // Only scroll to the route when the user isn't inside the form that produced
+  // it. This fires on every recompute, so with the carry chips in section 1 it
+  // measured 834px of travel leaving the focused chip 467px above the viewport
+  // (2.4.11). landOnArrival must stay in the condition — the "Plan this route"
+  // hand-off does focus a form control and does want the scroll.
+  if (landOnArrival || !document.getElementById('planNewBlock').contains(document.activeElement)) {
+    out.scrollIntoView({block: 'nearest', behavior: SMOOTH});
+  }
   // land inside the region that scroll just revealed — .hint when there is no
   // route, which is the sentence explaining why
   landNow();
@@ -999,14 +1079,41 @@ function renderRoute(out, steps, target, carried, ropts = {}) {
     out.appendChild(h); return;
   }
   if (!steps.length) {
-    out.innerHTML = `<div class="hint">Your start pal already is ${target.n} — no breeding needed.</div>`; return;
+    const msg = `Your start pal already is ${target.n} — no breeding needed.`;
+    // this branch returned without touching the live region, so it kept
+    // announcing the PREVIOUS route's carry claim
+    out.innerHTML = `<div class="hint">${msg}</div>`; setPlanStatus(msg); return;
   }
   const stepOdds = ropts.stepOdds || [];
   const sum = document.createElement('div'); sum.className = 'rsummary';
   const cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = `${steps.length} step${steps.length === 1 ? '' : 's'} to ${target.n}`;
-  setPlanStatus(cnt.textContent + (carried.length ? ', carrying ' + carried.join(', ') + '.' : '.'));
+  // The clause after "carrying" is what the route delivers, is never longer than
+  // four names, and is omitted when empty. Over the cap it states the choice
+  // waiting instead — nothing is wrong, so this is not a warning (§6: never scold).
+  setPlanStatus(cnt.textContent + (ropts.overCap
+    ? `. Your starters hold ${ropts.overCap} passives — pick up to 4 to carry.`
+    : carried.length ? ', carrying ' + carried.join(', ') + '.' : '.'));
   sum.appendChild(cnt);
-  if (carried.length) { const sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = ropts.label || 'carrying:'; sum.appendChild(sub); sum.appendChild(passiveChips(carried)); }
+  if (ropts.overCap) {
+    const jump = document.createElement('button'); jump.className = 'alink'; jump.type = 'button';
+    jump.textContent = 'Pick passives to carry';
+    jump.addEventListener('click', () => {
+      const row = document.getElementById('carryRow');
+      row.scrollIntoView({block: 'center',
+        behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+      // land on a chip, not the input: a touch user gets their own passives with
+      // no keyboard, and the combobox's focus-opens-listbox would cover the row
+      // this press just revealed. After the scroll, never on a guessed timer.
+      const chip = document.querySelector('#carryFrom .pset:not(:disabled)');
+      (chip || document.querySelector('#carryPass .taginp')).focus({preventScroll: true});
+    });
+    sum.appendChild(jump);
+  } else if (carried.length) {
+    // one word for one fact: the old goal:/carrying: switch named the same thing
+    // — the set the route will carry — twice (§6)
+    const sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = 'carrying:';
+    sum.appendChild(sub); sum.appendChild(passiveChips(carried));
+  }
   out.appendChild(sum);
   const need = neededSpecies(steps, ropts.starterKs || []);
   if (need.length) out.appendChild(neededRow(need));
@@ -1107,6 +1214,19 @@ function renderPlans() {
     const prog = document.createElement('span'); prog.className = 'prog';
     prog.textContent = doneCnt === plan.steps.length ? '✓ complete' : `${doneCnt}/${plan.steps.length} steps`;
     head.appendChild(prog);
+    // Plans saved before the four-passive cap can list more. The data is left
+    // exactly as stored — truncating to "the first 4" would discard a user
+    // record to tidy the app's own arithmetic, and "first 4" is the arbitrary
+    // pick this whole change exists to refuse. Presentation only; the steps,
+    // tree and checklist stay live, because the route is species-only and
+    // remains correct. The branch can only fire on legacy rows.
+    if (plan.passives.length > 4) {
+      const w = document.createElement('span'); w.className = 'mchip warn';
+      w.append(`A pal holds 4 — this plan lists ${plan.passives.length}`);
+      const sr = document.createElement('span'); sr.className = 'sr-only';
+      sr.textContent = '. Plan a new route to choose which 4.';
+      w.appendChild(sr); head.appendChild(w);
+    }
     if (plan.passives.length) head.appendChild(passiveChips(plan.passives));
     const treeBtn = document.createElement('button'); treeBtn.className = 'stepopen pushr treebtn';
     treeBtn.title = 'Show this plan as an interactive tree';
